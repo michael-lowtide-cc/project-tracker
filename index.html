@@ -396,25 +396,40 @@ function setSyncUI(state, msg, showBtn=false, btnLabel=''){
 }
 
 function handleDriveAuth(){
-  // Redirect to Google OAuth — no popup needed
+  // Open auth in a new tab — works from any host including iframes
   const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');
   url.searchParams.set('client_id', GD_CLIENT_ID);
-  url.searchParams.set('redirect_uri', GD_REDIRECT);
+  url.searchParams.set('redirect_uri', 'https://michael-lowtide-cc.github.io/project-tracker/auth.html');
   url.searchParams.set('response_type', 'token');
   url.searchParams.set('scope', GD_SCOPE);
   url.searchParams.set('include_granted_scopes', 'true');
   url.searchParams.set('prompt', 'select_account');
-  window.location.href = url.toString();
+  setSyncUI('pending','Waiting for Google sign-in…');
+  const popup = window.open(url.toString(), 'gdrive-auth', 'width=500,height=620');
+  // Listen for token sent back from auth.html
+  window.addEventListener('message', async function handler(e){
+    if(e.data&&e.data.type==='gd_token'){
+      window.removeEventListener('message', handler);
+      gdToken = e.data.token;
+      localStorage.setItem('gd:wasConnected','1');
+      if(popup&&!popup.closed) popup.close();
+      await initDriveWithToken();
+    }
+    if(e.data&&e.data.type==='gd_error'){
+      window.removeEventListener('message', handler);
+      setSyncUI('error','Sign-in failed — click to retry',true,'Retry');
+    }
+  });
 }
 
 function checkHashToken(){
-  // Called on page load — see if Google redirected back with a token
+  // Only used when opened directly (not in iframe)
+  if(window.self !== window.top) return false; // inside iframe — skip
   const hash = window.location.hash;
   if(!hash) return false;
   const params = new URLSearchParams(hash.slice(1));
   const token  = params.get('access_token');
   if(!token) return false;
-  // Clean the token out of the URL bar
   history.replaceState(null,'', window.location.pathname);
   gdToken = token;
   localStorage.setItem('gd:wasConnected','1');
