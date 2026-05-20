@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Budget & Time Tracker</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" onload="gapiLoaded()" async defer></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#ffffff;--bg2:#f7f7f5;--bg3:#f0efe9;
+    --text:#1a1a1a;--text2:#6b6b6b;--text3:#9a9a9a;
+    --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.2);
+    --success:#1d9e75;--warning:#ba7517;--danger:#a32d2d;--info:#185fa5;
+    --radius:10px;--radius-sm:6px;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{--bg:#1e1e1c;--bg2:#2a2a28;--bg3:#323230;--text:#f0efe9;--text2:#9a9a94;--text3:#6b6b66;--border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.2);}
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:15px;line-height:1.5}
+  #app{max-width:760px;margin:0 auto;padding:2rem 1rem 4rem}
+  h1{font-size:22px;font-weight:500}
+  .sub{font-size:13px;color:var(--text2);margin-top:3px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem}
+  .icon-btn{background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:7px 9px;cursor:pointer;color:var(--text2);font-size:16px;display:flex;align-items:center}
+  .icon-btn:hover{background:var(--bg2);color:var(--text)}
+  .card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem}
+  .sec-title{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:0.09em;margin-bottom:12px}
+  .met-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1.25rem}
+  .met{background:var(--bg2);border-radius:var(--radius-sm);padding:1rem}
+  .met-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+  .met-val{font-size:20px;font-weight:500}
+  .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:0.5px solid var(--border);margin-bottom:1.25rem}
+  .tab{background:none;border:none;border-bottom:2px solid transparent;padding:9px 12px;font-size:13px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:-1px;transition:color 0.15s}
+  .tab.active{border-bottom-color:var(--text);font-weight:500;color:var(--text)}
+  .tab:hover{color:var(--text)}
+  label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
+  input,select,textarea{width:100%;padding:8px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border-color 0.15s}
+  input:focus,select:focus{border-color:var(--info)}
+  input[type=checkbox]{width:auto;margin:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+  .field{margin-bottom:12px}
+  .row-action{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+  .check-label{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;color:var(--text)}
+  button.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:14px;background:none;border:0.5px solid var(--border2);border-radius:var(--radius-sm);cursor:pointer;color:var(--text);font-family:inherit;transition:background 0.15s}
+  button.btn:hover{background:var(--bg2)}
+  button.btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+  button.btn.primary:hover{opacity:0.85}
+  button.btn.sm{padding:5px 10px;font-size:12px}
+  .entry-row{display:flex;justify-content:space-between;align-items:flex-start;padding:11px 0;border-bottom:0.5px solid var(--border)}
+  .entry-row:last-child{border-bottom:none}
+  .entry-title{font-size:14px;font-weight:500}
+  .entry-meta{font-size:12px;color:var(--text2);margin-top:2px}
+  .entry-right{display:flex;align-items:center;gap:10px}
+  .amt{font-size:14px;font-weight:500}
+  .del-btn{background:none;border:none;cursor:pointer;color:var(--text3);padding:4px 6px;border-radius:4px;font-size:16px}
+  .del-btn:hover{color:var(--danger)}
+  /* Gauge / budget bars */
+  .gauge-wrap{margin-bottom:1rem}
+  .gauge-bar{height:10px;background:var(--bg2);border-radius:5px;overflow:hidden;margin:6px 0;position:relative}
+  .gauge-fill{height:100%;border-radius:5px;transition:width 0.4s;position:absolute;left:0;top:0}
+  .gauge-retainer{height:100%;position:absolute;top:0;left:0;border-right:2px dashed rgba(255,255,255,0.7);pointer-events:none}
+  .gauge-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text2)}
+  .empty{font-size:14px;color:var(--text2);padding:1rem 0}
+  /* Invoice table */
+  .invoice-header{display:flex;justify-content:space-between;padding-bottom:1rem;border-bottom:0.5px solid var(--border);margin-bottom:1.25rem}
+  table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+  th{text-align:left;padding:5px 0;font-weight:400;color:var(--text2);font-size:12px;border-bottom:0.5px solid var(--border)}
+  td{padding:8px 0;vertical-align:top}
+  .tr-sep td{border-top:0.5px solid var(--border)}
+  .tr-strong td{border-top:0.5px solid var(--border2);font-weight:500;padding:9px 0}
+  .totals{border-top:0.5px solid var(--border2);padding-top:1rem;margin-top:0.5rem}
+  .total-row{display:flex;justify-content:space-between;padding:4px 0;font-size:14px}
+  .total-final{display:flex;justify-content:space-between;font-size:17px;font-weight:500;border-top:0.5px solid var(--border2);padding-top:10px;margin-top:6px}
+  .success-note{font-size:12px;color:var(--success);margin-top:6px}
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  /* Timer */
+  .timer-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;text-align:center}
+  .timer-display{font-size:44px;font-weight:500;letter-spacing:0.04em;font-variant-numeric:tabular-nums;margin:0.5rem 0 1rem;color:var(--text)}
+  .timer-running .timer-display{color:var(--success)}
+  .timer-btns{display:flex;gap:10px;justify-content:center;margin-bottom:1rem}
+  .btn-start{background:var(--success);color:#fff;border-color:var(--success)}
+  .btn-start:hover{opacity:0.85;background:var(--success)}
+  .btn-stop{background:var(--danger);color:#fff;border-color:var(--danger)}
+  .btn-stop:hover{opacity:0.85;background:var(--danger)}
+  .btn-discard{color:var(--text2)}
+  .timer-task{font-size:14px;color:var(--text2);min-height:20px}
+  /* Project cards */
+  .project-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:10px}
+  .project-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
+  .project-name{font-size:15px;font-weight:500}
+  .project-meta{font-size:12px;color:var(--text2);margin-top:3px;display:flex;flex-wrap:wrap;gap:4px 12px}
+  .project-body{margin-top:10px}
+  .status-badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;font-weight:500;flex-shrink:0}
+  .status-active{background:#e1f5ee;color:#0f6e56}
+  .status-paused{background:#faeeda;color:#854f0b}
+  .status-completed{background:#f1efe8;color:#5f5e5a}
+  @media(prefers-color-scheme:dark){
+    .status-active{background:#085041;color:#9fe1cb}
+    .status-paused{background:#633806;color:#fac775}
+    .status-completed{background:#2c2c2a;color:#b4b2a9}
+  }
+  .project-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-top:4px}
+  .legend-dot{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:4px}
+  /* Client cards */
+  .client-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:10px}
+  .client-top{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
+  .client-avatar{width:42px;height:42px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500;color:var(--text2);flex-shrink:0;border:0.5px solid var(--border)}
+  .client-info{flex:1;min-width:0}
+  .client-name{font-size:15px;font-weight:500}
+  .client-company{font-size:13px;color:var(--text2);margin-top:1px}
+  .client-details{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 16px}
+  .client-detail{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:5px}
+  .client-detail a{color:var(--info);text-decoration:none}
+  .client-detail a:hover{text-decoration:underline}
+  .client-actions{display:flex;gap:6px;flex-shrink:0}
+  /* Invoice tracking in client cards */
+  .inv-section{margin-top:12px;border-top:0.5px solid var(--border);padding-top:12px}
+  .inv-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:13px;gap:8px}
+  .inv-row:last-child{border-bottom:none}
+  .paid-badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
+  .paid-yes{background:#e1f5ee;color:#0f6e56}
+  .paid-no{background:#fdf0f0;color:#8b2020}
+  .paid-overdue{background:#f5e1e1;color:#7a1515;font-weight:600}
+  @media(prefers-color-scheme:dark){
+    .paid-yes{background:#085041;color:#9fe1cb}
+    .paid-no{background:#4a1a1a;color:#e8a0a0}
+    .paid-overdue{background:#5c1010;color:#f0b0b0}
+  }
+  /* Retainer toggle */
+  .retainer-fields{padding:10px;background:var(--bg2);border-radius:var(--radius-sm);margin-top:8px}
+  /* Sync indicator */
+  .sync-bar{display:flex;align-items:center;gap:8px;font-size:12px;padding:7px 12px;border-radius:var(--radius-sm);margin-bottom:1rem;border:0.5px solid var(--border)}
+  .sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .sync-idle .sync-dot{background:var(--success)}
+  .sync-saving .sync-dot{background:var(--warning);animation:pulse 1s infinite}
+  .sync-error .sync-dot{background:var(--danger)}
+  .sync-offline .sync-dot{background:var(--text3)}
+  .sync-pending .sync-dot{background:var(--info);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  @media print{
+    body{background:white}
+    #app{max-width:100%;padding:1rem}
+    .tabs,.header button,.no-print{display:none!important}
+    #invoice-section{display:block!important}
+    #dashboard-section,#time-section,#expenses-section,#projects-section,#clients-section{display:none!important}
+    .card{border:0.5px solid #ccc;box-shadow:none}
+  }
+  @media(max-width:520px){.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}.settings-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div>
+      <h1 id="proj-name-display">My Tracker</h1>
+      <div class="sub" id="proj-meta-display">Loading...</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="icon-btn no-print" id="gdrive-btn" onclick="handleDriveAuth()" title="Connect Google Drive" style="display:none">
+        <i class="ti ti-brand-google-drive"></i>
+      </button>
+      <button class="icon-btn no-print" onclick="toggleSettings()" aria-label="Settings"><i class="ti ti-settings"></i></button>
+    </div>
+  </div>
+  <!-- Sync status bar -->
+  <div id="sync-bar" class="sync-bar sync-offline no-print" style="display:none">
+    <span class="sync-dot"></span>
+    <span id="sync-msg">Not connected to Google Drive</span>
+    <button class="btn sm" id="sync-action-btn" onclick="handleDriveAuth()" style="margin-left:auto">Connect Drive</button>
+  </div>
+
+  <!-- Settings -->
+  <div id="settings-panel" class="card" style="display:none">
+    <div class="sec-title">Global settings</div>
+    <div class="settings-grid">
+      <div><label>Default hourly rate ($)</label><input id="s-rate" type="number" placeholder="150" oninput="saveSetting('hourlyRate',this.value);refreshAll()"></div>
+      <div><label>Invoice prefix</label><input id="s-prefix" type="text" placeholder="INV" oninput="saveSetting('invoicePrefix',this.value);refreshAll()"></div>
+      <div><label>Currency</label>
+        <select id="s-currency" onchange="saveSetting('currency',this.value);refreshAll()">
+          <option value="USD">USD ($)</option><option value="EUR">EUR (€)</option>
+          <option value="GBP">GBP (£)</option><option value="CAD">CAD (C$)</option><option value="AUD">AUD (A$)</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn" style="margin-top:1rem" onclick="toggleSettings()">Done</button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs no-print">
+    <button class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
+    <button class="tab" id="tab-time" onclick="switchTab('time')"><i class="ti ti-clock"></i> Time</button>
+    <button class="tab" id="tab-expenses" onclick="switchTab('expenses')"><i class="ti ti-receipt"></i> Expenses</button>
+    <button class="tab" id="tab-projects" onclick="switchTab('projects')"><i class="ti ti-folder"></i> Projects</button>
+    <button class="tab" id="tab-clients" onclick="switchTab('clients')"><i class="ti ti-users"></i> Clients</button>
+    <button class="tab" id="tab-invoice" onclick="switchTab('invoice')"><i class="ti ti-file-invoice"></i> Invoice</button>
+  </div>
+
+  <!-- ===== DASHBOARD ===== -->
+  <div id="dashboard-section">
+    <div id="dash-project-budgets"></div>
+    <div class="met-grid">
+      <div class="met"><div class="met-label">Hours (all time)</div><div class="met-val" id="m-hours">0h</div></div>
+      <div class="met"><div class="met-label">Billable time</div><div class="met-val" id="m-time-amt">$0</div></div>
+      <div class="met"><div class="met-label">Expenses</div><div class="met-val" id="m-exp-amt">$0</div></div>
+      <div class="met"><div class="met-label">Total billed</div><div class="met-val" id="m-total">$0</div></div>
+    </div>
+    <div class="sec-title">Recent time entries</div>
+    <div id="dash-recent"></div>
+  </div>
+
+  <!-- ===== TIME ===== -->
+  <div id="time-section" style="display:none">
+    <div class="timer-card" id="timer-card">
+      <div class="sec-title" style="margin-bottom:4px">Live timer</div>
+      <div class="timer-display" id="timer-display">0:00:00</div>
+      <div class="timer-task" id="timer-task-label"></div>
+      <div class="timer-btns" style="margin-top:0.75rem">
+        <button class="btn btn-start" id="btn-start" onclick="timerStart()"><i class="ti ti-player-play"></i> Start</button>
+        <button class="btn btn-stop" id="btn-stop" onclick="timerStop()" style="display:none"><i class="ti ti-player-stop"></i> Stop & log</button>
+        <button class="btn btn-discard" id="btn-discard" onclick="timerDiscard()" style="display:none"><i class="ti ti-x"></i> Discard</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sec-title">Log time manually</div>
+      <div class="grid2">
+        <div><label>Date</label><input type="date" id="t-date"></div>
+        <div><label>Hours</label><input type="number" id="t-hours" min="0.25" step="0.25" placeholder="2.5"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Client</label><select id="t-client" onchange="refreshTimeProjectDropdown()"><option value="">— No client —</option></select></div>
+        <div><label>Project</label><select id="t-project"><option value="">— No project —</option></select></div>
+      </div>
+      <div class="field"><label>Task / description</label><input type="text" id="t-task" placeholder="Homepage design review" onkeydown="if(event.key==='Enter')addTime()"></div>
+      <div class="field"><label>Notes (optional)</label><input type="text" id="t-notes" placeholder="Additional context" onkeydown="if(event.key==='Enter')addTime()"></div>
+      <div class="row-action">
+        <label class="check-label"><input type="checkbox" id="t-billable" checked> Billable</label>
+        <button class="btn primary" onclick="addTime()"><i class="ti ti-plus"></i> Add entry</button>
+      </div>
+    </div>
+    <div class="sec-title">All time entries</div>
+    <div id="time-list"></div>
+  </div>
+
+  <!-- ===== EXPENSES ===== -->
+  <div id="expenses-section" style="display:none">
+    <div class="card">
+      <div class="sec-title">Log expense</div>
+      <div class="grid2">
+        <div><label>Date</label><input type="date" id="e-date"></div>
+        <div><label>Amount</label><input type="number" id="e-amount" min="0" step="0.01" placeholder="49.99"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Category</label>
+          <select id="e-category">
+            <option>Software</option><option>Travel</option><option>Equipment</option>
+            <option>Subcontractor</option><option>Meals</option><option>Office</option><option>Other</option>
+          </select>
+        </div>
+        <div><label>Description</label><input type="text" id="e-desc" placeholder="Figma subscription" onkeydown="if(event.key==='Enter')addExpense()"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Client</label><select id="e-client" onchange="refreshExpenseProjectDropdown()"><option value="">— No client —</option></select></div>
+        <div><label>Project</label><select id="e-project"><option value="">— No project —</option></select></div>
+      </div>
+      <div class="row-action">
+        <label class="check-label"><input type="checkbox" id="e-billable" checked> Billable to client</label>
+        <button class="btn primary" onclick="addExpense()"><i class="ti ti-plus"></i> Add expense</button>
+      </div>
+    </div>
+    <div class="sec-title">All expenses</div>
+    <div id="expense-list"></div>
+  </div>
+
+  <!-- ===== PROJECTS ===== -->
+  <div id="projects-section" style="display:none">
+    <div class="card">
+      <div class="sec-title">Add project</div>
+      <div class="grid3">
+        <div><label>Project #</label><input type="text" id="p-num" placeholder="PRJ-001"></div>
+        <div style="grid-column:span 2"><label>Project name</label><input type="text" id="p-name" placeholder="Website Redesign"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Client</label><select id="p-client"><option value="">— No client —</option></select></div>
+        <div><label>Status</label>
+          <select id="p-status">
+            <option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid3">
+        <div><label>Start date</label><input type="date" id="p-start"></div>
+        <div><label>End date (optional)</label><input type="date" id="p-end"></div>
+        <div><label>Duration (optional)</label><input type="text" id="p-duration" placeholder="e.g. 3 months"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Total budget ($)</label><input type="number" id="p-budget" min="0" step="100" placeholder="10000"></div>
+        <div><label>Hourly rate ($)</label><input type="number" id="p-rate" min="0" step="5" placeholder="Use default"></div>
+      </div>
+      <!-- Retainer toggle -->
+      <div style="margin-bottom:12px">
+        <label class="check-label" style="margin-bottom:8px">
+          <input type="checkbox" id="p-retainer-on" onchange="toggleRetainerFields()"> Has retainer
+        </label>
+        <div id="retainer-fields" class="retainer-fields" style="display:none">
+          <div class="grid2" style="margin-bottom:0">
+            <div><label>Retainer amount ($)</label><input type="number" id="p-retainer-amt" min="0" step="100" placeholder="2000"></div>
+            <div style="display:flex;align-items:flex-end;padding-bottom:2px">
+              <label class="check-label"><input type="checkbox" id="p-retainer-in-budget"> Include in total budget</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="field"><label>Description (optional)</label><input type="text" id="p-desc" placeholder="Brief project overview" onkeydown="if(event.key==='Enter')addProject()"></div>
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn primary" onclick="addProject()"><i class="ti ti-plus"></i> Add project</button>
+      </div>
+    </div>
+    <div class="sec-title">All projects</div>
+    <div id="project-list"></div>
+  </div>
+
+  <!-- ===== CLIENTS ===== -->
+  <div id="clients-section" style="display:none">
+    <div class="card">
+      <div class="sec-title">Add client</div>
+      <div class="grid2">
+        <div><label>Company name</label><input type="text" id="c-company" placeholder="Acme Corp"></div>
+        <div><label>Contact name</label><input type="text" id="c-name" placeholder="Jane Smith"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Email</label><input type="email" id="c-email" placeholder="jane@acme.com"></div>
+        <div><label>Phone</label><input type="tel" id="c-phone" placeholder="+1 (555) 000-0000"></div>
+      </div>
+      <div class="field"><label>Notes (optional)</label><input type="text" id="c-notes" placeholder="Preferred contact method, timezone, etc." onkeydown="if(event.key==='Enter')addClient()"></div>
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn primary" onclick="addClient()"><i class="ti ti-plus"></i> Add client</button>
+      </div>
+    </div>
+    <div class="sec-title">Contacts</div>
+    <div id="client-list"></div>
+  </div>
+
+  <!-- ===== INVOICE ===== -->
+  <div id="invoice-section" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem" class="no-print">
+      <label style="font-size:14px;color:var(--text2);margin:0">Invoice period</label>
+      <input type="month" id="inv-month" style="width:180px" oninput="renderInvoice()">
+    </div>
+    <div class="card" id="invoice-card">
+      <div class="invoice-header">
+        <div>
+          <div style="font-size:22px;font-weight:500">Invoice</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px" id="inv-number"></div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:500" id="inv-proj"></div>
+          <div style="font-size:13px;color:var(--text2);margin-top:2px" id="inv-client"></div>
+          <div style="font-size:13px;color:var(--text2)" id="inv-period"></div>
+        </div>
+      </div>
+      <div id="inv-time-section"></div>
+      <div id="inv-exp-section"></div>
+      <div id="inv-empty" style="display:none;text-align:center;padding:2rem 0;color:var(--text2);font-size:14px"></div>
+      <div id="inv-totals"></div>
+    </div>
+    <button class="btn no-print" style="margin-top:1rem" onclick="window.print()"><i class="ti ti-printer"></i> Print / save as PDF</button>
+  </div>
+</div>
+
+<script>
+// ── Google Drive Sync ──
+const GD_CLIENT_ID = '964475055610-sb4e62npukeqrno43qpjnse5pa05ca5n.apps.googleusercontent.com';
+const GD_SCOPE     = 'https://www.googleapis.com/auth/drive.file';
+const GD_FILENAME  = 'tracker-data.json';
+const GD_KEYS      = ['tracker:settings','tracker:time','tracker:expenses','tracker:clients','tracker:projects','tracker:clientInvs'];
+
+let gdToken      = null;   // current access token
+let gdFileId     = null;   // Drive file ID once found/created
+let gdReady      = false;  // gapi loaded
+let syncTimer    = null;   // debounce timer
+let tokenClient  = null;
+
+function setSyncUI(state, msg, showBtn=false, btnLabel=''){
+  const bar=document.getElementById('sync-bar');
+  const dot=bar;
+  const msgEl=document.getElementById('sync-msg');
+  const btn=document.getElementById('sync-action-btn');
+  bar.style.display='flex';
+  bar.className='sync-bar no-print sync-'+state;
+  msgEl.textContent=msg;
+  btn.style.display=showBtn?'inline-flex':'none';
+  if(showBtn)btn.textContent=btnLabel;
+}
+
+// Called once gapi loads
+function gapiLoaded(){
+  gapi.load('client',async()=>{
+    await gapi.client.init({});
+    await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
+    gdReady=true;
+    // Show Drive button in header
+    document.getElementById('gdrive-btn').style.display='flex';
+    setSyncUI('offline','Google Drive not connected',true,'Connect Drive');
+    // If we stored a hint that user was previously connected, try silent refresh
+    if(localStorage.getItem('gd:wasConnected')==='1') silentRefresh();
+  });
+}
+
+function silentRefresh(){
+  if(!tokenClient) initTokenClient();
+  tokenClient.requestAccessToken({prompt:''});
+}
+
+function initTokenClient(){
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:GD_CLIENT_ID,
+    scope:GD_SCOPE,
+    callback:async(resp)=>{
+      if(resp.error){
+        setSyncUI('error','Drive auth failed — click to retry',true,'Retry');
+        return;
+      }
+      gdToken=resp.access_token;
+      gapi.client.setToken({access_token:gdToken});
+      localStorage.setItem('gd:wasConnected','1');
+      setSyncUI('pending','Connecting to Google Drive…');
+      await findOrCreateFile();
+      await loadFromDrive();
+    }
+  });
+}
+
+function handleDriveAuth(){
+  if(!gdReady){setSyncUI('error','Still loading — please wait a moment',true,'Retry');return;}
+  if(!tokenClient) initTokenClient();
+  tokenClient.requestAccessToken({prompt:'consent'});
+}
+
+async function findOrCreateFile(){
+  setSyncUI('pending','Looking for your data file…');
+  try{
+    const res=await gapi.client.drive.files.list({
+      q:`name='${GD_FILENAME}' and trashed=false`,
+      spaces:'drive',fields:'files(id,name)'
+    });
+    const files=res.result.files;
+    if(files&&files.length>0){
+      gdFileId=files[0].id;
+    } else {
+      // Create empty file
+      const meta={name:GD_FILENAME,mimeType:'application/json'};
+      const created=await gapi.client.drive.files.create({resource:meta,fields:'id'});
+      gdFileId=created.result.id;
+      // Write initial data
+      await writeToDrive();
+    }
+  } catch(e){
+    setSyncUI('error','Could not access Drive — click to retry',true,'Retry');
+    console.error(e);
+  }
+}
+
+async function loadFromDrive(){
+  if(!gdFileId||!gdToken) return;
+  setSyncUI('pending','Loading your data from Drive…');
+  try{
+    const res=await fetch(`https://www.googleapis.com/drive/v3/files/${gdFileId}?alt=media`,{
+      headers:{Authorization:`Bearer ${gdToken}`}
+    });
+    if(!res.ok) throw new Error('fetch failed');
+    const data=await res.json();
+    // Merge into localStorage and state
+    GD_KEYS.forEach(k=>{if(data[k]!==undefined)localStorage.setItem(k,JSON.stringify(data[k]));});
+    // Reload state from localStorage
+    settings     = load('tracker:settings',{hourlyRate:'150',invoicePrefix:'INV',currency:'USD'});
+    timeEntries  = load('tracker:time',[]);
+    expenses     = load('tracker:expenses',[]);
+    clients      = load('tracker:clients',[]);
+    projects     = load('tracker:projects',[]);
+    clientInvs   = load('tracker:clientInvs',{});
+    (function loadSettingsForm(){
+      document.getElementById('s-rate').value=settings.hourlyRate||'150';
+      document.getElementById('s-prefix').value=settings.invoicePrefix||'INV';
+      document.getElementById('s-currency').value=settings.currency||'USD';
+    })();
+    allDropdownRefresh();
+    refreshAll();
+    setSyncUI('idle',`Synced with Google Drive · ${new Date().toLocaleTimeString()}`);
+  } catch(e){
+    setSyncUI('error','Could not load from Drive — using local data',true,'Retry');
+    console.error(e);
+  }
+}
+
+async function writeToDrive(){
+  if(!gdFileId||!gdToken) return;
+  const data={};
+  GD_KEYS.forEach(k=>{try{data[k]=JSON.parse(localStorage.getItem(k));}catch{data[k]=null;}});
+  try{
+    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${gdFileId}?uploadType=media`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${gdToken}`},
+      body:JSON.stringify(data)
+    });
+    setSyncUI('idle',`Saved to Google Drive · ${new Date().toLocaleTimeString()}`);
+  } catch(e){
+    setSyncUI('error','Drive save failed — data safe locally',true,'Retry');
+    console.error(e);
+  }
+}
+
+function scheduleDriveSync(){
+  if(!gdToken||!gdFileId) return;
+  setSyncUI('saving','Saving…');
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(writeToDrive, 1500); // debounce: wait 1.5s after last change
+}
+
+// ── Storage ──
+function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
+function save(k,v){
+  try{localStorage.setItem(k,JSON.stringify(v));}catch{}
+  scheduleDriveSync();
+}
+
+// ── State ──
+let settings = load('tracker:settings',{hourlyRate:'150',invoicePrefix:'INV',currency:'USD'});
+let timeEntries = load('tracker:time',[]);
+let expenses    = load('tracker:expenses',[]);
+let clients     = load('tracker:clients',[]);
+let projects    = load('tracker:projects',[]);
+let clientInvs  = load('tracker:clientInvs',{});  // { clientId: [{id,date,amount,dueDate,paid,paidDate,notes}] }
+let currentTab  = 'dashboard';
+
+// ── Helpers ──
+function uid(){return Math.random().toString(36).slice(2,10)}
+function today(){return new Date().toISOString().split('T')[0]}
+function thisMonth(){return today().substring(0,7)}
+function fmtDate(d){if(!d)return'';return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
+function monthLabel(m){const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'})}
+function $f(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:settings.currency||'USD',minimumFractionDigits:2}).format(n||0)}
+function saveSetting(k,v){settings[k]=v;save('tracker:settings',settings)}
+function toggleRetainerFields(){
+  const on=document.getElementById('p-retainer-on').checked;
+  document.getElementById('retainer-fields').style.display=on?'block':'none';
+}
+
+// ── Init ──
+document.getElementById('t-date').value=today();
+document.getElementById('e-date').value=today();
+document.getElementById('inv-month').value=thisMonth();
+document.getElementById('p-start').value=today();
+(function loadSettingsForm(){
+  document.getElementById('s-rate').value=settings.hourlyRate||'150';
+  document.getElementById('s-prefix').value=settings.invoicePrefix||'INV';
+  document.getElementById('s-currency').value=settings.currency||'USD';
+})();
+
+function toggleSettings(){
+  const p=document.getElementById('settings-panel');
+  p.style.display=p.style.display==='none'?'block':'none';
+}
+
+function switchTab(t){
+  currentTab=t;
+  ['dashboard','time','expenses','projects','clients','invoice'].forEach(id=>{
+    document.getElementById(id+'-section').style.display=id===t?'block':'none';
+    document.getElementById('tab-'+id).classList.toggle('active',id===t);
+  });
+  if(t==='invoice')renderInvoice();
+  if(t==='clients')renderClientList();
+  if(t==='projects')renderProjectList();
+}
+
+// ── Dashboard ──
+function refreshAll(){
+  // Header
+  document.getElementById('proj-name-display').textContent='Project Tracker';
+  const now=new Date();
+  document.getElementById('proj-meta-display').textContent=now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+
+  // Metrics (all-time)
+  const totalHours=timeEntries.reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const billHours=timeEntries.filter(e=>e.billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const rate=parseFloat(settings.hourlyRate||0);
+  const timeAmt=billHours*rate;
+  const expAmt=expenses.filter(e=>e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+  const total=timeAmt+expAmt;
+
+  document.getElementById('m-hours').textContent=totalHours.toFixed(1)+'h';
+  document.getElementById('m-time-amt').textContent=$f(timeAmt);
+  document.getElementById('m-exp-amt').textContent=$f(expAmt);
+  document.getElementById('m-total').textContent=$f(total);
+
+  // Per-project budget bars
+  renderDashBudgets();
+
+  // Recent entries
+  const el=document.getElementById('dash-recent');
+  const recent=[...timeEntries].slice(0,6);
+  if(!recent.length){el.innerHTML='<div class="empty">No time logged yet. Go to the Time tab to start!</div>';}
+  else el.innerHTML=recent.map(e=>{
+    const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+    return`<div class="entry-row">
+      <div><div class="entry-title">${e.task}</div><div class="entry-meta">${fmtDate(e.date)}${proj?' · '+proj.name:''}${e.billable?'':' · non-billable'}</div></div>
+      <span class="amt">${e.hours}h</span>
+    </div>`;
+  }).join('');
+
+  renderTimeList();
+  renderExpenseList();
+  if(currentTab==='invoice')renderInvoice();
+  if(currentTab==='projects')renderProjectList();
+}
+
+function renderDashBudgets(){
+  const el=document.getElementById('dash-project-budgets');
+  const active=projects.filter(p=>p.status==='active'&&parseFloat(p.budget||0)>0);
+  if(!active.length){
+    el.innerHTML='<div class="card"><div style="font-size:13px;color:var(--text2)">No active projects with budgets set. Add a project to see budget tracking here.</div></div>';
+    return;
+  }
+  el.innerHTML=active.map(p=>{
+    const projRate=parseFloat(p.rate||settings.hourlyRate||0);
+    const pTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+    const pExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+    const billed=pTime*projRate+pExp;
+    const budget=parseFloat(p.budget||0);
+    const retainer=p.retainerOn?parseFloat(p.retainerAmt||0):0;
+    const retainerInBudget=p.retainerOn&&p.retainerInBudget;
+    const pct=budget>0?Math.min(100,(billed/budget)*100):0;
+    const retPct=retainerInBudget&&budget>0?Math.min(100,(retainer/budget)*100):0;
+    const remaining=budget-billed;
+    const color=pct>=100?'var(--danger)':pct>=80?'var(--warning)':'var(--success)';
+    const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
+    const clientLabel=client?(client.company||client.contactName):'';
+    return`<div class="card gauge-wrap">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <span style="font-size:14px;font-weight:500">${p.num?'<span style="color:var(--text2);font-size:12px">'+p.num+'</span> ':''} ${p.name}</span>
+          ${clientLabel?`<span style="font-size:12px;color:var(--text2);margin-left:6px">· ${clientLabel}</span>`:''}
+        </div>
+        <span style="font-size:13px;font-weight:500;white-space:nowrap">${$f(billed)} / ${$f(budget)}</span>
+      </div>
+      <div class="gauge-bar">
+        <div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
+        ${retainerInBudget&&retPct>0?`<div class="gauge-retainer" style="width:${retPct.toFixed(1)}%"></div>`:''}
+      </div>
+      <div class="gauge-row">
+        <span>${pct.toFixed(0)}% used${p.retainerOn?` · Retainer: ${$f(retainer)}${retainerInBudget?' (in budget)':''}`:''}</span>
+        <span style="color:${remaining<0?'var(--danger)':'var(--text2)'}">${remaining<0?$f(Math.abs(remaining))+' over':$f(remaining)+' remaining'}</span>
+      </div>
+      ${retainerInBudget&&retPct>0?`<div class="legend"><span><span class="legend-dot" style="background:${color}"></span>Billed</span><span><span class="legend-dot" style="background:var(--bg2);border:1px dashed var(--text2)"></span>Retainer mark</span></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── Time ──
+function refreshClientDropdown(){
+  const sel=document.getElementById('t-client');if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— No client —</option>';
+  clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName;sel.appendChild(o);});
+  if(prev)sel.value=prev;
+  refreshTimeProjectDropdown();
+}
+
+function refreshTimeProjectDropdown(){
+  const sel=document.getElementById('t-project');if(!sel)return;
+  const cid=document.getElementById('t-client').value||'';
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— No project —</option>';
+  const filtered=cid?projects.filter(p=>p.clientId===cid):projects;
+  filtered.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
+  if(prev&&filtered.find(p=>p.id===prev))sel.value=prev;
+}
+
+function renderTimeList(){
+  const el=document.getElementById('time-list');
+  if(!timeEntries.length){el.innerHTML='<div class="empty">No entries yet.</div>';return;}
+  el.innerHTML=timeEntries.map(e=>{
+    const client=e.clientId?clients.find(c=>c.id===e.clientId):null;
+    const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+    const projRate=proj?parseFloat(proj.rate||settings.hourlyRate||0):parseFloat(settings.hourlyRate||0);
+    return`<div class="entry-row">
+      <div style="flex:1">
+        <div class="entry-title">${e.task}</div>
+        <div class="entry-meta">${fmtDate(e.date)}${client?' · '+(client.company||client.contactName):''}${proj?' · '+proj.name:''}${e.notes?' · '+e.notes:''}${e.billable?'':' · non-billable'}</div>
+      </div>
+      <div class="entry-right">
+        <span class="amt">${e.hours}h</span>
+        ${e.billable?`<span style="font-size:12px;color:var(--text2)">${$f(e.hours*projRate)}</span>`:''}
+        <button class="del-btn" onclick="deleteTime('${e.id}')"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteTime(id){timeEntries=timeEntries.filter(e=>e.id!==id);save('tracker:time',timeEntries);refreshAll();}
+
+function addTime(){
+  const date=document.getElementById('t-date').value;
+  const task=document.getElementById('t-task').value.trim();
+  const hours=parseFloat(document.getElementById('t-hours').value);
+  const notes=document.getElementById('t-notes').value.trim();
+  const billable=document.getElementById('t-billable').checked;
+  const clientId=document.getElementById('t-client').value||'';
+  const projectId=document.getElementById('t-project').value||'';
+  if(!date||!task||!hours)return;
+  timeEntries.unshift({id:uid(),date,task,hours,notes,billable,clientId,projectId});
+  save('tracker:time',timeEntries);
+  document.getElementById('t-task').value='';
+  document.getElementById('t-hours').value='';
+  document.getElementById('t-notes').value='';
+  refreshAll();
+}
+
+// ── Expenses ──
+function refreshExpenseClientDropdown(){
+  const sel=document.getElementById('e-client');if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— No client —</option>';
+  clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName;sel.appendChild(o);});
+  if(prev)sel.value=prev;
+  refreshExpenseProjectDropdown();
+}
+
+function refreshExpenseProjectDropdown(){
+  const sel=document.getElementById('e-project');if(!sel)return;
+  const cid=document.getElementById('e-client').value||'';
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— No project —</option>';
+  const filtered=cid?projects.filter(p=>p.clientId===cid):projects;
+  filtered.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
+  if(prev&&filtered.find(p=>p.id===prev))sel.value=prev;
+}
+
+function renderExpenseList(){
+  const el=document.getElementById('expense-list');
+  if(!expenses.length){el.innerHTML='<div class="empty">No expenses logged yet.</div>';return;}
+  el.innerHTML=expenses.map(e=>{
+    const client=e.clientId?clients.find(c=>c.id===e.clientId):null;
+    const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+    return`<div class="entry-row">
+      <div style="flex:1">
+        <div class="entry-title">${e.description}</div>
+        <div class="entry-meta">${fmtDate(e.date)} · ${e.category}${client?' · '+(client.company||client.contactName):''}${proj?' · '+proj.name:''}${e.billable?'':' · non-billable'}</div>
+      </div>
+      <div class="entry-right">
+        <span class="amt">${$f(e.amount)}</span>
+        <button class="del-btn" onclick="deleteExpense('${e.id}')"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteExpense(id){expenses=expenses.filter(e=>e.id!==id);save('tracker:expenses',expenses);refreshAll();}
+
+function addExpense(){
+  const date=document.getElementById('e-date').value;
+  const amount=parseFloat(document.getElementById('e-amount').value);
+  const category=document.getElementById('e-category').value;
+  const description=document.getElementById('e-desc').value.trim();
+  const billable=document.getElementById('e-billable').checked;
+  const clientId=document.getElementById('e-client').value||'';
+  const projectId=document.getElementById('e-project').value||'';
+  if(!date||!amount||!description)return;
+  expenses.unshift({id:uid(),date,amount,category,description,billable,clientId,projectId});
+  save('tracker:expenses',expenses);
+  document.getElementById('e-desc').value='';
+  document.getElementById('e-amount').value='';
+  refreshAll();
+}
+
+// ── Projects ──
+function refreshProjectClientDropdown(){
+  const sel=document.getElementById('p-client');if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— No client —</option>';
+  clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName;sel.appendChild(o);});
+  if(prev)sel.value=prev;
+}
+
+function renderProjectList(){
+  const el=document.getElementById('project-list');
+  if(!projects.length){el.innerHTML='<div class="empty">No projects yet. Add one above!</div>';return;}
+  el.innerHTML=projects.map(p=>{
+    const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
+    const clientLabel=client?(client.company||client.contactName):'';
+    const statusClass='status-'+p.status;
+    const statusText=p.status.charAt(0).toUpperCase()+p.status.slice(1);
+    const projRate=parseFloat(p.rate||settings.hourlyRate||0);
+    const pTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+    const pExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+    const billed=pTime*projRate+pExp;
+    const budget=parseFloat(p.budget||0);
+    const retainer=p.retainerOn?parseFloat(p.retainerAmt||0):0;
+    const retainerInBudget=p.retainerOn&&p.retainerInBudget;
+    const pct=budget>0?Math.min(100,(billed/budget)*100):0;
+    const retPct=retainerInBudget&&budget>0?Math.min(100,(retainer/budget)*100):0;
+    const color=pct>=100?'var(--danger)':pct>=80?'var(--warning)':'var(--success)';
+    return`<div class="project-card">
+      <div class="project-header">
+        <div style="flex:1;min-width:0">
+          <div class="project-name">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} &mdash; </span>`:''}${p.name}</div>
+          <div class="project-meta">
+            ${clientLabel?`<span><i class="ti ti-building" style="font-size:12px"></i> ${clientLabel}</span>`:''}
+            ${p.startDate?`<span><i class="ti ti-calendar" style="font-size:12px"></i> ${fmtDate(p.startDate)}</span>`:''}
+            ${p.endDate?`<span><i class="ti ti-calendar-off" style="font-size:12px"></i> ${fmtDate(p.endDate)}</span>`:''}
+            ${p.duration?`<span><i class="ti ti-clock" style="font-size:12px"></i> ${p.duration}</span>`:''}
+            ${p.rate?`<span><i class="ti ti-coin" style="font-size:12px"></i> ${$f(p.rate)}/hr</span>`:''}
+          </div>
+        </div>
+        <div class="project-actions">
+          <span class="status-badge ${statusClass}">${statusText}</span>
+          <select onchange="updateProjectStatus('${p.id}',this.value)" style="width:auto;font-size:12px;padding:4px 8px" aria-label="Change status">
+            <option value="active"${p.status==='active'?' selected':''}>Active</option>
+            <option value="paused"${p.status==='paused'?' selected':''}>Paused</option>
+            <option value="completed"${p.status==='completed'?' selected':''}>Completed</option>
+          </select>
+          <button class="del-btn" onclick="deleteProject('${p.id}')"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>
+      ${budget>0?`<div class="project-body">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px">
+          <span>Budget: ${$f(billed)} / ${$f(budget)}${p.retainerOn?` · Retainer: ${$f(retainer)}${retainerInBudget?' (in budget)':''}`:''}</span>
+          <span>${pct.toFixed(0)}%</span>
+        </div>
+        <div class="gauge-bar" style="height:7px">
+          <div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
+          ${retainerInBudget&&retPct>0?`<div class="gauge-retainer" style="width:${retPct.toFixed(1)}%"></div>`:''}
+        </div>
+      </div>`:''}
+      ${p.desc?`<div style="font-size:13px;color:var(--text2);margin-top:8px">${p.desc}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function addProject(){
+  const name=document.getElementById('p-name').value.trim();
+  if(!name)return;
+  const retainerOn=document.getElementById('p-retainer-on').checked;
+  projects.unshift({
+    id:uid(),
+    num:document.getElementById('p-num').value.trim(),
+    name,
+    clientId:document.getElementById('p-client').value||'',
+    status:document.getElementById('p-status').value,
+    startDate:document.getElementById('p-start').value||'',
+    endDate:document.getElementById('p-end').value||'',
+    duration:document.getElementById('p-duration').value.trim(),
+    budget:document.getElementById('p-budget').value||'',
+    rate:document.getElementById('p-rate').value||'',
+    retainerOn,
+    retainerAmt:retainerOn?document.getElementById('p-retainer-amt').value||'':'',
+    retainerInBudget:retainerOn&&document.getElementById('p-retainer-in-budget').checked,
+    desc:document.getElementById('p-desc').value.trim()
+  });
+  save('tracker:projects',projects);
+  ['p-num','p-name','p-end','p-duration','p-budget','p-rate','p-retainer-amt','p-desc'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('p-retainer-on').checked=false;
+  document.getElementById('retainer-fields').style.display='none';
+  document.getElementById('p-retainer-in-budget').checked=false;
+  document.getElementById('p-start').value=today();
+  allDropdownRefresh();
+  renderProjectList();
+  refreshAll();
+}
+
+function updateProjectStatus(id,status){
+  const p=projects.find(p=>p.id===id);
+  if(p){p.status=status;save('tracker:projects',projects);renderProjectList();refreshAll();}
+}
+
+function deleteProject(id){
+  if(!confirm('Remove this project?'))return;
+  projects=projects.filter(p=>p.id!==id);
+  save('tracker:projects',projects);
+  allDropdownRefresh();
+  renderProjectList();
+  refreshAll();
+}
+
+// ── Clients + Invoice Tracking ──
+function initials(n){if(!n)return'?';return n.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();}
+
+function renderClientList(){
+  const el=document.getElementById('client-list');
+  if(!clients.length){el.innerHTML='<div class="empty">No clients yet. Add one above!</div>';return;}
+  el.innerHTML=clients.map(c=>{
+    const invList=clientInvs[c.id]||[];
+    const todayStr=today();
+    return`<div class="client-card">
+      <div class="client-top">
+        <div class="client-avatar">${initials(c.contactName||c.company)}</div>
+        <div class="client-info">
+          <div class="client-name">${c.contactName||'—'}</div>
+          <div class="client-company">${c.company||'—'}</div>
+          <div class="client-details">
+            ${c.email?`<span class="client-detail"><i class="ti ti-mail" style="font-size:14px"></i><a href="mailto:${c.email}">${c.email}</a></span>`:''}
+            ${c.phone?`<span class="client-detail"><i class="ti ti-phone" style="font-size:14px"></i><a href="tel:${c.phone}">${c.phone}</a></span>`:''}
+            ${c.notes?`<span class="client-detail" style="width:100%;color:var(--text3)"><i class="ti ti-note" style="font-size:14px"></i>${c.notes}</span>`:''}
+          </div>
+        </div>
+        <div class="client-actions">
+          <button class="del-btn" onclick="deleteClient('${c.id}')"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>
+      <!-- Invoice section -->
+      <div class="inv-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span class="sec-title" style="margin:0">Invoices</span>
+          <button class="btn sm" onclick="showInvForm('${c.id}')"><i class="ti ti-plus"></i> Add invoice</button>
+        </div>
+        <div id="inv-form-${c.id}" style="display:none;background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:10px">
+          <div class="grid3" style="margin-bottom:8px">
+            <div><label>Invoice #</label><input type="text" id="if-num-${c.id}" placeholder="${(settings.invoicePrefix||'INV')}-001"></div>
+            <div><label>Date</label><input type="date" id="if-date-${c.id}" value="${today()}"></div>
+            <div><label>Due date</label><input type="date" id="if-due-${c.id}"></div>
+          </div>
+          <div class="grid2" style="margin-bottom:8px">
+            <div><label>Amount ($)</label><input type="number" id="if-amt-${c.id}" min="0" step="0.01" placeholder="1500.00"></div>
+            <div><label>Notes (optional)</label><input type="text" id="if-notes-${c.id}" placeholder="Month of May services"></div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn sm" onclick="hideInvForm('${c.id}')">Cancel</button>
+            <button class="btn sm primary" onclick="addClientInv('${c.id}')"><i class="ti ti-plus"></i> Add</button>
+          </div>
+        </div>
+        ${invList.length===0?`<div style="font-size:13px;color:var(--text3)">No invoices yet.</div>`:
+          invList.map(inv=>{
+            const overdue=!inv.paid&&inv.dueDate&&inv.dueDate<todayStr;
+            const badge=inv.paid?'paid-yes':overdue?'paid-overdue':'paid-no';
+            const label=inv.paid?'Paid':overdue?'Overdue':'Unpaid';
+            return`<div class="inv-row">
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:500">${inv.num||'—'}</div>
+                <div style="font-size:11px;color:var(--text2)">${fmtDate(inv.date)}${inv.dueDate?' · Due '+fmtDate(inv.dueDate):''}${inv.notes?' · '+inv.notes:''}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span style="font-weight:500">${$f(parseFloat(inv.amount||0))}</span>
+                <span class="paid-badge ${badge}">${label}</span>
+                ${!inv.paid?`<button class="btn sm" onclick="markInvPaid('${c.id}','${inv.id}')" title="Mark paid"><i class="ti ti-check"></i></button>`:''}
+                <button class="del-btn" onclick="deleteClientInv('${c.id}','${inv.id}')"><i class="ti ti-trash"></i></button>
+              </div>
+            </div>`;
+          }).join('')
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showInvForm(cid){document.getElementById('inv-form-'+cid).style.display='block';}
+function hideInvForm(cid){document.getElementById('inv-form-'+cid).style.display='none';}
+
+function addClientInv(cid){
+  const num=document.getElementById('if-num-'+cid).value.trim();
+  const date=document.getElementById('if-date-'+cid).value;
+  const dueDate=document.getElementById('if-due-'+cid).value;
+  const amount=document.getElementById('if-amt-'+cid).value;
+  const notes=document.getElementById('if-notes-'+cid).value.trim();
+  if(!date||!amount)return;
+  if(!clientInvs[cid])clientInvs[cid]=[];
+  clientInvs[cid].unshift({id:uid(),num,date,dueDate,amount,notes,paid:false,paidDate:''});
+  save('tracker:clientInvs',clientInvs);
+  hideInvForm(cid);
+  renderClientList();
+}
+
+function markInvPaid(cid,iid){
+  const list=clientInvs[cid]||[];
+  const inv=list.find(i=>i.id===iid);
+  if(inv){inv.paid=true;inv.paidDate=today();}
+  save('tracker:clientInvs',clientInvs);
+  renderClientList();
+}
+
+function deleteClientInv(cid,iid){
+  if(!clientInvs[cid])return;
+  clientInvs[cid]=clientInvs[cid].filter(i=>i.id!==iid);
+  save('tracker:clientInvs',clientInvs);
+  renderClientList();
+}
+
+function addClient(){
+  const company=document.getElementById('c-company').value.trim();
+  const contactName=document.getElementById('c-name').value.trim();
+  const email=document.getElementById('c-email').value.trim();
+  const phone=document.getElementById('c-phone').value.trim();
+  const notes=document.getElementById('c-notes').value.trim();
+  if(!company&&!contactName)return;
+  clients.unshift({id:uid(),company,contactName,email,phone,notes});
+  save('tracker:clients',clients);
+  ['c-company','c-name','c-email','c-phone','c-notes'].forEach(id=>{document.getElementById(id).value='';});
+  allDropdownRefresh();
+  renderClientList();
+}
+
+function deleteClient(id){
+  if(!confirm('Remove this client?'))return;
+  clients=clients.filter(c=>c.id!==id);
+  save('tracker:clients',clients);
+  allDropdownRefresh();
+  renderClientList();
+}
+
+// ── All dropdowns refresh ──
+function allDropdownRefresh(){
+  refreshClientDropdown();
+  refreshExpenseClientDropdown();
+  refreshProjectClientDropdown();
+  refreshTimeProjectDropdown();
+  refreshExpenseProjectDropdown();
+}
+
+// ── Invoice (print) ──
+function renderInvoice(){
+  const m=document.getElementById('inv-month').value||thisMonth();
+  const prefix=settings.invoicePrefix||'INV';
+  const rate=parseFloat(settings.hourlyRate||0);
+
+  document.getElementById('inv-number').textContent=prefix+'-'+m.replace('-','');
+  document.getElementById('inv-proj').textContent='All projects';
+  document.getElementById('inv-client').textContent='';
+  document.getElementById('inv-period').textContent='Period: '+monthLabel(m);
+
+  const invT=timeEntries.filter(e=>e.date.startsWith(m)&&e.billable).sort((a,b)=>a.date.localeCompare(b.date));
+  const invE=expenses.filter(e=>e.date.startsWith(m)&&e.billable).sort((a,b)=>a.date.localeCompare(b.date));
+  const invHours=invT.reduce((s,e)=>s+e.hours,0);
+  const invTimeAmt=invT.reduce((s,e)=>{const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;const r=proj?parseFloat(proj.rate||rate):rate;return s+e.hours*r;},0);
+  const invExpAmt=invE.reduce((s,e)=>s+e.amount,0);
+  const invTotal=invTimeAmt+invExpAmt;
+
+  const tsec=document.getElementById('inv-time-section');
+  const esec=document.getElementById('inv-exp-section');
+  const empty=document.getElementById('inv-empty');
+  const totals=document.getElementById('inv-totals');
+
+  if(!invT.length&&!invE.length){
+    tsec.innerHTML='';esec.innerHTML='';totals.innerHTML='';
+    empty.style.display='block';
+    empty.textContent='No billable entries for '+monthLabel(m)+'.';
+    return;
+  }
+  empty.style.display='none';
+
+  tsec.innerHTML=invT.length?`
+    <div class="sec-title" style="margin-top:0">Services</div>
+    <table style="margin-bottom:1.25rem">
+      <thead><tr>
+        <th style="width:20%">Date</th><th>Description</th>
+        <th style="text-align:right;width:50px">Hrs</th>
+        <th style="text-align:right;width:75px">Rate</th>
+        <th style="text-align:right;width:85px">Amount</th>
+      </tr></thead>
+      <tbody>
+        ${invT.map(e=>{const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;const r=proj?parseFloat(proj.rate||rate):rate;return`<tr class="tr-sep">
+          <td style="color:var(--text2);font-size:12px">${fmtDate(e.date)}</td>
+          <td>${e.task}${proj?`<span style="font-size:11px;color:var(--text2)"> — ${proj.name}</span>`:''}${e.notes?`<br><span style="font-size:11px;color:var(--text2)">${e.notes}</span>`:''}</td>
+          <td style="text-align:right">${e.hours}</td>
+          <td style="text-align:right;color:var(--text2)">${$f(r)}</td>
+          <td style="text-align:right">${$f(e.hours*r)}</td>
+        </tr>`;}).join('')}
+        <tr class="tr-strong"><td colspan="2">${invHours.toFixed(1)}h total</td><td colspan="3" style="text-align:right">${$f(invTimeAmt)}</td></tr>
+      </tbody>
+    </table>`:'';
+
+  esec.innerHTML=invE.length?`
+    <div class="sec-title">Expenses</div>
+    <table style="margin-bottom:1.25rem">
+      <thead><tr>
+        <th style="width:20%">Date</th><th style="width:20%">Category</th>
+        <th>Description</th><th style="text-align:right;width:90px">Amount</th>
+      </tr></thead>
+      <tbody>
+        ${invE.map(e=>`<tr class="tr-sep">
+          <td style="color:var(--text2);font-size:12px">${fmtDate(e.date)}</td>
+          <td style="color:var(--text2)">${e.category}</td>
+          <td>${e.description}</td>
+          <td style="text-align:right">${$f(e.amount)}</td>
+        </tr>`).join('')}
+        <tr class="tr-strong"><td colspan="3">Subtotal expenses</td><td style="text-align:right">${$f(invExpAmt)}</td></tr>
+      </tbody>
+    </table>`:'';
+
+  totals.innerHTML=`<div class="totals">
+    <div class="total-final"><span>Total due</span><span>${$f(invTotal)}</span></div>
+  </div>`;
+}
+
+// ── Timer ──
+let timerInterval=null,timerStart_=0,timerRunning=false;
+function fmtTimer(ms){const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h+':'+(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;}
+
+function timerStart(){
+  if(timerRunning)return;
+  timerStart_=Date.now();timerRunning=true;
+  document.getElementById('btn-start').style.display='none';
+  document.getElementById('btn-stop').style.display='inline-flex';
+  document.getElementById('btn-discard').style.display='inline-flex';
+  document.getElementById('timer-card').classList.add('timer-running');
+  const t=document.getElementById('t-task').value.trim();
+  document.getElementById('timer-task-label').textContent=t?'Timing: '+t:'';
+  timerInterval=setInterval(()=>{document.getElementById('timer-display').textContent=fmtTimer(Date.now()-timerStart_);},1000);
+}
+
+function timerStop(){
+  if(!timerRunning)return;
+  clearInterval(timerInterval);timerRunning=false;
+  const elapsed=(Date.now()-timerStart_)/1000/3600;
+  const rounded=Math.round(elapsed*4)/4;
+  document.getElementById('t-hours').value=rounded>0?rounded.toFixed(2):'0.25';
+  document.getElementById('t-date').value=today();
+  timerReset();document.getElementById('t-task').focus();
+}
+
+function timerDiscard(){clearInterval(timerInterval);timerRunning=false;timerReset();}
+
+function timerReset(){
+  timerStart_=0;
+  document.getElementById('timer-display').textContent='0:00:00';
+  document.getElementById('timer-task-label').textContent='';
+  document.getElementById('btn-start').style.display='inline-flex';
+  document.getElementById('btn-stop').style.display='none';
+  document.getElementById('btn-discard').style.display='none';
+  document.getElementById('timer-card').classList.remove('timer-running');
+}
+
+// ── Boot ──
+window.gapiLoaded=gapiLoaded; // called by gapi script onload
+// Manually check if gapi already loaded (race condition)
+if(typeof gapi!=='undefined') gapiLoaded();
+allDropdownRefresh();
+refreshAll();
+</script>
+</body>
+</html>
