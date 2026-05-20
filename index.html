@@ -479,14 +479,15 @@ async function loadFromDrive(){
       const errText=await res.text();
       throw new Error(`HTTP ${res.status}: ${errText}`);
     }
-    const data=await res.json();
-    GD_KEYS.forEach(k=>{if(data[k]!==undefined)localStorage.setItem(k,JSON.stringify(data[k]));});
-    settings    = load('tracker:settings',{hourlyRate:'150',invoicePrefix:'INV',currency:'USD'});
-    timeEntries = load('tracker:time',[]);
-    expenses    = load('tracker:expenses',[]);
-    clients     = load('tracker:clients',[]);
-    projects    = load('tracker:projects',[]);
-    clientInvs  = load('tracker:clientInvs',{});
+    const data=await res.json().catch(()=>({}));
+    // Only restore keys that have actual data (not null)
+    GD_KEYS.forEach(k=>{if(data[k]!=null)localStorage.setItem(k,JSON.stringify(data[k]));});
+    settings    = load('tracker:settings',{}) ; settings = Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD'}, settings||{});
+    timeEntries = load('tracker:time',[])     || [];
+    expenses    = load('tracker:expenses',[]) || [];
+    clients     = load('tracker:clients',[])  || [];
+    projects    = load('tracker:projects',[]) || [];
+    clientInvs  = load('tracker:clientInvs',{}) || {};
     (function loadSettingsForm(){
       document.getElementById('s-rate').value=settings.hourlyRate||'150';
       document.getElementById('s-prefix').value=settings.invoicePrefix||'INV';
