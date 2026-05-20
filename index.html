@@ -3,180 +3,204 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Project Budget & Time Tracker</title>
+<title>Lowtide.cc Project Tracker</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
 <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()" async defer></script>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  :root{
-    --bg:#ffffff;--bg2:#f7f7f5;--bg3:#f0efe9;
-    --text:#1a1a1a;--text2:#6b6b6b;--text3:#9a9a9a;
-    --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.2);
-    --success:#1d9e75;--warning:#ba7517;--danger:#a32d2d;--info:#185fa5;
-    --radius:10px;--radius-sm:6px;
-  }
-  @media(prefers-color-scheme:dark){
-    :root{--bg:#1e1e1c;--bg2:#2a2a28;--bg3:#323230;--text:#f0efe9;--text2:#9a9a94;--text3:#6b6b66;--border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.2);}
-  }
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:15px;line-height:1.5}
-  #app{max-width:760px;margin:0 auto;padding:2rem 1rem 4rem}
-  h1{font-size:22px;font-weight:500}
-  .sub{font-size:13px;color:var(--text2);margin-top:3px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem}
-  .icon-btn{background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:7px 9px;cursor:pointer;color:var(--text2);font-size:16px;display:flex;align-items:center}
-  .icon-btn:hover{background:var(--bg2);color:var(--text)}
-  .card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem}
-  .sec-title{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:0.09em;margin-bottom:12px}
-  .met-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1.25rem}
-  .met{background:var(--bg2);border-radius:var(--radius-sm);padding:1rem}
-  .met-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
-  .met-val{font-size:20px;font-weight:500}
-  .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:0.5px solid var(--border);margin-bottom:1.25rem}
-  .tab{background:none;border:none;border-bottom:2px solid transparent;padding:9px 12px;font-size:13px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:-1px;transition:color 0.15s}
-  .tab.active{border-bottom-color:var(--text);font-weight:500;color:var(--text)}
-  .tab:hover{color:var(--text)}
-  label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
-  input,select,textarea{width:100%;padding:8px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border-color 0.15s}
-  input:focus,select:focus{border-color:var(--info)}
-  input[type=checkbox]{width:auto;margin:0}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
-  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
-  .field{margin-bottom:12px}
-  .row-action{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
-  .check-label{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;color:var(--text)}
-  button.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:14px;background:none;border:0.5px solid var(--border2);border-radius:var(--radius-sm);cursor:pointer;color:var(--text);font-family:inherit;transition:background 0.15s}
-  button.btn:hover{background:var(--bg2)}
-  button.btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
-  button.btn.primary:hover{opacity:0.85}
-  button.btn.sm{padding:5px 10px;font-size:12px}
-  .entry-row{display:flex;justify-content:space-between;align-items:flex-start;padding:11px 0;border-bottom:0.5px solid var(--border)}
-  .entry-row:last-child{border-bottom:none}
-  .entry-title{font-size:14px;font-weight:500}
-  .entry-meta{font-size:12px;color:var(--text2);margin-top:2px}
-  .entry-right{display:flex;align-items:center;gap:10px}
-  .amt{font-size:14px;font-weight:500}
-  .del-btn{background:none;border:none;cursor:pointer;color:var(--text3);padding:4px 6px;border-radius:4px;font-size:16px}
-  .del-btn:hover{color:var(--danger)}
-  /* Gauge / budget bars */
-  .gauge-wrap{margin-bottom:1rem}
-  .gauge-bar{height:10px;background:var(--bg2);border-radius:5px;overflow:hidden;margin:6px 0;position:relative}
-  .gauge-fill{height:100%;border-radius:5px;transition:width 0.4s;position:absolute;left:0;top:0}
-  .gauge-retainer{height:100%;position:absolute;top:0;left:0;border-right:2px dashed rgba(255,255,255,0.7);pointer-events:none}
-  .gauge-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text2)}
-  .empty{font-size:14px;color:var(--text2);padding:1rem 0}
-  /* Invoice table */
-  .invoice-header{display:flex;justify-content:space-between;padding-bottom:1rem;border-bottom:0.5px solid var(--border);margin-bottom:1.25rem}
-  table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
-  th{text-align:left;padding:5px 0;font-weight:400;color:var(--text2);font-size:12px;border-bottom:0.5px solid var(--border)}
-  td{padding:8px 0;vertical-align:top}
-  .tr-sep td{border-top:0.5px solid var(--border)}
-  .tr-strong td{border-top:0.5px solid var(--border2);font-weight:500;padding:9px 0}
-  .totals{border-top:0.5px solid var(--border2);padding-top:1rem;margin-top:0.5rem}
-  .total-row{display:flex;justify-content:space-between;padding:4px 0;font-size:14px}
-  .total-final{display:flex;justify-content:space-between;font-size:17px;font-weight:500;border-top:0.5px solid var(--border2);padding-top:10px;margin-top:6px}
-  .success-note{font-size:12px;color:var(--success);margin-top:6px}
-  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  /* Timer */
-  .timer-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;text-align:center}
-  .timer-display{font-size:44px;font-weight:500;letter-spacing:0.04em;font-variant-numeric:tabular-nums;margin:0.5rem 0 1rem;color:var(--text)}
-  .timer-running .timer-display{color:var(--success)}
-  .timer-btns{display:flex;gap:10px;justify-content:center;margin-bottom:1rem}
-  .btn-start{background:var(--success);color:#fff;border-color:var(--success)}
-  .btn-start:hover{opacity:0.85;background:var(--success)}
-  .btn-stop{background:var(--danger);color:#fff;border-color:var(--danger)}
-  .btn-stop:hover{opacity:0.85;background:var(--danger)}
-  .btn-discard{color:var(--text2)}
-  .timer-task{font-size:14px;color:var(--text2);min-height:20px}
-  /* Project cards */
-  .project-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:10px}
-  .project-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
-  .project-name{font-size:15px;font-weight:500}
-  .project-meta{font-size:12px;color:var(--text2);margin-top:3px;display:flex;flex-wrap:wrap;gap:4px 12px}
-  .project-body{margin-top:10px}
-  .status-badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;font-weight:500;flex-shrink:0}
-  .status-active{background:#e1f5ee;color:#0f6e56}
-  .status-paused{background:#faeeda;color:#854f0b}
-  .status-completed{background:#f1efe8;color:#5f5e5a}
-  @media(prefers-color-scheme:dark){
-    .status-active{background:#085041;color:#9fe1cb}
-    .status-paused{background:#633806;color:#fac775}
-    .status-completed{background:#2c2c2a;color:#b4b2a9}
-  }
-  .project-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
-  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-top:4px}
-  .legend-dot{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:4px}
-  /* Client cards */
-  .client-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:10px}
-  .client-top{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
-  .client-avatar{width:42px;height:42px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500;color:var(--text2);flex-shrink:0;border:0.5px solid var(--border)}
-  .client-info{flex:1;min-width:0}
-  .client-name{font-size:15px;font-weight:500}
-  .client-company{font-size:13px;color:var(--text2);margin-top:1px}
-  .client-details{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 16px}
-  .client-detail{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:5px}
-  .client-detail a{color:var(--info);text-decoration:none}
-  .client-detail a:hover{text-decoration:underline}
-  .client-actions{display:flex;gap:6px;flex-shrink:0}
-  /* Invoice tracking in client cards */
-  .inv-section{margin-top:12px;border-top:0.5px solid var(--border);padding-top:12px}
-  .inv-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:13px;gap:8px}
-  .inv-row:last-child{border-bottom:none}
-  .paid-badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
-  .paid-yes{background:#e1f5ee;color:#0f6e56}
-  .paid-no{background:#fdf0f0;color:#8b2020}
-  .paid-overdue{background:#f5e1e1;color:#7a1515;font-weight:600}
-  @media(prefers-color-scheme:dark){
-    .paid-yes{background:#085041;color:#9fe1cb}
-    .paid-no{background:#4a1a1a;color:#e8a0a0}
-    .paid-overdue{background:#5c1010;color:#f0b0b0}
-  }
-  /* Retainer toggle */
-  .retainer-fields{padding:10px;background:var(--bg2);border-radius:var(--radius-sm);margin-top:8px}
-  /* Sync indicator */
-  .sync-bar{display:flex;align-items:center;gap:8px;font-size:12px;padding:7px 12px;border-radius:var(--radius-sm);margin-bottom:1rem;border:0.5px solid var(--border)}
-  .sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-  .sync-idle .sync-dot{background:var(--success)}
-  .sync-saving .sync-dot{background:var(--warning);animation:pulse 1s infinite}
-  .sync-error .sync-dot{background:var(--danger)}
-  .sync-offline .sync-dot{background:var(--text3)}
-  .sync-pending .sync-dot{background:var(--info);animation:pulse 1s infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-  @media print{
-    body{background:white}
-    #app{max-width:100%;padding:1rem}
-    .tabs,.header button,.no-print{display:none!important}
-    #invoice-section{display:block!important}
-    #dashboard-section,#time-section,#expenses-section,#projects-section,#clients-section{display:none!important}
-    .card{border:0.5px solid #ccc;box-shadow:none}
-  }
-  @media(max-width:520px){.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}.settings-grid{grid-template-columns:1fr}}
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f2;--bg2:#eaeae5;--bg3:#E0E0DB;
+  --text:#2A2829;--text2:#6b686a;--text3:#9a979a;
+  --border:rgba(42,40,41,0.13);--border2:rgba(42,40,41,0.25);
+  --success:#1d9e75;--warning:#ba7517;--danger:#a32d2d;--info:#9151a0;--accent:#9151a0;
+  --radius:10px;--radius-sm:6px;
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#2A2829;--bg2:#3a3638;--bg3:#221f22;--text:#E0E0DB;--text2:#a09aa0;--text3:#706870;--border:rgba(224,224,219,0.1);--border2:rgba(224,224,219,0.2);}
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:15px;line-height:1.5}
+#app{max-width:780px;margin:0 auto;padding:2rem 1rem 4rem}
+h1{font-size:22px;font-weight:500}
+.sub{font-size:13px;color:var(--text2);margin-top:3px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem}
+.icon-btn{background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:7px 9px;cursor:pointer;color:var(--text2);font-size:16px;display:flex;align-items:center}
+.icon-btn:hover{background:var(--bg2);color:var(--text)}
+.card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem}
+.sec-title{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:0.09em;margin-bottom:12px}
+.met-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1.25rem}
+.met{background:var(--bg2);border-radius:var(--radius-sm);padding:1rem}
+.met-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.met-val{font-size:20px;font-weight:500}
+.tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:.5px solid var(--border);margin-bottom:1.25rem}
+.tab{background:none;border:none;border-bottom:2px solid transparent;padding:9px 12px;font-size:13px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:-1px;transition:color .15s}
+.tab.active{border-bottom-color:var(--accent);font-weight:500;color:var(--accent)}
+.tab:hover{color:var(--text)}
+label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
+input,select,textarea{width:100%;padding:8px 10px;border:.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border-color .15s}
+input:focus,select:focus{border-color:var(--accent)}
+input[type=checkbox],input[type=radio]{width:auto;margin:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.field{margin-bottom:12px}
+.row-action{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.check-label{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;color:var(--text)}
+button.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:14px;background:none;border:.5px solid var(--border2);border-radius:var(--radius-sm);cursor:pointer;color:var(--text);font-family:inherit;transition:background .15s}
+button.btn:hover{background:var(--bg2)}
+button.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.btn.primary:hover{opacity:.85}
+button.btn.danger{background:var(--danger);color:#fff;border-color:var(--danger)}
+button.btn.danger:hover{opacity:.85}
+button.btn.sm{padding:5px 10px;font-size:12px}
+.entry-row{display:flex;justify-content:space-between;align-items:flex-start;padding:11px 0;border-bottom:.5px solid var(--border)}
+.entry-row:last-child{border-bottom:none}
+.entry-title{font-size:14px;font-weight:500}
+.entry-meta{font-size:12px;color:var(--text2);margin-top:2px}
+.entry-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.amt{font-size:14px;font-weight:500}
+.icon-action{background:none;border:none;cursor:pointer;color:var(--text3);padding:4px 5px;border-radius:4px;font-size:15px;display:flex;align-items:center}
+.icon-action:hover{color:var(--text);background:var(--bg2)}
+.icon-action.danger:hover{color:var(--danger)}
+/* Edit forms */
+.edit-form{background:var(--bg2);border-radius:var(--radius-sm);padding:12px;margin-top:8px;border:.5px solid var(--border)}
+.edit-form .grid2{margin-bottom:8px}
+.edit-form .field{margin-bottom:8px}
+.edit-actions{display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px}
+/* Gauge / budget */
+.gauge-wrap{margin-bottom:1rem}
+.gauge-bar{height:10px;background:var(--bg2);border-radius:5px;overflow:hidden;margin:6px 0;position:relative}
+.gauge-fill{height:100%;border-radius:5px;transition:width .4s;position:absolute;left:0;top:0}
+.gauge-mark{height:100%;position:absolute;top:0;border-right:2px dashed rgba(255,255,255,.7);pointer-events:none}
+.gauge-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text2)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-top:4px}
+.legend-dot{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:4px}
+/* Invoice print table */
+.inv-table-wrap{margin-bottom:1.25rem}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th{text-align:left;padding:5px 0;font-weight:400;color:var(--text2);font-size:12px;border-bottom:.5px solid var(--border)}
+td{padding:8px 0;vertical-align:top}
+.tr-sep td{border-top:.5px solid var(--border)}
+.tr-strong td{border-top:.5px solid var(--border2);font-weight:500;padding:9px 0}
+.totals{border-top:.5px solid var(--border2);padding-top:1rem;margin-top:.5rem}
+.total-row{display:flex;justify-content:space-between;padding:4px 0;font-size:14px}
+.total-final{display:flex;justify-content:space-between;font-size:17px;font-weight:500;border-top:.5px solid var(--border2);padding-top:10px;margin-top:6px}
+.invoice-header{display:flex;justify-content:space-between;padding-bottom:1rem;border-bottom:.5px solid var(--border);margin-bottom:1.25rem}
+/* Timer */
+.timer-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;text-align:center}
+.timer-display{font-size:44px;font-weight:500;letter-spacing:.04em;font-variant-numeric:tabular-nums;margin:.5rem 0 1rem;color:var(--text)}
+.timer-running .timer-display{color:var(--success)}
+.timer-btns{display:flex;gap:10px;justify-content:center;margin-bottom:1rem}
+.btn-start{background:var(--success);color:#fff;border-color:var(--success)}
+.btn-start:hover{opacity:.85;background:var(--success)}
+.btn-stop{background:var(--danger);color:#fff;border-color:var(--danger)}
+.btn-stop:hover{opacity:.85;background:var(--danger)}
+/* Project cards */
+.project-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:10px}
+.project-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
+.project-meta{font-size:12px;color:var(--text2);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px}
+.status-badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;font-weight:500;flex-shrink:0}
+.status-active{background:#e1f5ee;color:#0f6e56}
+.status-on_hold{background:#faeeda;color:#854f0b}
+.status-completed{background:#f1efe8;color:#5f5e5a}
+@media(prefers-color-scheme:dark){
+  .status-active{background:#085041;color:#9fe1cb}
+  .status-on_hold{background:#633806;color:#fac775}
+  .status-completed{background:#2c2c2a;color:#b4b2a9}
+}
+/* Client cards */
+.client-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:10px}
+.client-top{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
+.client-avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;border:.5px solid var(--border);cursor:pointer;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500;color:var(--text2);overflow:hidden}
+.client-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.client-details{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 16px}
+.client-detail{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:5px}
+.client-detail a{color:var(--accent);text-decoration:none}
+.client-detail a:hover{text-decoration:underline}
+.add-contact-row{display:flex;gap:8px;margin-bottom:8px;align-items:flex-end}
+.add-contact-row .field{flex:1;margin-bottom:0}
+/* Invoice tracking */
+.inv-section{margin-top:12px;border-top:.5px solid var(--border);padding-top:12px}
+.inv-proj-group{margin-bottom:12px}
+.inv-proj-label{font-size:12px;font-weight:500;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.inv-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:.5px solid var(--border);font-size:13px;gap:8px}
+.inv-row:last-child{border-bottom:none}
+.paid-badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
+.paid-yes{background:#e1f5ee;color:#0f6e56}
+.paid-no{background:#fdf0f0;color:#8b2020}
+.paid-overdue{background:#f5e1e1;color:#7a1515;font-weight:600}
+@media(prefers-color-scheme:dark){
+  .paid-yes{background:#085041;color:#9fe1cb}
+  .paid-no{background:#4a1a1a;color:#e8a0a0}
+  .paid-overdue{background:#5c1010;color:#f0b0b0}
+}
+/* Categories */
+.cat-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.cat-tag{display:flex;align-items:center;gap:4px;background:var(--bg2);border:.5px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px}
+.cat-tag button{background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:0 2px;line-height:1}
+.cat-tag button:hover{color:var(--danger)}
+/* Recurring badge */
+.recur-tag{font-size:10px;background:var(--info);color:#fff;padding:1px 6px;border-radius:10px;margin-left:4px;vertical-align:middle}
+/* Retainer toggle */
+.retainer-fields{padding:10px;background:var(--bg2);border-radius:var(--radius-sm);margin-top:8px}
+/* Sync */
+.sync-bar{display:flex;align-items:center;gap:8px;font-size:12px;padding:7px 12px;border-radius:var(--radius-sm);margin-bottom:1rem;border:.5px solid var(--border)}
+.sync-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sync-idle .sync-dot{background:var(--accent)}
+.sync-saving .sync-dot{background:var(--warning);animation:pulse 1s infinite}
+.sync-error .sync-dot{background:var(--danger)}
+.sync-offline .sync-dot{background:var(--text3)}
+.sync-pending .sync-dot{background:var(--info);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.empty{font-size:14px;color:var(--text2);padding:1rem 0}
+/* Period filter buttons */
+.period-btn{background:none;border:.5px solid var(--border2);border-radius:20px;padding:2px 10px;font-size:11px;cursor:pointer;color:var(--text2);font-family:inherit;transition:all .15s}
+.period-btn:hover{background:var(--bg2);color:var(--text)}
+.period-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+@media print{
+  body{background:white}
+  #app{max-width:100%;padding:1rem}
+  .tabs,.header button,.no-print{display:none!important}
+  #invoice-section{display:block!important}
+  #dashboard-section,#time-section,#expenses-section,#projects-section,#clients-section{display:none!important}
+}
+@media(max-width:520px){.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <div id="app">
+
+  <!-- HEADER -->
   <div class="header">
     <div>
-      <h1 id="proj-name-display">My Tracker</h1>
-      <div class="sub" id="proj-meta-display">Loading...</div>
+      <h1 id="proj-name-display">Lowtide.cc Project Tracker</h1>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+        <div class="sub" id="proj-meta-display"></div>
+        <div style="display:flex;gap:4px" id="period-filters">
+          <button class="period-btn active" onclick="setPeriod('month')" id="pb-month">Month</button>
+          <button class="period-btn" onclick="setPeriod('year')" id="pb-year">Year</button>
+          <button class="period-btn" onclick="setPeriod('all')" id="pb-all">All time</button>
+        </div>
+      </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button class="icon-btn no-print" id="gdrive-btn" onclick="handleDriveAuth()" title="Connect Google Drive" style="display:none">
-        <i class="ti ti-brand-google-drive"></i>
-      </button>
+      <button class="icon-btn no-print" id="gdrive-btn" onclick="handleDriveAuth()" title="Connect Google Drive" style="display:none"><i class="ti ti-brand-google-drive"></i></button>
       <button class="icon-btn no-print" onclick="toggleSettings()" aria-label="Settings"><i class="ti ti-settings"></i></button>
     </div>
   </div>
-  <!-- Sync status bar -->
+
+  <!-- SYNC BAR -->
   <div id="sync-bar" class="sync-bar sync-offline no-print" style="display:none">
     <span class="sync-dot"></span>
-    <span id="sync-msg">Not connected to Google Drive</span>
-    <button class="btn sm" id="sync-action-btn" onclick="handleDriveAuth()" style="margin-left:auto">Connect Drive</button>
+    <span id="sync-msg">Not connected</span>
+    <div style="display:flex;gap:6px;margin-left:auto">
+      <button class="btn sm" id="sync-force-btn" onclick="forcSync()" style="display:none" title="Force sync now"><i class="ti ti-refresh"></i></button>
+      <button class="btn sm" id="sync-action-btn" onclick="handleDriveAuth()">Connect Drive</button>
+    </div>
   </div>
 
-  <!-- Settings -->
+  <!-- SETTINGS -->
   <div id="settings-panel" class="card" style="display:none">
     <div class="sec-title">Global settings</div>
-    <div class="settings-grid">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div><label>Default hourly rate ($)</label><input id="s-rate" type="number" placeholder="150" oninput="saveSetting('hourlyRate',this.value);refreshAll()"></div>
       <div><label>Invoice prefix</label><input id="s-prefix" type="text" placeholder="INV" oninput="saveSetting('invoicePrefix',this.value);refreshAll()"></div>
       <div><label>Currency</label>
@@ -186,10 +210,16 @@
         </select>
       </div>
     </div>
+    <div class="sec-title" style="margin-top:8px">Expense categories</div>
+    <div class="cat-wrap" id="cat-list"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input id="new-cat-input" type="text" placeholder="New category…" style="flex:1" onkeydown="if(event.key==='Enter')addCategory()">
+      <button class="btn sm" onclick="addCategory()"><i class="ti ti-plus"></i> Add</button>
+    </div>
     <button class="btn" style="margin-top:1rem" onclick="toggleSettings()">Done</button>
   </div>
 
-  <!-- Tabs -->
+  <!-- TABS -->
   <div class="tabs no-print">
     <button class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
     <button class="tab" id="tab-time" onclick="switchTab('time')"><i class="ti ti-clock"></i> Time</button>
@@ -199,11 +229,11 @@
     <button class="tab" id="tab-invoice" onclick="switchTab('invoice')"><i class="ti ti-file-invoice"></i> Invoice</button>
   </div>
 
-  <!-- ===== DASHBOARD ===== -->
+  <!-- DASHBOARD -->
   <div id="dashboard-section">
     <div id="dash-project-budgets"></div>
     <div class="met-grid">
-      <div class="met"><div class="met-label">Hours (all time)</div><div class="met-val" id="m-hours">0h</div></div>
+      <div class="met"><div class="met-label">Hours logged</div><div class="met-val" id="m-hours">0h</div></div>
       <div class="met"><div class="met-label">Billable time</div><div class="met-val" id="m-time-amt">$0</div></div>
       <div class="met"><div class="met-label">Expenses</div><div class="met-val" id="m-exp-amt">$0</div></div>
       <div class="met"><div class="met-label">Total billed</div><div class="met-val" id="m-total">$0</div></div>
@@ -212,23 +242,25 @@
     <div id="dash-recent"></div>
   </div>
 
-  <!-- ===== TIME ===== -->
+  <!-- TIME -->
   <div id="time-section" style="display:none">
     <div class="timer-card" id="timer-card">
       <div class="sec-title" style="margin-bottom:4px">Live timer</div>
       <div class="timer-display" id="timer-display">0:00:00</div>
-      <div class="timer-task" id="timer-task-label"></div>
-      <div class="timer-btns" style="margin-top:0.75rem">
+      <div style="font-size:14px;color:var(--text2);min-height:20px" id="timer-task-label"></div>
+      <div class="timer-btns" style="margin-top:.75rem">
         <button class="btn btn-start" id="btn-start" onclick="timerStart()"><i class="ti ti-player-play"></i> Start</button>
+        <button class="btn" id="btn-pause" onclick="timerPause()" style="display:none;background:var(--warning);color:#fff;border-color:var(--warning)"><i class="ti ti-player-pause"></i> Pause</button>
+        <button class="btn" id="btn-resume" onclick="timerResume()" style="display:none;background:var(--success);color:#fff;border-color:var(--success)"><i class="ti ti-player-play"></i> Resume</button>
         <button class="btn btn-stop" id="btn-stop" onclick="timerStop()" style="display:none"><i class="ti ti-player-stop"></i> Stop & log</button>
-        <button class="btn btn-discard" id="btn-discard" onclick="timerDiscard()" style="display:none"><i class="ti ti-x"></i> Discard</button>
+        <button class="btn" id="btn-discard" onclick="timerDiscard()" style="display:none"><i class="ti ti-x"></i> Discard</button>
       </div>
     </div>
     <div class="card">
       <div class="sec-title">Log time manually</div>
       <div class="grid2">
         <div><label>Date</label><input type="date" id="t-date"></div>
-        <div><label>Hours</label><input type="number" id="t-hours" min="0.25" step="0.25" placeholder="2.5"></div>
+        <div><label>Hours</label><input type="number" id="t-hours" min=".25" step=".25" placeholder="2.5"></div>
       </div>
       <div class="grid2">
         <div><label>Client</label><select id="t-client" onchange="refreshTimeProjectDropdown()"><option value="">— No client —</option></select></div>
@@ -245,29 +277,36 @@
     <div id="time-list"></div>
   </div>
 
-  <!-- ===== EXPENSES ===== -->
+  <!-- EXPENSES -->
   <div id="expenses-section" style="display:none">
     <div class="card">
       <div class="sec-title">Log expense</div>
       <div class="grid2">
         <div><label>Date</label><input type="date" id="e-date"></div>
-        <div><label>Amount</label><input type="number" id="e-amount" min="0" step="0.01" placeholder="49.99"></div>
+        <div><label>Amount ($)</label><input type="number" id="e-amount" min="0" step=".01" placeholder="49.99"></div>
       </div>
       <div class="grid2">
-        <div><label>Category</label>
-          <select id="e-category">
-            <option>Software</option><option>Travel</option><option>Equipment</option>
-            <option>Subcontractor</option><option>Meals</option><option>Office</option><option>Other</option>
-          </select>
-        </div>
+        <div><label>Category</label><select id="e-category"></select></div>
         <div><label>Description</label><input type="text" id="e-desc" placeholder="Figma subscription" onkeydown="if(event.key==='Enter')addExpense()"></div>
       </div>
       <div class="grid2">
         <div><label>Client</label><select id="e-client" onchange="refreshExpenseProjectDropdown()"><option value="">— No client —</option></select></div>
         <div><label>Project</label><select id="e-project"><option value="">— No project —</option></select></div>
       </div>
-      <div class="row-action">
-        <label class="check-label"><input type="checkbox" id="e-billable" checked> Billable to client</label>
+      <div class="grid2" style="margin-bottom:4px">
+        <label class="check-label" style="margin-bottom:0"><input type="checkbox" id="e-billable" checked> Billable to client</label>
+        <label class="check-label" style="margin-bottom:0"><input type="checkbox" id="e-recurring"> Recurring</label>
+      </div>
+      <div id="e-recurring-fields" style="display:none;margin-bottom:12px">
+        <label>Frequency</label>
+        <select id="e-freq">
+          <option value="weekly">Weekly</option>
+          <option value="monthly" selected>Monthly</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="annually">Annually</option>
+        </select>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:4px">
         <button class="btn primary" onclick="addExpense()"><i class="ti ti-plus"></i> Add expense</button>
       </div>
     </div>
@@ -275,7 +314,7 @@
     <div id="expense-list"></div>
   </div>
 
-  <!-- ===== PROJECTS ===== -->
+  <!-- PROJECTS -->
   <div id="projects-section" style="display:none">
     <div class="card">
       <div class="sec-title">Add project</div>
@@ -284,71 +323,113 @@
         <div style="grid-column:span 2"><label>Project name</label><input type="text" id="p-name" placeholder="Website Redesign"></div>
       </div>
       <div class="grid2">
-        <div><label>Client</label><select id="p-client"><option value="">— No client —</option></select></div>
+        <div><label>Client</label>
+          <select id="p-client">
+            <option value="">— No client —</option>
+            <option value="__new__">+ Add new client…</option>
+          </select>
+        </div>
         <div><label>Status</label>
           <select id="p-status">
-            <option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option>
+            <option value="active">Active</option>
+            <option value="on_hold">On Hold</option>
+            <option value="completed">Completed</option>
           </select>
         </div>
       </div>
-      <div class="grid3">
-        <div><label>Start date</label><input type="date" id="p-start"></div>
-        <div><label>End date (optional)</label><input type="date" id="p-end"></div>
-        <div><label>Duration (optional)</label><input type="text" id="p-duration" placeholder="e.g. 3 months"></div>
-      </div>
       <div class="grid2">
-        <div><label>Total budget ($)</label><input type="number" id="p-budget" min="0" step="100" placeholder="10000"></div>
-        <div><label>Hourly rate ($)</label><input type="number" id="p-rate" min="0" step="5" placeholder="Use default"></div>
+        <div><label>Start date</label><input type="date" id="p-start"></div>
+        <div>
+          <label>End date</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="p-end-type" onchange="toggleEndDateType()" style="width:auto;flex-shrink:0;font-size:13px">
+              <option value="none">No end date</option>
+              <option value="specific">Specific date</option>
+              <option value="monthyear">Month / year</option>
+            </select>
+            <input type="date" id="p-end-date" style="display:none">
+            <input type="month" id="p-end-month" style="display:none">
+          </div>
+        </div>
       </div>
-      <!-- Retainer toggle -->
+      <div class="field"><label>Duration (optional)</label><input type="text" id="p-duration" placeholder="e.g. 3 months"></div>
+      <div class="grid2">
+        <div>
+          <label>Budget</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="p-budget-type" onchange="toggleBudgetType()" style="width:auto;flex-shrink:0;font-size:13px">
+              <option value="fixed">Fixed</option>
+              <option value="range">Range</option>
+            </select>
+            <input type="number" id="p-budget" min="0" step="100" placeholder="10000" style="flex:1">
+            <span id="p-budget-range-sep" style="display:none;color:var(--text2);font-size:13px">–</span>
+            <input type="number" id="p-budget-max" min="0" step="100" placeholder="12000" style="flex:1;display:none">
+          </div>
+        </div>
+        <div><label>Hourly rate ($/hr)</label><input type="number" id="p-rate" min="0" step="5" placeholder="Use default"></div>
+      </div>
       <div style="margin-bottom:12px">
-        <label class="check-label" style="margin-bottom:8px">
-          <input type="checkbox" id="p-retainer-on" onchange="toggleRetainerFields()"> Has retainer
-        </label>
+        <label class="check-label" style="margin-bottom:8px"><input type="checkbox" id="p-retainer-on" onchange="toggleRetainerFields()"> Has retainer</label>
         <div id="retainer-fields" class="retainer-fields" style="display:none">
           <div class="grid2" style="margin-bottom:0">
             <div><label>Retainer amount ($)</label><input type="number" id="p-retainer-amt" min="0" step="100" placeholder="2000"></div>
-            <div style="display:flex;align-items:flex-end;padding-bottom:2px">
+            <div style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;padding-bottom:2px">
               <label class="check-label"><input type="checkbox" id="p-retainer-in-budget"> Include in total budget</label>
+              <label class="check-label"><input type="checkbox" id="p-retainer-paid"> Mark as paid</label>
             </div>
           </div>
         </div>
       </div>
       <div class="field"><label>Description (optional)</label><input type="text" id="p-desc" placeholder="Brief project overview" onkeydown="if(event.key==='Enter')addProject()"></div>
-      <div style="display:flex;justify-content:flex-end">
-        <button class="btn primary" onclick="addProject()"><i class="ti ti-plus"></i> Add project</button>
-      </div>
+      <div style="display:flex;justify-content:flex-end"><button class="btn primary" onclick="addProject()"><i class="ti ti-plus"></i> Add project</button></div>
     </div>
     <div class="sec-title">All projects</div>
     <div id="project-list"></div>
   </div>
 
-  <!-- ===== CLIENTS ===== -->
+  <!-- CLIENTS -->
   <div id="clients-section" style="display:none">
     <div class="card">
       <div class="sec-title">Add client</div>
-      <div class="grid2">
-        <div><label>Company name</label><input type="text" id="c-company" placeholder="Acme Corp"></div>
-        <div><label>Contact name</label><input type="text" id="c-name" placeholder="Jane Smith"></div>
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+        <div style="flex-shrink:0;text-align:center">
+          <div id="add-client-photo-preview" class="client-avatar" onclick="document.getElementById('add-client-photo-input').click()" title="Upload photo" style="width:54px;height:54px;font-size:18px;cursor:pointer">
+            <i class="ti ti-camera" style="font-size:20px;color:var(--text3)"></i>
+          </div>
+          <input type="file" id="add-client-photo-input" accept="image/*" style="display:none" onchange="previewClientPhoto(this,'add-client-photo-preview','add-client-photo-data')">
+          <input type="hidden" id="add-client-photo-data">
+          <div style="font-size:10px;color:var(--text3);margin-top:3px">Photo</div>
+        </div>
+        <div style="flex:1">
+          <div class="grid2" style="margin-bottom:0">
+            <div class="field"><label>Company name</label><input type="text" id="c-company" placeholder="Acme Corp"></div>
+            <div class="field"><label>Contact name</label><input type="text" id="c-name" placeholder="Jane Smith"></div>
+          </div>
+          <div class="grid2" style="margin-bottom:0">
+            <div class="field"><label>Email</label><input type="email" id="c-email" placeholder="jane@acme.com"></div>
+            <div class="field"><label>Phone</label><input type="tel" id="c-phone" placeholder="+1 (555) 000-0000"></div>
+          </div>
+        </div>
       </div>
-      <div class="grid2">
-        <div><label>Email</label><input type="email" id="c-email" placeholder="jane@acme.com"></div>
-        <div><label>Phone</label><input type="tel" id="c-phone" placeholder="+1 (555) 000-0000"></div>
-      </div>
-      <div class="field"><label>Notes (optional)</label><input type="text" id="c-notes" placeholder="Preferred contact method, timezone, etc." onkeydown="if(event.key==='Enter')addClient()"></div>
-      <div style="display:flex;justify-content:flex-end">
-        <button class="btn primary" onclick="addClient()"><i class="ti ti-plus"></i> Add client</button>
-      </div>
+      <div class="field"><label>Notes (optional)</label><input type="text" id="c-notes" placeholder="Timezone, preferred contact, etc."></div>
+      <div class="sec-title" style="margin-top:4px">Additional contacts (optional)</div>
+      <div id="add-extra-contacts"></div>
+      <button class="btn sm" onclick="addExtraContactRow('add-extra-contacts')" style="margin-bottom:12px"><i class="ti ti-plus"></i> Add contact</button>
+      <div style="display:flex;justify-content:flex-end"><button class="btn primary" onclick="addClient()"><i class="ti ti-plus"></i> Add client</button></div>
     </div>
     <div class="sec-title">Contacts</div>
     <div id="client-list"></div>
   </div>
 
-  <!-- ===== INVOICE ===== -->
+  <!-- INVOICE (print) -->
   <div id="invoice-section" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem" class="no-print">
-      <label style="font-size:14px;color:var(--text2);margin:0">Invoice period</label>
+      <label style="font-size:14px;color:var(--text2);margin:0">Period</label>
       <input type="month" id="inv-month" style="width:180px" oninput="renderInvoice()">
+      <label style="font-size:14px;color:var(--text2);margin:0">Project</label>
+      <select id="inv-project-filter" style="width:200px" onchange="renderInvoice()">
+        <option value="">All projects</option>
+      </select>
     </div>
     <div class="card" id="invoice-card">
       <div class="invoice-header">
@@ -357,11 +438,12 @@
           <div style="font-size:12px;color:var(--text2);margin-top:4px" id="inv-number"></div>
         </div>
         <div style="text-align:right">
-          <div style="font-weight:500" id="inv-proj"></div>
-          <div style="font-size:13px;color:var(--text2);margin-top:2px" id="inv-client"></div>
+          <div style="font-weight:500" id="inv-proj-name"></div>
+          <div style="font-size:13px;color:var(--text2);margin-top:2px" id="inv-client-name"></div>
           <div style="font-size:13px;color:var(--text2)" id="inv-period"></div>
         </div>
       </div>
+      <div id="inv-retainer-section"></div>
       <div id="inv-time-section"></div>
       <div id="inv-exp-section"></div>
       <div id="inv-empty" style="display:none;text-align:center;padding:2rem 0;color:var(--text2);font-size:14px"></div>
@@ -369,69 +451,72 @@
     </div>
     <button class="btn no-print" style="margin-top:1rem" onclick="window.print()"><i class="ti ti-printer"></i> Print / save as PDF</button>
   </div>
-</div>
+
+</div><!-- #app -->
 
 <script>
-// ── Google Drive Sync ──
-const GD_CLIENT_ID  = '964475055610-sb4e62npukeqrno43qpjnse5pa05ca5n.apps.googleusercontent.com';
-const GD_SCOPE      = 'https://www.googleapis.com/auth/drive.file';
-const GD_FILENAME   = 'tracker-data.json';
-const GD_KEYS       = ['tracker:settings','tracker:time','tracker:expenses','tracker:clients','tracker:projects','tracker:clientInvs'];
-// Dynamic redirect — always matches the exact URL the app is running on
-const GD_REDIRECT   = window.location.origin + window.location.pathname;
+// ═══════════════════════════════════════════════
+//  GOOGLE DRIVE SYNC
+// ═══════════════════════════════════════════════
+const GD_CLIENT_ID = '964475055610-sb4e62npukeqrno43qpjnse5pa05ca5n.apps.googleusercontent.com';
+const GD_SCOPE     = 'https://www.googleapis.com/auth/drive.file';
+const GD_FILENAME  = 'tracker-data.json';
+const GD_KEYS      = ['tracker:settings','tracker:time','tracker:expenses','tracker:clients','tracker:projects','tracker:clientInvs'];
 
-let gdToken   = null;
-let gdFileId  = null;
-let syncTimer = null;
+let gdToken=null, gdFileId=null, syncTimer=null;
 
-function setSyncUI(state, msg, showBtn=false, btnLabel=''){
+function setSyncUI(state,msg,showBtn=false,btnLabel=''){
   const bar=document.getElementById('sync-bar');
-  const msgEl=document.getElementById('sync-msg');
-  const btn=document.getElementById('sync-action-btn');
   bar.style.display='flex';
   bar.className='sync-bar no-print sync-'+state;
-  msgEl.textContent=msg;
+  document.getElementById('sync-msg').textContent=msg;
+  const btn=document.getElementById('sync-action-btn');
   btn.style.display=showBtn?'inline-flex':'none';
   if(showBtn)btn.textContent=btnLabel;
+  document.getElementById('sync-force-btn').style.display=gdToken?'inline-flex':'none';
+}
+
+async function forcSync(){
+  if(!gdToken||!gdFileId){setSyncUI('error','Not connected — click Connect Drive first',true,'Connect Drive');return;}
+  setSyncUI('saving','Syncing now…');
+  clearTimeout(syncTimer);
+  await writeToDrive();
 }
 
 function handleDriveAuth(){
-  // Open auth in a new tab — works from any host including iframes
   const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  url.searchParams.set('client_id', GD_CLIENT_ID);
-  url.searchParams.set('redirect_uri', 'https://michael-lowtide-cc.github.io/project-tracker/auth.html');
-  url.searchParams.set('response_type', 'token');
-  url.searchParams.set('scope', GD_SCOPE);
-  url.searchParams.set('include_granted_scopes', 'true');
-  url.searchParams.set('prompt', 'select_account');
+  url.searchParams.set('client_id',GD_CLIENT_ID);
+  url.searchParams.set('redirect_uri','https://michael-lowtide-cc.github.io/project-tracker/auth.html');
+  url.searchParams.set('response_type','token');
+  url.searchParams.set('scope',GD_SCOPE);
+  url.searchParams.set('include_granted_scopes','true');
+  url.searchParams.set('prompt','select_account');
   setSyncUI('pending','Waiting for Google sign-in…');
-  const popup = window.open(url.toString(), 'gdrive-auth', 'width=500,height=620');
-  // Listen for token sent back from auth.html
-  window.addEventListener('message', async function handler(e){
+  const popup=window.open(url.toString(),'gdrive-auth','width=500,height=620');
+  window.addEventListener('message',async function h(e){
     if(e.data&&e.data.type==='gd_token'){
-      window.removeEventListener('message', handler);
-      gdToken = e.data.token;
+      window.removeEventListener('message',h);
+      gdToken=e.data.token;
       localStorage.setItem('gd:wasConnected','1');
-      if(popup&&!popup.closed) popup.close();
+      if(popup&&!popup.closed)popup.close();
       await initDriveWithToken();
     }
     if(e.data&&e.data.type==='gd_error'){
-      window.removeEventListener('message', handler);
+      window.removeEventListener('message',h);
       setSyncUI('error','Sign-in failed — click to retry',true,'Retry');
     }
   });
 }
 
 function checkHashToken(){
-  // Only used when opened directly (not in iframe)
-  if(window.self !== window.top) return false; // inside iframe — skip
-  const hash = window.location.hash;
-  if(!hash) return false;
-  const params = new URLSearchParams(hash.slice(1));
-  const token  = params.get('access_token');
-  if(!token) return false;
-  history.replaceState(null,'', window.location.pathname);
-  gdToken = token;
+  if(window.self!==window.top)return false;
+  const hash=window.location.hash;
+  if(!hash)return false;
+  const p=new URLSearchParams(hash.slice(1));
+  const t=p.get('access_token');
+  if(!t)return false;
+  history.replaceState(null,'',window.location.pathname);
+  gdToken=t;
   localStorage.setItem('gd:wasConnected','1');
   return true;
 }
@@ -440,87 +525,52 @@ async function initDriveWithToken(){
   setSyncUI('pending','Connecting to Google Drive…');
   await gapi.client.init({});
   await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
-  gapi.client.setToken({access_token: gdToken});
+  gapi.client.setToken({access_token:gdToken});
   await findOrCreateFile();
   await loadFromDrive();
 }
 
 function gapiLoaded(){
-  gapi.load('client', async ()=>{
+  gapi.load('client',async()=>{
     document.getElementById('gdrive-btn').style.display='flex';
-    const hasToken = checkHashToken();
-    if(hasToken){
-      await initDriveWithToken();
-    } else if(localStorage.getItem('gd:wasConnected')==='1'){
-      // Previously connected — show status but don't auto-redirect
-      setSyncUI('offline','Google Drive not connected',true,'Connect Drive');
-    } else {
-      setSyncUI('offline','Google Drive not connected',true,'Connect Drive');
-    }
+    if(checkHashToken()){await initDriveWithToken();}
+    else{setSyncUI('offline','Google Drive not connected',true,'Connect Drive');}
   });
 }
 
 async function findOrCreateFile(){
-  setSyncUI('pending','Looking for your data file…');
+  setSyncUI('pending','Looking for data file…');
   try{
-    const res=await gapi.client.drive.files.list({
-      q:`name='${GD_FILENAME}' and trashed=false`,
-      spaces:'drive',fields:'files(id,name)'
-    });
+    const res=await gapi.client.drive.files.list({q:`name='${GD_FILENAME}' and trashed=false`,spaces:'drive',fields:'files(id,name)'});
     const files=res.result.files;
-    if(files&&files.length>0){
-      gdFileId=files[0].id;
-    } else {
-      const meta={name:GD_FILENAME,mimeType:'application/json'};
-      const created=await gapi.client.drive.files.create({resource:meta,fields:'id'});
-      gdFileId=created.result.id;
+    if(files&&files.length>0){gdFileId=files[0].id;}
+    else{
+      const cr=await gapi.client.drive.files.create({resource:{name:GD_FILENAME,mimeType:'application/json'},fields:'id'});
+      gdFileId=cr.result.id;
       await writeToDrive();
     }
-  } catch(e){
-    const msg=e.result?.error?.message||e.message||JSON.stringify(e);
-    console.error('findOrCreateFile error:',e);
-    setSyncUI('error','Drive error: '+msg,true,'Retry');
-  }
+  }catch(e){setSyncUI('error','Drive error: '+(e.result?.error?.message||e.message),true,'Retry');console.error(e);}
 }
 
 async function loadFromDrive(){
-  if(!gdFileId||!gdToken) return;
-  setSyncUI('pending','Loading your data from Drive…');
+  if(!gdFileId||!gdToken)return;
+  setSyncUI('pending','Loading from Drive…');
   try{
-    const res=await fetch(`https://www.googleapis.com/drive/v3/files/${gdFileId}?alt=media`,{
-      headers:{Authorization:`Bearer ${gdToken}`}
-    });
-    if(!res.ok){
-      const errText=await res.text();
-      throw new Error(`HTTP ${res.status}: ${errText}`);
-    }
+    const res=await fetch(`https://www.googleapis.com/drive/v3/files/${gdFileId}?alt=media`,{headers:{Authorization:`Bearer ${gdToken}`}});
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
     const raw=await res.text();
     const data=(raw&&raw!=='null'&&raw.trim()!=='')?JSON.parse(raw):{};
-    // Only restore keys that have actual data (not null)
     GD_KEYS.forEach(k=>{if(data[k]!=null)localStorage.setItem(k,JSON.stringify(data[k]));});
-    settings    = load('tracker:settings',{}) ; settings = Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD'}, settings||{});
-    timeEntries = load('tracker:time',[])     || [];
-    expenses    = load('tracker:expenses',[]) || [];
-    clients     = load('tracker:clients',[])  || [];
-    projects    = load('tracker:projects',[]) || [];
-    clientInvs  = load('tracker:clientInvs',{}) || {};
-    (function loadSettingsForm(){
-      document.getElementById('s-rate').value=settings.hourlyRate||'150';
-      document.getElementById('s-prefix').value=settings.invoicePrefix||'INV';
-      document.getElementById('s-currency').value=settings.currency||'USD';
-    })();
+    reloadState();
     allDropdownRefresh();
     refreshAll();
-    setSyncUI('idle',`Synced with Google Drive · ${new Date().toLocaleTimeString()}`);
-  } catch(e){
-    const msg=e.message||JSON.stringify(e);
-    console.error('loadFromDrive error:',e);
-    setSyncUI('error','Could not load from Drive: '+msg,true,'Retry');
-  }
+    setSyncUI('idle',`Synced · ${new Date().toLocaleTimeString()}`);
+    document.getElementById('sync-force-btn').style.display='inline-flex';
+  }catch(e){setSyncUI('error','Load failed: '+e.message,true,'Retry');console.error(e);}
 }
 
 async function writeToDrive(){
-  if(!gdFileId||!gdToken) return;
+  if(!gdFileId||!gdToken)return;
   const data={};
   GD_KEYS.forEach(k=>{try{data[k]=JSON.parse(localStorage.getItem(k));}catch{data[k]=null;}});
   try{
@@ -529,54 +579,75 @@ async function writeToDrive(){
       headers:{'Content-Type':'application/json','Authorization':`Bearer ${gdToken}`},
       body:JSON.stringify(data)
     });
-    setSyncUI('idle',`Saved to Google Drive · ${new Date().toLocaleTimeString()}`);
-  } catch(e){
-    setSyncUI('error','Drive save failed — data safe locally',true,'Retry');
-    console.error(e);
-  }
+    setSyncUI('idle',`Saved · ${new Date().toLocaleTimeString()}`);
+    document.getElementById('sync-force-btn').style.display='inline-flex';
+  }catch(e){setSyncUI('error','Save failed — data safe locally',true,'Retry');console.error(e);}
 }
 
 function scheduleDriveSync(){
-  if(!gdToken||!gdFileId) return;
+  if(!gdToken||!gdFileId)return;
   setSyncUI('saving','Saving…');
   clearTimeout(syncTimer);
   syncTimer=setTimeout(writeToDrive,1500);
 }
 
-// ── Storage ──
+// ═══════════════════════════════════════════════
+//  STORAGE
+// ═══════════════════════════════════════════════
 function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
-function save(k,v){
-  try{localStorage.setItem(k,JSON.stringify(v));}catch{}
-  scheduleDriveSync();
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}scheduleDriveSync();}
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const DEF_CATS=['Software','Travel','Equipment','Subcontractor','Meals','Office','Other'];
+let settings, timeEntries, expenses, clients, projects, clientInvs, currentTab='dashboard';
+let editing={time:null,expenses:null,projects:null,clients:null};
+
+function reloadState(){
+  settings   =Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD',expenseCategories:DEF_CATS},load('tracker:settings',{})||{});
+  timeEntries=load('tracker:time',[])||[];
+  expenses   =load('tracker:expenses',[])||[];
+  clients    =load('tracker:clients',[])||[];
+  projects   =load('tracker:projects',[])||[];
+  clientInvs =load('tracker:clientInvs',{})||{};
 }
+reloadState();
 
-// ── State ──
-let settings = load('tracker:settings',{hourlyRate:'150',invoicePrefix:'INV',currency:'USD'});
-let timeEntries = load('tracker:time',[]);
-let expenses    = load('tracker:expenses',[]);
-let clients     = load('tracker:clients',[]);
-let projects    = load('tracker:projects',[]);
-let clientInvs  = load('tracker:clientInvs',{});  // { clientId: [{id,date,amount,dueDate,paid,paidDate,notes}] }
-let currentTab  = 'dashboard';
-
-// ── Helpers ──
+// ═══════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════
 function uid(){return Math.random().toString(36).slice(2,10)}
 function today(){return new Date().toISOString().split('T')[0]}
 function thisMonth(){return today().substring(0,7)}
 function fmtDate(d){if(!d)return'';return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
-function monthLabel(m){const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'})}
+function fmtMonth(m){if(!m)return'';const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'})}
 function $f(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:settings.currency||'USD',minimumFractionDigits:2}).format(n||0)}
 function saveSetting(k,v){settings[k]=v;save('tracker:settings',settings)}
-function toggleRetainerFields(){
-  const on=document.getElementById('p-retainer-on').checked;
-  document.getElementById('retainer-fields').style.display=on?'block':'none';
+function getProjRate(proj){return parseFloat((proj&&proj.rate)?proj.rate:settings.hourlyRate||0)}
+function getProjBudget(proj){
+  if(!proj)return{min:0,max:0,isRange:false,display:''};
+  const min=parseFloat(proj.budget||0);
+  const isRange=proj.budgetType==='range'&&proj.budgetMax;
+  const max=isRange?parseFloat(proj.budgetMax||0):min;
+  return{min,max,isRange,display:isRange?$f(min)+' – '+$f(max):$f(min)};
 }
+function getCategories(){return settings.expenseCategories||DEF_CATS;}
 
-// ── Init ──
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
 document.getElementById('t-date').value=today();
 document.getElementById('e-date').value=today();
 document.getElementById('inv-month').value=thisMonth();
 document.getElementById('p-start').value=today();
+document.getElementById('e-recurring').addEventListener('change',function(){
+  document.getElementById('e-recurring-fields').style.display=this.checked?'block':'none';
+});
+document.getElementById('p-client').addEventListener('change',function(){
+  if(this.value==='__new__'){switchTab('clients');this.value='';return;}
+  refreshProjectClientDropdown();
+});
 (function loadSettingsForm(){
   document.getElementById('s-rate').value=settings.hourlyRate||'150';
   document.getElementById('s-prefix').value=settings.invoicePrefix||'INV';
@@ -585,7 +656,9 @@ document.getElementById('p-start').value=today();
 
 function toggleSettings(){
   const p=document.getElementById('settings-panel');
-  p.style.display=p.style.display==='none'?'block':'none';
+  const show=p.style.display==='none';
+  p.style.display=show?'block':'none';
+  if(show)renderCategoryList();
 }
 
 function switchTab(t){
@@ -599,95 +672,204 @@ function switchTab(t){
   if(t==='projects')renderProjectList();
 }
 
-// ── Dashboard ──
-function refreshAll(){
-  // Header
-  document.getElementById('proj-name-display').textContent='Project Tracker';
+function toggleEndDateType(){
+  const v=document.getElementById('p-end-type').value;
+  document.getElementById('p-end-date').style.display=v==='specific'?'block':'none';
+  document.getElementById('p-end-month').style.display=v==='monthyear'?'block':'none';
+}
+
+function toggleBudgetType(){
+  const r=document.getElementById('p-budget-type').value==='range';
+  document.getElementById('p-budget-range-sep').style.display=r?'inline':'none';
+  document.getElementById('p-budget-max').style.display=r?'block':'none';
+  document.getElementById('p-budget').placeholder=r?'Min (e.g. 8000)':'Amount';
+}
+
+function toggleRetainerFields(){
+  document.getElementById('retainer-fields').style.display=document.getElementById('p-retainer-on').checked?'block':'none';
+}
+
+// Photo upload
+function previewClientPhoto(input,previewId,dataId){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const prev=document.getElementById(previewId);
+    document.getElementById(dataId).value=e.target.result;
+    prev.innerHTML=`<img src="${e.target.result}" alt="photo">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Extra contact rows
+function addExtraContactRow(containerId, data={}){
+  const wrap=document.getElementById(containerId);
+  const row=document.createElement('div');
+  row.className='add-contact-row';
+  row.innerHTML=`
+    <div class="field"><label>Name</label><input type="text" class="ec-name" value="${data.name||''}" placeholder="Alex Jones"></div>
+    <div class="field"><label>Email</label><input type="email" class="ec-email" value="${data.email||''}" placeholder="alex@co.com"></div>
+    <div class="field"><label>Phone</label><input type="tel" class="ec-phone" value="${data.phone||''}" placeholder="+1 (555) 000"></div>
+    <button class="icon-action danger" onclick="this.parentNode.remove()" style="margin-top:18px;flex-shrink:0"><i class="ti ti-x"></i></button>`;
+  wrap.appendChild(row);
+}
+
+function getExtraContacts(containerId){
+  const rows=document.getElementById(containerId).querySelectorAll('.add-contact-row');
+  return Array.from(rows).map(r=>({
+    name:r.querySelector('.ec-name').value.trim(),
+    email:r.querySelector('.ec-email').value.trim(),
+    phone:r.querySelector('.ec-phone').value.trim()
+  })).filter(c=>c.name||c.email||c.phone);
+}
+
+// ═══════════════════════════════════════════════
+//  CATEGORIES
+// ═══════════════════════════════════════════════
+function renderCategoryList(){
+  const cats=getCategories();
+  document.getElementById('cat-list').innerHTML=cats.map((c,i)=>
+    `<span class="cat-tag">${c}<button onclick="removeCategory(${i})" title="Remove">×</button></span>`
+  ).join('');
+  refreshExpenseCategoryDropdown();
+}
+
+function addCategory(){
+  const v=document.getElementById('new-cat-input').value.trim();
+  if(!v)return;
+  const cats=getCategories();
+  if(!cats.includes(v))cats.push(v);
+  saveSetting('expenseCategories',cats);
+  document.getElementById('new-cat-input').value='';
+  renderCategoryList();
+}
+
+function removeCategory(i){
+  const cats=getCategories();
+  cats.splice(i,1);
+  saveSetting('expenseCategories',cats);
+  renderCategoryList();
+}
+
+function refreshExpenseCategoryDropdown(){
+  const sel=document.getElementById('e-category');if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML=getCategories().map(c=>`<option value="${c}">${c}</option>`).join('');
+  if(prev)sel.value=prev;
+}
+
+// ═══════════════════════════════════════════════
+//  PERIOD FILTER
+// ═══════════════════════════════════════════════
+let currentPeriod='month';
+function setPeriod(p){
+  currentPeriod=p;
+  ['month','year','all'].forEach(x=>document.getElementById('pb-'+x).classList.toggle('active',x===p));
+  refreshAll();
+}
+function periodLabel(){
   const now=new Date();
-  document.getElementById('proj-meta-display').textContent=now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  if(currentPeriod==='month')return now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  if(currentPeriod==='year')return String(now.getFullYear());
+  return 'All time';
+}
+function filterByPeriod(entries){
+  if(currentPeriod==='all')return entries;
+  const now=new Date();
+  const prefix=currentPeriod==='month'?today().substring(0,7):String(now.getFullYear());
+  return entries.filter(e=>e.date&&e.date.startsWith(prefix));
+}
 
-  // Metrics (all-time)
-  const totalHours=timeEntries.reduce((s,e)=>s+parseFloat(e.hours||0),0);
-  const billHours=timeEntries.filter(e=>e.billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
-  const rate=parseFloat(settings.hourlyRate||0);
-  const timeAmt=billHours*rate;
-  const expAmt=expenses.filter(e=>e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
-  const total=timeAmt+expAmt;
+// ═══════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════
+function refreshAll(){
+  document.getElementById('proj-meta-display').textContent=periodLabel();
 
+  const filteredTime=filterByPeriod(timeEntries);
+  const filteredExp=filterByPeriod(expenses);
+
+  const totalHours=filteredTime.reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const billTimeAmt=filteredTime.filter(e=>e.billable).reduce((s,e)=>{
+    const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+    return s+parseFloat(e.hours||0)*getProjRate(proj);
+  },0);
+  const expAmt=filteredExp.filter(e=>e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
   document.getElementById('m-hours').textContent=totalHours.toFixed(1)+'h';
-  document.getElementById('m-time-amt').textContent=$f(timeAmt);
+  document.getElementById('m-time-amt').textContent=$f(billTimeAmt);
   document.getElementById('m-exp-amt').textContent=$f(expAmt);
-  document.getElementById('m-total').textContent=$f(total);
+  document.getElementById('m-total').textContent=$f(billTimeAmt+expAmt);
 
-  // Per-project budget bars
   renderDashBudgets();
 
-  // Recent entries
   const el=document.getElementById('dash-recent');
-  const recent=[...timeEntries].slice(0,6);
-  if(!recent.length){el.innerHTML='<div class="empty">No time logged yet. Go to the Time tab to start!</div>';}
-  else el.innerHTML=recent.map(e=>{
+  if(!filteredTime.length){el.innerHTML='<div class="empty">No time logged for this period.</div>';return;}
+  el.innerHTML=[...filteredTime].slice(0,6).map(e=>{
     const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
-    return`<div class="entry-row">
-      <div><div class="entry-title">${e.task}</div><div class="entry-meta">${fmtDate(e.date)}${proj?' · '+proj.name:''}${e.billable?'':' · non-billable'}</div></div>
-      <span class="amt">${e.hours}h</span>
-    </div>`;
+    return`<div class="entry-row"><div><div class="entry-title">${e.task}</div><div class="entry-meta">${fmtDate(e.date)}${proj?' · '+proj.name:''}${e.billable?'':' · non-billable'}</div></div><span class="amt">${e.hours}h</span></div>`;
   }).join('');
 
   renderTimeList();
   renderExpenseList();
+  refreshInvoiceProjectFilter();
   if(currentTab==='invoice')renderInvoice();
   if(currentTab==='projects')renderProjectList();
 }
 
 function renderDashBudgets(){
   const el=document.getElementById('dash-project-budgets');
-  const active=projects.filter(p=>p.status==='active'&&parseFloat(p.budget||0)>0);
+  const active=projects.filter(p=>p.status==='active');
   if(!active.length){
-    el.innerHTML='<div class="card"><div style="font-size:13px;color:var(--text2)">No active projects with budgets set. Add a project to see budget tracking here.</div></div>';
+    el.innerHTML='<div class="card" style="font-size:13px;color:var(--text2)">No active projects yet. Add a project to see budget tracking here.</div>';
     return;
   }
   el.innerHTML=active.map(p=>{
-    const projRate=parseFloat(p.rate||settings.hourlyRate||0);
-    const pTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
-    const pExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
-    const billed=pTime*projRate+pExp;
-    const budget=parseFloat(p.budget||0);
+    const rate=getProjRate(p);
+    const bTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*rate,0);
+    const bExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+    const billed=bTime+bExp;
+    const budget=getProjBudget(p);
     const retainer=p.retainerOn?parseFloat(p.retainerAmt||0):0;
     const retainerInBudget=p.retainerOn&&p.retainerInBudget;
-    const pct=budget>0?Math.min(100,(billed/budget)*100):0;
-    const retPct=retainerInBudget&&budget>0?Math.min(100,(retainer/budget)*100):0;
-    const remaining=budget-billed;
+    const budgetMax=budget.max||0;
+    const budgetMin=budget.min||0;
+    const pct=budgetMax>0?Math.min(100,(billed/budgetMax)*100):0;
+    const minPct=budget.isRange&&budgetMax>0?Math.min(100,(budgetMin/budgetMax)*100):0;
+    const retPct=retainerInBudget&&budgetMax>0?Math.min(100,(retainer/budgetMax)*100):0;
+    const remaining=budgetMax>0?budgetMax-billed:null;
     const color=pct>=100?'var(--danger)':pct>=80?'var(--warning)':'var(--success)';
     const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
     const clientLabel=client?(client.company||client.contactName):'';
     return`<div class="card gauge-wrap">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div>
-          <span style="font-size:14px;font-weight:500">${p.num?'<span style="color:var(--text2);font-size:12px">'+p.num+'</span> ':''} ${p.name}</span>
+          <span style="font-size:14px;font-weight:500">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} — </span>`:''}${p.name}</span>
           ${clientLabel?`<span style="font-size:12px;color:var(--text2);margin-left:6px">· ${clientLabel}</span>`:''}
         </div>
-        <span style="font-size:13px;font-weight:500;white-space:nowrap">${$f(billed)} / ${$f(budget)}</span>
+        <span style="font-size:13px;font-weight:500;white-space:nowrap">${$f(billed)}${budgetMax?' / '+budget.display:''}</span>
       </div>
-      <div class="gauge-bar">
+      ${budgetMax>0?`<div class="gauge-bar">
         <div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
-        ${retainerInBudget&&retPct>0?`<div class="gauge-retainer" style="width:${retPct.toFixed(1)}%"></div>`:''}
+        ${retainerInBudget&&retPct>0?`<div class="gauge-mark" style="width:${retPct.toFixed(1)}%"></div>`:''}
+        ${budget.isRange&&minPct>0?`<div class="gauge-mark" style="width:${minPct.toFixed(1)}%;border-color:rgba(255,200,0,.8)"></div>`:''}
       </div>
       <div class="gauge-row">
-        <span>${pct.toFixed(0)}% used${p.retainerOn?` · Retainer: ${$f(retainer)}${retainerInBudget?' (in budget)':''}`:''}</span>
-        <span style="color:${remaining<0?'var(--danger)':'var(--text2)'}">${remaining<0?$f(Math.abs(remaining))+' over':$f(remaining)+' remaining'}</span>
-      </div>
-      ${retainerInBudget&&retPct>0?`<div class="legend"><span><span class="legend-dot" style="background:${color}"></span>Billed</span><span><span class="legend-dot" style="background:var(--bg2);border:1px dashed var(--text2)"></span>Retainer mark</span></div>`:''}
+        <span>${pct.toFixed(0)}% used${p.retainerOn?` · Retainer ${$f(retainer)}${retainerInBudget?' (in budget)':''}${p.retainerPaid?' ✓':''}`:''}</span>
+        ${remaining!==null?`<span style="color:${remaining<0?'var(--danger)':'var(--text2)'}">${remaining<0?$f(Math.abs(remaining))+' over':$f(remaining)+' remaining'}</span>`:''}
+      </div>`:'<div style="font-size:12px;color:var(--text3)">No budget set · '+$f(billed)+' billed</div>'}
     </div>`;
   }).join('');
 }
 
-// ── Time ──
+// ═══════════════════════════════════════════════
+//  TIME
+// ═══════════════════════════════════════════════
 function refreshClientDropdown(){
   const sel=document.getElementById('t-client');if(!sel)return;
   const prev=sel.value;
   sel.innerHTML='<option value="">— No client —</option>';
-  clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName;sel.appendChild(o);});
+  clients.forEach(c=>{const o=new Option((c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName,c.id);sel.appendChild(o);});
   if(prev)sel.value=prev;
   refreshTimeProjectDropdown();
 }
@@ -697,57 +879,116 @@ function refreshTimeProjectDropdown(){
   const cid=document.getElementById('t-client').value||'';
   const prev=sel.value;
   sel.innerHTML='<option value="">— No project —</option>';
-  const filtered=cid?projects.filter(p=>p.clientId===cid):projects;
-  filtered.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
-  if(prev&&filtered.find(p=>p.id===prev))sel.value=prev;
+  (cid?projects.filter(p=>p.clientId===cid):projects).forEach(p=>{sel.appendChild(new Option(p.name,p.id));});
+  if(prev&&(cid?projects.filter(p=>p.clientId===cid):projects).find(p=>p.id===prev))sel.value=prev;
 }
 
 function renderTimeList(){
   const el=document.getElementById('time-list');
   if(!timeEntries.length){el.innerHTML='<div class="empty">No entries yet.</div>';return;}
-  el.innerHTML=timeEntries.map(e=>{
-    const client=e.clientId?clients.find(c=>c.id===e.clientId):null;
-    const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
-    const projRate=proj?parseFloat(proj.rate||settings.hourlyRate||0):parseFloat(settings.hourlyRate||0);
-    return`<div class="entry-row">
-      <div style="flex:1">
-        <div class="entry-title">${e.task}</div>
-        <div class="entry-meta">${fmtDate(e.date)}${client?' · '+(client.company||client.contactName):''}${proj?' · '+proj.name:''}${e.notes?' · '+e.notes:''}${e.billable?'':' · non-billable'}</div>
+  // Group by date
+  const groups={};
+  timeEntries.forEach(e=>{
+    const d=e.date||'unknown';
+    if(!groups[d])groups[d]=[];
+    groups[d].push(e);
+  });
+  const sortedDates=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
+  el.innerHTML=sortedDates.map(date=>{
+    const entries=groups[date];
+    const dayHours=entries.reduce((s,e)=>s+parseFloat(e.hours||0),0);
+    const dayAmt=entries.filter(e=>e.billable).reduce((s,e)=>{
+      const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+      return s+parseFloat(e.hours||0)*getProjRate(proj);
+    },0);
+    return`<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid var(--border2);margin-bottom:2px">
+        <span style="font-size:12px;font-weight:600;color:var(--accent)">${fmtDate(date)}</span>
+        <span style="font-size:12px;color:var(--text2)">${dayHours.toFixed(1)}h${dayAmt>0?' · '+$f(dayAmt):''}</span>
       </div>
-      <div class="entry-right">
-        <span class="amt">${e.hours}h</span>
-        ${e.billable?`<span style="font-size:12px;color:var(--text2)">${$f(e.hours*projRate)}</span>`:''}
-        <button class="del-btn" onclick="deleteTime('${e.id}')"><i class="ti ti-trash"></i></button>
-      </div>
+      ${entries.map(e=>{
+        const client=e.clientId?clients.find(c=>c.id===e.clientId):null;
+        const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+        const rate=getProjRate(proj);
+        const isEditing=editing.time===e.id;
+        return`<div>
+          <div class="entry-row" style="padding:8px 0">
+            <div style="flex:1">
+              <div class="entry-title">${e.task}</div>
+              <div class="entry-meta">${client?''+( client.company||client.contactName):''}${proj?( client?' · ':'')+proj.name:''}${e.notes?' · '+e.notes:''}${e.billable?'':' · non-billable'}</div>
+            </div>
+            <div class="entry-right">
+              <span class="amt">${e.hours}h</span>
+              ${e.billable?`<span style="font-size:12px;color:var(--text2)">${$f(e.hours*rate)}</span>`:''}
+              <button class="icon-action" onclick="toggleEdit('time','${e.id}')" title="${isEditing?'Close':'Edit'}"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
+            </div>
+          </div>
+          ${isEditing?renderTimeEditForm(e):''}
+        </div>`;
+      }).join('')}
     </div>`;
   }).join('');
 }
 
-function deleteTime(id){timeEntries=timeEntries.filter(e=>e.id!==id);save('tracker:time',timeEntries);refreshAll();}
+function renderTimeEditForm(e){
+  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName}</option>`).join('');
+  const projOpts=projects.map(p=>`<option value="${p.id}"${p.id===e.projectId?' selected':''}>${p.name}</option>`).join('');
+  return`<div class="edit-form">
+    <div class="grid2">
+      <div><label>Date</label><input type="date" id="et-date-${e.id}" value="${e.date}"></div>
+      <div><label>Hours</label><input type="number" id="et-hours-${e.id}" value="${e.hours}" min=".25" step=".25"></div>
+    </div>
+    <div class="grid2">
+      <div><label>Client</label><select id="et-client-${e.id}"><option value="">— No client —</option>${clientOpts}</select></div>
+      <div><label>Project</label><select id="et-project-${e.id}"><option value="">— No project —</option>${projOpts}</select></div>
+    </div>
+    <div class="field"><label>Task</label><input type="text" id="et-task-${e.id}" value="${e.task}"></div>
+    <div class="field"><label>Notes</label><input type="text" id="et-notes-${e.id}" value="${e.notes||''}"></div>
+    <div class="edit-actions">
+      <label class="check-label"><input type="checkbox" id="et-bill-${e.id}" ${e.billable?'checked':''}> Billable</label>
+      <div style="display:flex;gap:8px">
+        <button class="btn danger sm" onclick="deleteTime('${e.id}')"><i class="ti ti-trash"></i> Delete</button>
+        <button class="btn primary sm" onclick="saveTimeEdit('${e.id}')"><i class="ti ti-check"></i> Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function saveTimeEdit(id){
+  const e=timeEntries.find(x=>x.id===id);if(!e)return;
+  e.date=document.getElementById(`et-date-${id}`).value;
+  e.hours=parseFloat(document.getElementById(`et-hours-${id}`).value)||0;
+  e.clientId=document.getElementById(`et-client-${id}`).value||'';
+  e.projectId=document.getElementById(`et-project-${id}`).value||'';
+  e.task=document.getElementById(`et-task-${id}`).value.trim();
+  e.notes=document.getElementById(`et-notes-${id}`).value.trim();
+  e.billable=document.getElementById(`et-bill-${id}`).checked;
+  save('tracker:time',timeEntries);
+  editing.time=null;
+  refreshAll();
+}
+
+function deleteTime(id){if(!confirm('Delete this time entry?'))return;timeEntries=timeEntries.filter(e=>e.id!==id);save('tracker:time',timeEntries);editing.time=null;refreshAll();}
 
 function addTime(){
   const date=document.getElementById('t-date').value;
   const task=document.getElementById('t-task').value.trim();
   const hours=parseFloat(document.getElementById('t-hours').value);
-  const notes=document.getElementById('t-notes').value.trim();
-  const billable=document.getElementById('t-billable').checked;
-  const clientId=document.getElementById('t-client').value||'';
-  const projectId=document.getElementById('t-project').value||'';
   if(!date||!task||!hours)return;
-  timeEntries.unshift({id:uid(),date,task,hours,notes,billable,clientId,projectId});
+  timeEntries.unshift({id:uid(),date,task,hours,notes:document.getElementById('t-notes').value.trim(),billable:document.getElementById('t-billable').checked,clientId:document.getElementById('t-client').value||'',projectId:document.getElementById('t-project').value||''});
   save('tracker:time',timeEntries);
-  document.getElementById('t-task').value='';
-  document.getElementById('t-hours').value='';
-  document.getElementById('t-notes').value='';
+  document.getElementById('t-task').value='';document.getElementById('t-hours').value='';document.getElementById('t-notes').value='';
   refreshAll();
 }
 
-// ── Expenses ──
+// ═══════════════════════════════════════════════
+//  EXPENSES
+// ═══════════════════════════════════════════════
 function refreshExpenseClientDropdown(){
   const sel=document.getElementById('e-client');if(!sel)return;
   const prev=sel.value;
   sel.innerHTML='<option value="">— No client —</option>';
-  clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName;sel.appendChild(o);});
+  clients.forEach(c=>{sel.appendChild(new Option((c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName,c.id));});
   if(prev)sel.value=prev;
   refreshExpenseProjectDropdown();
 }
@@ -757,9 +998,8 @@ function refreshExpenseProjectDropdown(){
   const cid=document.getElementById('e-client').value||'';
   const prev=sel.value;
   sel.innerHTML='<option value="">— No project —</option>';
-  const filtered=cid?projects.filter(p=>p.clientId===cid):projects;
-  filtered.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
-  if(prev&&filtered.find(p=>p.id===prev))sel.value=prev;
+  (cid?projects.filter(p=>p.clientId===cid):projects).forEach(p=>{sel.appendChild(new Option(p.name,p.id));});
+  if(prev)sel.value=prev;
 }
 
 function renderExpenseList(){
@@ -768,258 +1008,456 @@ function renderExpenseList(){
   el.innerHTML=expenses.map(e=>{
     const client=e.clientId?clients.find(c=>c.id===e.clientId):null;
     const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
-    return`<div class="entry-row">
-      <div style="flex:1">
-        <div class="entry-title">${e.description}</div>
-        <div class="entry-meta">${fmtDate(e.date)} · ${e.category}${client?' · '+(client.company||client.contactName):''}${proj?' · '+proj.name:''}${e.billable?'':' · non-billable'}</div>
+    const isEditing=editing.expenses===e.id;
+    return`<div>
+      <div class="entry-row">
+        <div style="flex:1">
+          <div class="entry-title">${e.description}${e.recurring?`<span class="recur-tag">${e.recurringFrequency||'recurring'}</span>`:''}</div>
+          <div class="entry-meta">${fmtDate(e.date)} · ${e.category}${client?' · '+(client.company||client.contactName):''}${proj?' · '+proj.name:''}${e.billable?'':' · non-billable'}</div>
+        </div>
+        <div class="entry-right">
+          <span class="amt">${$f(e.amount)}</span>
+          <button class="icon-action" onclick="toggleEdit('expenses','${e.id}')" title="${isEditing?'Close':'Edit'}"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
+        </div>
       </div>
-      <div class="entry-right">
-        <span class="amt">${$f(e.amount)}</span>
-        <button class="del-btn" onclick="deleteExpense('${e.id}')"><i class="ti ti-trash"></i></button>
-      </div>
+      ${isEditing?renderExpenseEditForm(e):''}
     </div>`;
   }).join('');
 }
 
-function deleteExpense(id){expenses=expenses.filter(e=>e.id!==id);save('tracker:expenses',expenses);refreshAll();}
+function renderExpenseEditForm(e){
+  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName}</option>`).join('');
+  const projOpts=projects.map(p=>`<option value="${p.id}"${p.id===e.projectId?' selected':''}>${p.name}</option>`).join('');
+  const catOpts=getCategories().map(c=>`<option value="${c}"${c===e.category?' selected':''}>${c}</option>`).join('');
+  const freqOpts=['weekly','monthly','quarterly','annually'].map(f=>`<option value="${f}"${f===e.recurringFrequency?' selected':''}>${f.charAt(0).toUpperCase()+f.slice(1)}</option>`).join('');
+  return`<div class="edit-form">
+    <div class="grid2">
+      <div><label>Date</label><input type="date" id="ee-date-${e.id}" value="${e.date}"></div>
+      <div><label>Amount ($)</label><input type="number" id="ee-amt-${e.id}" value="${e.amount}" min="0" step=".01"></div>
+    </div>
+    <div class="grid2">
+      <div><label>Category</label><select id="ee-cat-${e.id}">${catOpts}</select></div>
+      <div><label>Description</label><input type="text" id="ee-desc-${e.id}" value="${e.description}"></div>
+    </div>
+    <div class="grid2">
+      <div><label>Client</label><select id="ee-client-${e.id}"><option value="">— No client —</option>${clientOpts}</select></div>
+      <div><label>Project</label><select id="ee-project-${e.id}"><option value="">— No project —</option>${projOpts}</select></div>
+    </div>
+    <div class="grid2" style="margin-bottom:${e.recurring?'8px':'0'}">
+      <label class="check-label"><input type="checkbox" id="ee-bill-${e.id}" ${e.billable?'checked':''}> Billable</label>
+      <label class="check-label"><input type="checkbox" id="ee-recur-${e.id}" ${e.recurring?'checked':''} onchange="document.getElementById('ee-freq-wrap-${e.id}').style.display=this.checked?'block':'none'"> Recurring</label>
+    </div>
+    <div id="ee-freq-wrap-${e.id}" style="display:${e.recurring?'block':'none'};margin-bottom:8px"><label>Frequency</label><select id="ee-freq-${e.id}">${freqOpts}</select></div>
+    <div class="edit-actions">
+      <div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn danger sm" onclick="deleteExpense('${e.id}')"><i class="ti ti-trash"></i> Delete</button>
+        <button class="btn primary sm" onclick="saveExpenseEdit('${e.id}')"><i class="ti ti-check"></i> Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function saveExpenseEdit(id){
+  const e=expenses.find(x=>x.id===id);if(!e)return;
+  e.date=document.getElementById(`ee-date-${id}`).value;
+  e.amount=parseFloat(document.getElementById(`ee-amt-${id}`).value)||0;
+  e.category=document.getElementById(`ee-cat-${id}`).value;
+  e.description=document.getElementById(`ee-desc-${id}`).value.trim();
+  e.clientId=document.getElementById(`ee-client-${id}`).value||'';
+  e.projectId=document.getElementById(`ee-project-${id}`).value||'';
+  e.billable=document.getElementById(`ee-bill-${id}`).checked;
+  e.recurring=document.getElementById(`ee-recur-${id}`).checked;
+  e.recurringFrequency=document.getElementById(`ee-freq-${id}`).value;
+  save('tracker:expenses',expenses);
+  editing.expenses=null;
+  refreshAll();
+}
+
+function deleteExpense(id){if(!confirm('Delete this expense?'))return;expenses=expenses.filter(e=>e.id!==id);save('tracker:expenses',expenses);editing.expenses=null;refreshAll();}
 
 function addExpense(){
   const date=document.getElementById('e-date').value;
   const amount=parseFloat(document.getElementById('e-amount').value);
-  const category=document.getElementById('e-category').value;
   const description=document.getElementById('e-desc').value.trim();
-  const billable=document.getElementById('e-billable').checked;
-  const clientId=document.getElementById('e-client').value||'';
-  const projectId=document.getElementById('e-project').value||'';
   if(!date||!amount||!description)return;
-  expenses.unshift({id:uid(),date,amount,category,description,billable,clientId,projectId});
+  const recurring=document.getElementById('e-recurring').checked;
+  expenses.unshift({id:uid(),date,amount,category:document.getElementById('e-category').value,description,billable:document.getElementById('e-billable').checked,clientId:document.getElementById('e-client').value||'',projectId:document.getElementById('e-project').value||'',recurring,recurringFrequency:recurring?document.getElementById('e-freq').value:''});
   save('tracker:expenses',expenses);
-  document.getElementById('e-desc').value='';
-  document.getElementById('e-amount').value='';
+  document.getElementById('e-desc').value='';document.getElementById('e-amount').value='';
   refreshAll();
 }
 
-// ── Projects ──
+// ═══════════════════════════════════════════════
+//  PROJECTS
+// ═══════════════════════════════════════════════
 function refreshProjectClientDropdown(){
   const sel=document.getElementById('p-client');if(!sel)return;
   const prev=sel.value;
-  sel.innerHTML='<option value="">— No client —</option>';
-  clients.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName;sel.appendChild(o);});
-  if(prev)sel.value=prev;
+  sel.innerHTML='<option value="">— No client —</option><option value="__new__">+ Add new client…</option>';
+  clients.forEach(c=>{sel.appendChild(new Option((c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName,c.id));});
+  if(prev&&prev!=='__new__')sel.value=prev;
 }
 
 function renderProjectList(){
   const el=document.getElementById('project-list');
-  if(!projects.length){el.innerHTML='<div class="empty">No projects yet. Add one above!</div>';return;}
+  if(!projects.length){el.innerHTML='<div class="empty">No projects yet.</div>';return;}
   el.innerHTML=projects.map(p=>{
     const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
     const clientLabel=client?(client.company||client.contactName):'';
-    const statusClass='status-'+p.status;
-    const statusText=p.status.charAt(0).toUpperCase()+p.status.slice(1);
-    const projRate=parseFloat(p.rate||settings.hourlyRate||0);
-    const pTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0),0);
-    const pExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
-    const billed=pTime*projRate+pExp;
-    const budget=parseFloat(p.budget||0);
-    const retainer=p.retainerOn?parseFloat(p.retainerAmt||0):0;
-    const retainerInBudget=p.retainerOn&&p.retainerInBudget;
-    const pct=budget>0?Math.min(100,(billed/budget)*100):0;
-    const retPct=retainerInBudget&&budget>0?Math.min(100,(retainer/budget)*100):0;
+    const rate=getProjRate(p);
+    const bTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*rate,0);
+    const bExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+    const billed=bTime+bExp;
+    const budget=getProjBudget(p);
+    const budgetMax=budget.max;
+    const pct=budgetMax>0?Math.min(100,(billed/budgetMax)*100):0;
     const color=pct>=100?'var(--danger)':pct>=80?'var(--warning)':'var(--success)';
+    const statusLabel=p.status==='on_hold'?'On Hold':p.status==='active'?'Active':'Completed';
+    const isEditing=editing.projects===p.id;
+    const endDisp=p.endDateType==='specific'?fmtDate(p.endDate):p.endDateType==='monthyear'?fmtMonth(p.endDateMonth):'';
     return`<div class="project-card">
       <div class="project-header">
         <div style="flex:1;min-width:0">
-          <div class="project-name">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} &mdash; </span>`:''}${p.name}</div>
+          <div style="font-size:15px;font-weight:500">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} — </span>`:''}${p.name}</div>
           <div class="project-meta">
             ${clientLabel?`<span><i class="ti ti-building" style="font-size:12px"></i> ${clientLabel}</span>`:''}
             ${p.startDate?`<span><i class="ti ti-calendar" style="font-size:12px"></i> ${fmtDate(p.startDate)}</span>`:''}
-            ${p.endDate?`<span><i class="ti ti-calendar-off" style="font-size:12px"></i> ${fmtDate(p.endDate)}</span>`:''}
+            ${endDisp?`<span><i class="ti ti-calendar-off" style="font-size:12px"></i> ${endDisp}</span>`:''}
             ${p.duration?`<span><i class="ti ti-clock" style="font-size:12px"></i> ${p.duration}</span>`:''}
             ${p.rate?`<span><i class="ti ti-coin" style="font-size:12px"></i> ${$f(p.rate)}/hr</span>`:''}
+            ${budget.display?`<span><i class="ti ti-chart-bar" style="font-size:12px"></i> ${budget.display}</span>`:''}
           </div>
         </div>
-        <div class="project-actions">
-          <span class="status-badge ${statusClass}">${statusText}</span>
-          <select onchange="updateProjectStatus('${p.id}',this.value)" style="width:auto;font-size:12px;padding:4px 8px" aria-label="Change status">
-            <option value="active"${p.status==='active'?' selected':''}>Active</option>
-            <option value="paused"${p.status==='paused'?' selected':''}>Paused</option>
-            <option value="completed"${p.status==='completed'?' selected':''}>Completed</option>
-          </select>
-          <button class="del-btn" onclick="deleteProject('${p.id}')"><i class="ti ti-trash"></i></button>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+          <span class="status-badge status-${p.status}">${statusLabel}</span>
+          <button class="icon-action" onclick="toggleEdit('projects','${p.id}')" title="${isEditing?'Close':'Edit'}"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
         </div>
       </div>
-      ${budget>0?`<div class="project-body">
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px">
-          <span>Budget: ${$f(billed)} / ${$f(budget)}${p.retainerOn?` · Retainer: ${$f(retainer)}${retainerInBudget?' (in budget)':''}`:''}</span>
-          <span>${pct.toFixed(0)}%</span>
-        </div>
-        <div class="gauge-bar" style="height:7px">
-          <div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
-          ${retainerInBudget&&retPct>0?`<div class="gauge-retainer" style="width:${retPct.toFixed(1)}%"></div>`:''}
-        </div>
+      ${budgetMax>0?`<div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:3px"><span>${$f(billed)} billed</span><span>${pct.toFixed(0)}%</span></div>
+        <div class="gauge-bar" style="height:7px"><div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div></div>
       </div>`:''}
       ${p.desc?`<div style="font-size:13px;color:var(--text2);margin-top:8px">${p.desc}</div>`:''}
+      ${isEditing?renderProjectEditForm(p):''}
     </div>`;
   }).join('');
 }
 
+function renderProjectEditForm(p){
+  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===p.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName}</option>`).join('');
+  const statusOpts=['active','on_hold','completed'].map(s=>`<option value="${s}"${s===p.status?' selected':''}>${s==='on_hold'?'On Hold':s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('');
+  const endType=p.endDateType||'none';
+  return`<div class="edit-form" style="margin-top:12px">
+    <div class="grid3">
+      <div><label>Project #</label><input type="text" id="ep-num-${p.id}" value="${p.num||''}"></div>
+      <div style="grid-column:span 2"><label>Name</label><input type="text" id="ep-name-${p.id}" value="${p.name}"></div>
+    </div>
+    <div class="grid2">
+      <div><label>Client</label><select id="ep-client-${p.id}"><option value="">— No client —</option>${clientOpts}</select></div>
+      <div><label>Status</label><select id="ep-status-${p.id}">${statusOpts}</select></div>
+    </div>
+    <div class="grid2">
+      <div><label>Start date</label><input type="date" id="ep-start-${p.id}" value="${p.startDate||''}"></div>
+      <div><label>Hourly rate ($/hr)</label><input type="number" id="ep-rate-${p.id}" value="${p.rate||''}" min="0" step="5" placeholder="Use default"></div>
+    </div>
+    <div class="grid2">
+      <div><label>Budget (min / fixed)</label><input type="number" id="ep-budget-${p.id}" value="${p.budget||''}" min="0" step="100"></div>
+      <div><label>Budget max (range)</label><input type="number" id="ep-budgetmax-${p.id}" value="${p.budgetMax||''}" min="0" step="100" placeholder="Leave blank if fixed"></div>
+    </div>
+    <div class="grid2" style="margin-bottom:8px">
+      <label class="check-label"><input type="checkbox" id="ep-ret-on-${p.id}" ${p.retainerOn?'checked':''} onchange="document.getElementById('ep-ret-fields-${p.id}').style.display=this.checked?'grid':'none'"> Has retainer</label>
+      <label class="check-label"><input type="checkbox" id="ep-ret-paid-${p.id}" ${p.retainerPaid?'checked':''}> Retainer paid</label>
+    </div>
+    <div id="ep-ret-fields-${p.id}" style="display:${p.retainerOn?'grid':'none'};grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px">
+      <div><label>Retainer amount ($)</label><input type="number" id="ep-ret-amt-${p.id}" value="${p.retainerAmt||''}" min="0" step="100"></div>
+      <div style="display:flex;align-items:flex-end;padding-bottom:2px"><label class="check-label"><input type="checkbox" id="ep-ret-inbud-${p.id}" ${p.retainerInBudget?'checked':''}> In total budget</label></div>
+    </div>
+    <div class="field"><label>Description</label><input type="text" id="ep-desc-${p.id}" value="${p.desc||''}"></div>
+    <div class="edit-actions">
+      <div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn danger sm" onclick="deleteProject('${p.id}')"><i class="ti ti-trash"></i> Delete</button>
+        <button class="btn primary sm" onclick="saveProjectEdit('${p.id}')"><i class="ti ti-check"></i> Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function saveProjectEdit(id){
+  const p=projects.find(x=>x.id===id);if(!p)return;
+  p.num=document.getElementById(`ep-num-${id}`).value.trim();
+  p.name=document.getElementById(`ep-name-${id}`).value.trim();
+  p.clientId=document.getElementById(`ep-client-${id}`).value||'';
+  p.status=document.getElementById(`ep-status-${id}`).value;
+  p.startDate=document.getElementById(`ep-start-${id}`).value;
+  p.rate=document.getElementById(`ep-rate-${id}`).value;
+  p.budget=document.getElementById(`ep-budget-${id}`).value;
+  const bmax=document.getElementById(`ep-budgetmax-${id}`).value;
+  p.budgetMax=bmax;p.budgetType=bmax?'range':'fixed';
+  p.retainerOn=document.getElementById(`ep-ret-on-${id}`).checked;
+  p.retainerPaid=document.getElementById(`ep-ret-paid-${id}`).checked;
+  p.retainerAmt=document.getElementById(`ep-ret-amt-${id}`).value;
+  p.retainerInBudget=document.getElementById(`ep-ret-inbud-${id}`).checked;
+  p.desc=document.getElementById(`ep-desc-${id}`).value.trim();
+  save('tracker:projects',projects);
+  editing.projects=null;
+  allDropdownRefresh();
+  refreshAll();
+}
+
+function deleteProject(id){if(!confirm('Delete this project?'))return;projects=projects.filter(p=>p.id!==id);save('tracker:projects',projects);editing.projects=null;allDropdownRefresh();refreshAll();}
+
 function addProject(){
-  const name=document.getElementById('p-name').value.trim();
-  if(!name)return;
+  const name=document.getElementById('p-name').value.trim();if(!name)return;
   const retainerOn=document.getElementById('p-retainer-on').checked;
-  projects.unshift({
-    id:uid(),
-    num:document.getElementById('p-num').value.trim(),
-    name,
-    clientId:document.getElementById('p-client').value||'',
-    status:document.getElementById('p-status').value,
-    startDate:document.getElementById('p-start').value||'',
-    endDate:document.getElementById('p-end').value||'',
-    duration:document.getElementById('p-duration').value.trim(),
-    budget:document.getElementById('p-budget').value||'',
-    rate:document.getElementById('p-rate').value||'',
-    retainerOn,
-    retainerAmt:retainerOn?document.getElementById('p-retainer-amt').value||'':'',
-    retainerInBudget:retainerOn&&document.getElementById('p-retainer-in-budget').checked,
-    desc:document.getElementById('p-desc').value.trim()
-  });
+  const endType=document.getElementById('p-end-type').value;
+  const budType=document.getElementById('p-budget-type').value;
+  const bmax=document.getElementById('p-budget-max').value;
+  projects.unshift({id:uid(),num:document.getElementById('p-num').value.trim(),name,clientId:document.getElementById('p-client').value||'',status:document.getElementById('p-status').value,startDate:document.getElementById('p-start').value,endDateType:endType,endDate:endType==='specific'?document.getElementById('p-end-date').value:'',endDateMonth:endType==='monthyear'?document.getElementById('p-end-month').value:'',duration:document.getElementById('p-duration').value.trim(),budget:document.getElementById('p-budget').value||'',budgetMax:budType==='range'?bmax:'',budgetType:budType,rate:document.getElementById('p-rate').value||'',retainerOn,retainerAmt:retainerOn?document.getElementById('p-retainer-amt').value:'',retainerInBudget:retainerOn&&document.getElementById('p-retainer-in-budget').checked,retainerPaid:retainerOn&&document.getElementById('p-retainer-paid').checked,desc:document.getElementById('p-desc').value.trim()});
   save('tracker:projects',projects);
-  ['p-num','p-name','p-end','p-duration','p-budget','p-rate','p-retainer-amt','p-desc'].forEach(id=>{document.getElementById(id).value='';});
-  document.getElementById('p-retainer-on').checked=false;
-  document.getElementById('retainer-fields').style.display='none';
-  document.getElementById('p-retainer-in-budget').checked=false;
+  ['p-num','p-name','p-budget','p-budget-max','p-rate','p-retainer-amt','p-desc','p-end-date','p-end-month','p-duration'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('p-retainer-on').checked=false;document.getElementById('retainer-fields').style.display='none';
+  document.getElementById('p-end-type').value='none';toggleEndDateType();
+  document.getElementById('p-budget-type').value='fixed';toggleBudgetType();
   document.getElementById('p-start').value=today();
-  allDropdownRefresh();
-  renderProjectList();
-  refreshAll();
+  allDropdownRefresh();refreshAll();
 }
 
-function updateProjectStatus(id,status){
-  const p=projects.find(p=>p.id===id);
-  if(p){p.status=status;save('tracker:projects',projects);renderProjectList();refreshAll();}
-}
-
-function deleteProject(id){
-  if(!confirm('Remove this project?'))return;
-  projects=projects.filter(p=>p.id!==id);
-  save('tracker:projects',projects);
-  allDropdownRefresh();
-  renderProjectList();
-  refreshAll();
-}
-
-// ── Clients + Invoice Tracking ──
+// ═══════════════════════════════════════════════
+//  CLIENTS
+// ═══════════════════════════════════════════════
 function initials(n){if(!n)return'?';return n.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();}
 
 function renderClientList(){
   const el=document.getElementById('client-list');
-  if(!clients.length){el.innerHTML='<div class="empty">No clients yet. Add one above!</div>';return;}
+  if(!clients.length){el.innerHTML='<div class="empty">No clients yet.</div>';return;}
   el.innerHTML=clients.map(c=>{
+    const isEditing=editing.clients===c.id;
+    const avatar=c.photo?`<img src="${c.photo}" alt="photo">`:`<span>${initials(c.contactName||c.company)}</span>`;
     const invList=clientInvs[c.id]||[];
     const todayStr=today();
-    return`<div class="client-card">
-      <div class="client-top">
-        <div class="client-avatar">${initials(c.contactName||c.company)}</div>
-        <div class="client-info">
-          <div class="client-name">${c.contactName||'—'}</div>
-          <div class="client-company">${c.company||'—'}</div>
-          <div class="client-details">
-            ${c.email?`<span class="client-detail"><i class="ti ti-mail" style="font-size:14px"></i><a href="mailto:${c.email}">${c.email}</a></span>`:''}
-            ${c.phone?`<span class="client-detail"><i class="ti ti-phone" style="font-size:14px"></i><a href="tel:${c.phone}">${c.phone}</a></span>`:''}
-            ${c.notes?`<span class="client-detail" style="width:100%;color:var(--text3)"><i class="ti ti-note" style="font-size:14px"></i>${c.notes}</span>`:''}
-          </div>
+    // Group invoices by project
+    const byProj={};
+    invList.forEach(inv=>{const k=inv.projectId||'__none__';if(!byProj[k])byProj[k]=[];byProj[k].push(inv);});
+    const projGroups=Object.entries(byProj).map(([pid,invs])=>{
+      const proj=pid!=='__none__'?projects.find(p=>p.id===pid):null;
+      const retainerOn=proj&&proj.retainerOn;
+      const retainerPaid=proj&&proj.retainerPaid;
+      const retainerAmt=proj?parseFloat(proj.retainerAmt||0):0;
+      const projRate=proj?getProjRate(proj):parseFloat(settings.hourlyRate||0);
+      // Calculate billed time against project retainer
+      const totalBilledTime=proj?timeEntries.filter(e=>e.projectId===proj.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*projRate,0):0;
+      const totalBilledExp=proj?expenses.filter(e=>e.projectId===proj.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0):0;
+      const totalBilled=totalBilledTime+totalBilledExp;
+      const retainerRemaining=retainerPaid?Math.max(0,retainerAmt-totalBilled):retainerAmt;
+      const retainerUsed=retainerPaid?Math.min(retainerAmt,totalBilled):0;
+      return`<div class="inv-proj-group">
+        <div class="inv-proj-label">
+          <i class="ti ti-folder" style="font-size:13px"></i>
+          ${proj?proj.name:'No project assigned'}
+          ${retainerOn?`<span style="font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;background:${retainerPaid?'#e1f5ee':'#fdf0f0'};color:${retainerPaid?'#0f6e56':'#8b2020'}">${retainerPaid?'Retainer paid':'Retainer unpaid'}</span>`:''}
+          ${retainerOn?`<button class="btn sm" onclick="toggleRetainerPaid('${proj.id}')">${retainerPaid?'Mark unpaid':'Mark paid'}</button>`:''}
         </div>
-        <div class="client-actions">
-          <button class="del-btn" onclick="deleteClient('${c.id}')"><i class="ti ti-trash"></i></button>
-        </div>
-      </div>
-      <!-- Invoice section -->
-      <div class="inv-section">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <span class="sec-title" style="margin:0">Invoices</span>
-          <button class="btn sm" onclick="showInvForm('${c.id}')"><i class="ti ti-plus"></i> Add invoice</button>
-        </div>
-        <div id="inv-form-${c.id}" style="display:none;background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:10px">
-          <div class="grid3" style="margin-bottom:8px">
-            <div><label>Invoice #</label><input type="text" id="if-num-${c.id}" placeholder="${(settings.invoicePrefix||'INV')}-001"></div>
-            <div><label>Date</label><input type="date" id="if-date-${c.id}" value="${today()}"></div>
-            <div><label>Due date</label><input type="date" id="if-due-${c.id}"></div>
-          </div>
-          <div class="grid2" style="margin-bottom:8px">
-            <div><label>Amount ($)</label><input type="number" id="if-amt-${c.id}" min="0" step="0.01" placeholder="1500.00"></div>
-            <div><label>Notes (optional)</label><input type="text" id="if-notes-${c.id}" placeholder="Month of May services"></div>
-          </div>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn sm" onclick="hideInvForm('${c.id}')">Cancel</button>
-            <button class="btn sm primary" onclick="addClientInv('${c.id}')"><i class="ti ti-plus"></i> Add</button>
-          </div>
-        </div>
-        ${invList.length===0?`<div style="font-size:13px;color:var(--text3)">No invoices yet.</div>`:
-          invList.map(inv=>{
-            const overdue=!inv.paid&&inv.dueDate&&inv.dueDate<todayStr;
-            const badge=inv.paid?'paid-yes':overdue?'paid-overdue':'paid-no';
-            const label=inv.paid?'Paid':overdue?'Overdue':'Unpaid';
-            return`<div class="inv-row">
+        ${retainerOn&&retainerPaid?`<div style="font-size:12px;color:var(--text2);margin-bottom:6px;padding:6px 10px;background:var(--bg2);border-radius:var(--radius-sm)">
+          Retainer: ${$f(retainerAmt)} · Used: ${$f(retainerUsed)} · Remaining: ${$f(retainerRemaining)}
+          ${retainerRemaining<=0?`<span style="color:var(--danger);margin-left:6px">· ${$f(Math.abs(retainerRemaining))} billed above retainer</span>`:''}
+        </div>`:''}
+        ${invs.map(inv=>{
+          const overdue=!inv.paid&&inv.dueDate&&inv.dueDate<todayStr;
+          const badge=inv.paid?'paid-yes':overdue?'paid-overdue':'paid-no';
+          const label=inv.paid?'Paid':overdue?'Overdue':'Unpaid';
+          const isEditingInv=editing.clients===`inv-${c.id}-${inv.id}`;
+          return`<div>
+            <div class="inv-row">
               <div style="flex:1;min-width:0">
                 <div style="font-weight:500">${inv.num||'—'}</div>
                 <div style="font-size:11px;color:var(--text2)">${fmtDate(inv.date)}${inv.dueDate?' · Due '+fmtDate(inv.dueDate):''}${inv.notes?' · '+inv.notes:''}</div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
                 <span style="font-weight:500">${$f(parseFloat(inv.amount||0))}</span>
                 <span class="paid-badge ${badge}">${label}</span>
-                ${!inv.paid?`<button class="btn sm" onclick="markInvPaid('${c.id}','${inv.id}')" title="Mark paid"><i class="ti ti-check"></i></button>`:''}
-                <button class="del-btn" onclick="deleteClientInv('${c.id}','${inv.id}')"><i class="ti ti-trash"></i></button>
+                ${!inv.paid?`<button class="btn sm" onclick="markInvPaid('${c.id}','${inv.id}')"><i class="ti ti-check"></i></button>`:''}
+                <button class="icon-action" onclick="toggleEdit('clients','inv-${c.id}-${inv.id}')" title="${isEditingInv?'Close':'Edit'}"><i class="ti ${isEditingInv?'ti-x':'ti-pencil'}"></i></button>
               </div>
-            </div>`;
-          }).join('')
-        }
+            </div>
+            ${isEditingInv?renderInvEditForm(c.id,inv):''}
+          </div>`;
+        }).join('')}
+        <button class="btn sm" onclick="showInvForm('${c.id}','${pid==='__none__'?'':pid}')" style="margin-top:6px"><i class="ti ti-plus"></i> Add invoice</button>
+        <div id="inv-form-${c.id}-${pid}" style="display:none;background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-top:8px">
+          ${renderInvAddFormHTML(c.id,pid==='__none__'?'':pid)}
+        </div>
+      </div>`;
+    }).join('');
+
+    // Button to add invoice for a new project
+    const allProjOptions=projects.filter(p=>p.clientId===c.id).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+
+    return`<div class="client-card">
+      <div class="client-top">
+        <div class="client-avatar" onclick="document.getElementById('photo-input-${c.id}').click()" title="Change photo" style="width:44px;height:44px">${avatar}</div>
+        <input type="file" id="photo-input-${c.id}" accept="image/*" style="display:none" onchange="updateClientPhoto('${c.id}',this)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:500">${c.contactName||'—'}</div>
+          <div style="font-size:13px;color:var(--text2)">${c.company||''}</div>
+          <div class="client-details">
+            ${c.email?`<span class="client-detail"><i class="ti ti-mail" style="font-size:14px"></i><a href="mailto:${c.email}">${c.email}</a></span>`:''}
+            ${c.phone?`<span class="client-detail"><i class="ti ti-phone" style="font-size:14px"></i><a href="tel:${c.phone}">${c.phone}</a></span>`:''}
+            ${c.notes?`<span class="client-detail" style="color:var(--text3)"><i class="ti ti-note" style="font-size:14px"></i>${c.notes}</span>`:''}
+          </div>
+          ${(c.additionalContacts||[]).map(ac=>`<div class="client-details" style="margin-top:4px;padding-top:4px;border-top:.5px solid var(--border)">
+            ${ac.name?`<span class="client-detail"><i class="ti ti-user" style="font-size:13px"></i>${ac.name}</span>`:''}
+            ${ac.email?`<span class="client-detail"><i class="ti ti-mail" style="font-size:13px"></i><a href="mailto:${ac.email}">${ac.email}</a></span>`:''}
+            ${ac.phone?`<span class="client-detail"><i class="ti ti-phone" style="font-size:13px"></i><a href="tel:${ac.phone}">${ac.phone}</a></span>`:''}
+          </div>`).join('')}
+        </div>
+        <button class="icon-action" onclick="toggleEdit('clients','${c.id}')" title="${isEditing?'Close':'Edit'}"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
+      </div>
+      ${isEditing?renderClientEditForm(c):''}
+      <!-- Invoices grouped by project -->
+      <div class="inv-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span class="sec-title" style="margin:0">Invoices</span>
+          ${Object.keys(byProj).length===0?`<button class="btn sm" onclick="showInvForm('${c.id}','')"><i class="ti ti-plus"></i> Add invoice</button>`:''}
+        </div>
+        ${Object.keys(byProj).length>0?projGroups:'<div style="font-size:13px;color:var(--text3)">No invoices yet.</div>'}
+        ${Object.keys(byProj).length>0&&allProjOptions?`<div id="inv-form-${c.id}-new" style="display:none;background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-top:8px">${renderInvAddFormHTML(c.id,'')}</div>`:''}
       </div>
     </div>`;
   }).join('');
 }
 
-function showInvForm(cid){document.getElementById('inv-form-'+cid).style.display='block';}
-function hideInvForm(cid){document.getElementById('inv-form-'+cid).style.display='none';}
+function renderInvAddFormHTML(cid,pid){
+  const projOpts=projects.filter(p=>p.clientId===cid).map(p=>`<option value="${p.id}"${p.id===pid?' selected':''}>${p.name}</option>`).join('');
+  return`<div class="grid3" style="margin-bottom:8px">
+    <div><label>Invoice #</label><input type="text" id="if-num-${cid}-${pid}" placeholder="${(settings.invoicePrefix||'INV')}-001"></div>
+    <div><label>Date</label><input type="date" id="if-date-${cid}-${pid}" value="${today()}"></div>
+    <div><label>Due date</label><input type="date" id="if-due-${cid}-${pid}"></div>
+  </div>
+  <div class="grid2" style="margin-bottom:8px">
+    <div><label>Amount ($)</label><input type="number" id="if-amt-${cid}-${pid}" min="0" step=".01" placeholder="1500.00"></div>
+    <div><label>Project</label><select id="if-proj-${cid}-${pid}"><option value="">— No project —</option>${projOpts}</select></div>
+  </div>
+  <div class="field"><label>Notes</label><input type="text" id="if-notes-${cid}-${pid}" placeholder="May services"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn sm" onclick="hideInvForm('${cid}','${pid}')">Cancel</button>
+    <button class="btn sm primary" onclick="addClientInv('${cid}','${pid}')"><i class="ti ti-plus"></i> Add</button>
+  </div>`;
+}
 
-function addClientInv(cid){
-  const num=document.getElementById('if-num-'+cid).value.trim();
-  const date=document.getElementById('if-date-'+cid).value;
-  const dueDate=document.getElementById('if-due-'+cid).value;
-  const amount=document.getElementById('if-amt-'+cid).value;
-  const notes=document.getElementById('if-notes-'+cid).value.trim();
-  if(!date||!amount)return;
-  if(!clientInvs[cid])clientInvs[cid]=[];
-  clientInvs[cid].unshift({id:uid(),num,date,dueDate,amount,notes,paid:false,paidDate:''});
+function renderInvEditForm(cid,inv){
+  const projOpts=projects.filter(p=>p.clientId===cid).map(p=>`<option value="${p.id}"${p.id===inv.projectId?' selected':''}>${p.name}</option>`).join('');
+  return`<div class="edit-form">
+    <div class="grid3">
+      <div><label>Invoice #</label><input type="text" id="ie-num-${cid}-${inv.id}" value="${inv.num||''}"></div>
+      <div><label>Date</label><input type="date" id="ie-date-${cid}-${inv.id}" value="${inv.date||''}"></div>
+      <div><label>Due date</label><input type="date" id="ie-due-${cid}-${inv.id}" value="${inv.dueDate||''}"></div>
+    </div>
+    <div class="grid2">
+      <div><label>Amount ($)</label><input type="number" id="ie-amt-${cid}-${inv.id}" value="${inv.amount||''}"></div>
+      <div><label>Project</label><select id="ie-proj-${cid}-${inv.id}"><option value="">— No project —</option>${projOpts}</select></div>
+    </div>
+    <div class="field"><label>Notes</label><input type="text" id="ie-notes-${cid}-${inv.id}" value="${inv.notes||''}"></div>
+    <div class="edit-actions">
+      <div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn danger sm" onclick="deleteClientInv('${cid}','${inv.id}')"><i class="ti ti-trash"></i> Delete</button>
+        <button class="btn primary sm" onclick="saveInvEdit('${cid}','${inv.id}')"><i class="ti ti-check"></i> Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function saveInvEdit(cid,iid){
+  const inv=(clientInvs[cid]||[]).find(i=>i.id===iid);if(!inv)return;
+  inv.num=document.getElementById(`ie-num-${cid}-${iid}`).value.trim();
+  inv.date=document.getElementById(`ie-date-${cid}-${iid}`).value;
+  inv.dueDate=document.getElementById(`ie-due-${cid}-${iid}`).value;
+  inv.amount=document.getElementById(`ie-amt-${cid}-${iid}`).value;
+  inv.projectId=document.getElementById(`ie-proj-${cid}-${iid}`).value||'';
+  inv.notes=document.getElementById(`ie-notes-${cid}-${iid}`).value.trim();
   save('tracker:clientInvs',clientInvs);
-  hideInvForm(cid);
+  editing.clients=null;
   renderClientList();
 }
 
-function markInvPaid(cid,iid){
-  const list=clientInvs[cid]||[];
-  const inv=list.find(i=>i.id===iid);
-  if(inv){inv.paid=true;inv.paidDate=today();}
-  save('tracker:clientInvs',clientInvs);
+function renderClientEditForm(c){
+  const clientOpts=clients.map(x=>x.id!==c.id?`<option value="${x.id}">${x.company||x.contactName}</option>`:'').join('');
+  const extraContactsHtml=(c.additionalContacts||[]).map((ac,i)=>`<div class="add-contact-row">
+    <div class="field"><label>Name</label><input type="text" class="ec-name" value="${ac.name||''}"></div>
+    <div class="field"><label>Email</label><input type="email" class="ec-email" value="${ac.email||''}"></div>
+    <div class="field"><label>Phone</label><input type="tel" class="ec-phone" value="${ac.phone||''}"></div>
+    <button class="icon-action danger" onclick="this.parentNode.remove()" style="margin-top:18px;flex-shrink:0"><i class="ti ti-x"></i></button>
+  </div>`).join('');
+  return`<div class="edit-form" style="margin-top:12px">
+    <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+      <div style="flex-shrink:0;text-align:center">
+        <div id="ep-photo-prev-${c.id}" class="client-avatar" onclick="document.getElementById('ep-photo-inp-${c.id}').click()" style="width:54px;height:54px;font-size:18px;cursor:pointer">${c.photo?`<img src="${c.photo}">`:`<i class="ti ti-camera" style="font-size:20px;color:var(--text3)"></i>`}</div>
+        <input type="file" id="ep-photo-inp-${c.id}" accept="image/*" style="display:none" onchange="previewClientPhoto(this,'ep-photo-prev-${c.id}','ep-photo-data-${c.id}')">
+        <input type="hidden" id="ep-photo-data-${c.id}" value="${c.photo||''}">
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">Photo</div>
+      </div>
+      <div style="flex:1">
+        <div class="grid2">
+          <div class="field"><label>Company</label><input type="text" id="ec-company-${c.id}" value="${c.company||''}"></div>
+          <div class="field"><label>Contact name</label><input type="text" id="ec-name-${c.id}" value="${c.contactName||''}"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Email</label><input type="email" id="ec-email-${c.id}" value="${c.email||''}"></div>
+          <div class="field"><label>Phone</label><input type="tel" id="ec-phone-${c.id}" value="${c.phone||''}"></div>
+        </div>
+      </div>
+    </div>
+    <div class="field"><label>Notes</label><input type="text" id="ec-notes-${c.id}" value="${c.notes||''}"></div>
+    <div class="sec-title" style="margin-top:4px">Additional contacts</div>
+    <div id="ec-extra-${c.id}">${extraContactsHtml}</div>
+    <button class="btn sm" onclick="addExtraContactRow('ec-extra-${c.id}')" style="margin-bottom:10px"><i class="ti ti-plus"></i> Add contact</button>
+    <div class="edit-actions">
+      <div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn danger sm" onclick="deleteClient('${c.id}')"><i class="ti ti-trash"></i> Delete</button>
+        <button class="btn primary sm" onclick="saveClientEdit('${c.id}')"><i class="ti ti-check"></i> Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function saveClientEdit(id){
+  const c=clients.find(x=>x.id===id);if(!c)return;
+  const newPhoto=document.getElementById(`ep-photo-data-${id}`).value;
+  c.photo=newPhoto||c.photo||'';
+  c.company=document.getElementById(`ec-company-${id}`).value.trim();
+  c.contactName=document.getElementById(`ec-name-${id}`).value.trim();
+  c.email=document.getElementById(`ec-email-${id}`).value.trim();
+  c.phone=document.getElementById(`ec-phone-${id}`).value.trim();
+  c.notes=document.getElementById(`ec-notes-${id}`).value.trim();
+  c.additionalContacts=getExtraContacts(`ec-extra-${id}`);
+  save('tracker:clients',clients);
+  editing.clients=null;
+  allDropdownRefresh();
   renderClientList();
 }
 
-function deleteClientInv(cid,iid){
-  if(!clientInvs[cid])return;
-  clientInvs[cid]=clientInvs[cid].filter(i=>i.id!==iid);
-  save('tracker:clientInvs',clientInvs);
-  renderClientList();
+function updateClientPhoto(id,input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const c=clients.find(x=>x.id===id);
+    if(c){c.photo=e.target.result;save('tracker:clients',clients);renderClientList();}
+  };
+  reader.readAsDataURL(file);
 }
 
 function addClient(){
   const company=document.getElementById('c-company').value.trim();
   const contactName=document.getElementById('c-name').value.trim();
-  const email=document.getElementById('c-email').value.trim();
-  const phone=document.getElementById('c-phone').value.trim();
-  const notes=document.getElementById('c-notes').value.trim();
   if(!company&&!contactName)return;
-  clients.unshift({id:uid(),company,contactName,email,phone,notes});
+  clients.unshift({id:uid(),company,contactName,email:document.getElementById('c-email').value.trim(),phone:document.getElementById('c-phone').value.trim(),notes:document.getElementById('c-notes').value.trim(),photo:document.getElementById('add-client-photo-data').value||'',additionalContacts:getExtraContacts('add-extra-contacts')});
   save('tracker:clients',clients);
-  ['c-company','c-name','c-email','c-phone','c-notes'].forEach(id=>{document.getElementById(id).value='';});
+  ['c-company','c-name','c-email','c-phone','c-notes','add-client-photo-data'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('add-client-photo-preview').innerHTML='<i class="ti ti-camera" style="font-size:20px;color:var(--text3)"></i>';
+  document.getElementById('add-extra-contacts').innerHTML='';
   allDropdownRefresh();
   renderClientList();
 }
@@ -1028,36 +1466,93 @@ function deleteClient(id){
   if(!confirm('Remove this client?'))return;
   clients=clients.filter(c=>c.id!==id);
   save('tracker:clients',clients);
+  editing.clients=null;
   allDropdownRefresh();
   renderClientList();
 }
 
-// ── All dropdowns refresh ──
-function allDropdownRefresh(){
-  refreshClientDropdown();
-  refreshExpenseClientDropdown();
-  refreshProjectClientDropdown();
-  refreshTimeProjectDropdown();
-  refreshExpenseProjectDropdown();
+function showInvForm(cid,pid){document.getElementById(`inv-form-${cid}-${pid||'new'}`).style.display='block';}
+function hideInvForm(cid,pid){const el=document.getElementById(`inv-form-${cid}-${pid||'new'}`);if(el)el.style.display='none';}
+
+function addClientInv(cid,pid){
+  const safePid=pid||document.getElementById(`if-proj-${cid}-${pid||''}`).value||'';
+  const date=document.getElementById(`if-date-${cid}-${pid}`).value;
+  const amount=document.getElementById(`if-amt-${cid}-${pid}`).value;
+  if(!date||!amount)return;
+  if(!clientInvs[cid])clientInvs[cid]=[];
+  clientInvs[cid].unshift({id:uid(),num:document.getElementById(`if-num-${cid}-${pid}`).value.trim(),date,dueDate:document.getElementById(`if-due-${cid}-${pid}`).value,amount,projectId:document.getElementById(`if-proj-${cid}-${pid}`).value||'',notes:document.getElementById(`if-notes-${cid}-${pid}`).value.trim(),paid:false,paidDate:''});
+  save('tracker:clientInvs',clientInvs);
+  hideInvForm(cid,pid);
+  renderClientList();
 }
 
-// ── Invoice (print) ──
+function markInvPaid(cid,iid){
+  const inv=(clientInvs[cid]||[]).find(i=>i.id===iid);
+  if(inv){inv.paid=true;inv.paidDate=today();}
+  save('tracker:clientInvs',clientInvs);
+  renderClientList();
+}
+
+function deleteClientInv(cid,iid){
+  if(!confirm('Delete this invoice?'))return;
+  if(clientInvs[cid])clientInvs[cid]=clientInvs[cid].filter(i=>i.id!==iid);
+  save('tracker:clientInvs',clientInvs);
+  editing.clients=null;
+  renderClientList();
+}
+
+function toggleRetainerPaid(projId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  p.retainerPaid=!p.retainerPaid;
+  save('tracker:projects',projects);
+  renderClientList();
+  renderDashBudgets();
+}
+
+// ═══════════════════════════════════════════════
+//  INVOICE (print view)
+// ═══════════════════════════════════════════════
+function refreshInvoiceProjectFilter(){
+  const sel=document.getElementById('inv-project-filter');if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML='<option value="">All projects</option>';
+  projects.forEach(p=>sel.appendChild(new Option(p.name,p.id)));
+  if(prev)sel.value=prev;
+}
+
 function renderInvoice(){
   const m=document.getElementById('inv-month').value||thisMonth();
+  const pid=document.getElementById('inv-project-filter').value||'';
   const prefix=settings.invoicePrefix||'INV';
-  const rate=parseFloat(settings.hourlyRate||0);
+  const defRate=parseFloat(settings.hourlyRate||0);
+  const proj=pid?projects.find(p=>p.id===pid):null;
+  const projRate=proj?getProjRate(proj):defRate;
+  const client=proj&&proj.clientId?clients.find(c=>c.id===proj.clientId):null;
 
-  document.getElementById('inv-number').textContent=prefix+'-'+m.replace('-','');
-  document.getElementById('inv-proj').textContent='All projects';
-  document.getElementById('inv-client').textContent='';
-  document.getElementById('inv-period').textContent='Period: '+monthLabel(m);
+  document.getElementById('inv-number').textContent=prefix+'-'+m.replace('-','')+(pid?'-'+pid.slice(0,4):'');
+  document.getElementById('inv-proj-name').textContent=proj?proj.name:'All Projects';
+  document.getElementById('inv-client-name').textContent=client?'For: '+(client.company||client.contactName):'';
+  document.getElementById('inv-period').textContent='Period: '+fmtMonth(m);
 
-  const invT=timeEntries.filter(e=>e.date.startsWith(m)&&e.billable).sort((a,b)=>a.date.localeCompare(b.date));
-  const invE=expenses.filter(e=>e.date.startsWith(m)&&e.billable).sort((a,b)=>a.date.localeCompare(b.date));
-  const invHours=invT.reduce((s,e)=>s+e.hours,0);
-  const invTimeAmt=invT.reduce((s,e)=>{const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;const r=proj?parseFloat(proj.rate||rate):rate;return s+e.hours*r;},0);
+  const invT=timeEntries.filter(e=>e.date.startsWith(m)&&e.billable&&(!pid||e.projectId===pid)).sort((a,b)=>a.date.localeCompare(b.date));
+  const invE=expenses.filter(e=>e.date.startsWith(m)&&e.billable&&(!pid||e.projectId===pid)).sort((a,b)=>a.date.localeCompare(b.date));
+
+  const invTimeAmt=invT.reduce((s,e)=>{const p=e.projectId?projects.find(x=>x.id===e.projectId):null;const r=p?getProjRate(p):defRate;return s+e.hours*r;},0);
   const invExpAmt=invE.reduce((s,e)=>s+e.amount,0);
   const invTotal=invTimeAmt+invExpAmt;
+  const invHours=invT.reduce((s,e)=>s+e.hours,0);
+
+  // Retainer logic
+  const retainerOn=proj&&proj.retainerOn&&proj.retainerPaid&&proj.retainerInBudget;
+  const retainerAmt=retainerOn?parseFloat(proj.retainerAmt||0):0;
+  const retainerApplied=retainerOn?Math.min(retainerAmt,invTotal):0;
+  const balance=invTotal-retainerApplied;
+
+  const rSec=document.getElementById('inv-retainer-section');
+  rSec.innerHTML=retainerOn?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:1rem;font-size:13px">
+    <strong>Retainer on account:</strong> ${$f(retainerAmt)} paid
+    <span style="color:var(--success);margin-left:8px">· ${$f(retainerApplied)} applied this invoice</span>
+  </div>`:'';
 
   const tsec=document.getElementById('inv-time-section');
   const esec=document.getElementById('inv-exp-section');
@@ -1067,97 +1562,143 @@ function renderInvoice(){
   if(!invT.length&&!invE.length){
     tsec.innerHTML='';esec.innerHTML='';totals.innerHTML='';
     empty.style.display='block';
-    empty.textContent='No billable entries for '+monthLabel(m)+'.';
+    empty.textContent='No billable entries for '+fmtMonth(m)+(pid?' in this project':'')+ '.';
     return;
   }
   empty.style.display='none';
 
-  tsec.innerHTML=invT.length?`
-    <div class="sec-title" style="margin-top:0">Services</div>
-    <table style="margin-bottom:1.25rem">
-      <thead><tr>
-        <th style="width:20%">Date</th><th>Description</th>
-        <th style="text-align:right;width:50px">Hrs</th>
-        <th style="text-align:right;width:75px">Rate</th>
-        <th style="text-align:right;width:85px">Amount</th>
-      </tr></thead>
-      <tbody>
-        ${invT.map(e=>{const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;const r=proj?parseFloat(proj.rate||rate):rate;return`<tr class="tr-sep">
-          <td style="color:var(--text2);font-size:12px">${fmtDate(e.date)}</td>
-          <td>${e.task}${proj?`<span style="font-size:11px;color:var(--text2)"> — ${proj.name}</span>`:''}${e.notes?`<br><span style="font-size:11px;color:var(--text2)">${e.notes}</span>`:''}</td>
-          <td style="text-align:right">${e.hours}</td>
-          <td style="text-align:right;color:var(--text2)">${$f(r)}</td>
-          <td style="text-align:right">${$f(e.hours*r)}</td>
-        </tr>`;}).join('')}
-        <tr class="tr-strong"><td colspan="2">${invHours.toFixed(1)}h total</td><td colspan="3" style="text-align:right">${$f(invTimeAmt)}</td></tr>
-      </tbody>
-    </table>`:'';
+  tsec.innerHTML=invT.length?`<div class="sec-title" style="margin-top:0">Services</div>
+  <table style="margin-bottom:1.25rem">
+    <thead><tr><th style="width:18%">Date</th><th>Tasks</th><th style="text-align:right;width:50px">Hrs</th><th style="text-align:right;width:70px">Rate</th><th style="text-align:right;width:85px">Amount</th></tr></thead>
+    <tbody>
+      ${(()=>{
+        // Group by date + rate
+        const byDate={};
+        invT.forEach(e=>{
+          const p=e.projectId?projects.find(x=>x.id===e.projectId):null;
+          const r=p?getProjRate(p):defRate;
+          const key=e.date+'|'+r;
+          if(!byDate[key])byDate[key]={date:e.date,rate:r,hours:0,tasks:[],proj:p};
+          byDate[key].hours+=parseFloat(e.hours||0);
+          const task=e.task+(e.notes?' ('+e.notes+')':'');
+          if(!byDate[key].tasks.includes(task))byDate[key].tasks.push(task);
+        });
+        return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date)).map(d=>`<tr class="tr-sep">
+          <td style="color:var(--text2);font-size:12px">${fmtDate(d.date)}</td>
+          <td>${d.tasks.join('<br>')}${d.proj&&!pid?`<span style="font-size:11px;color:var(--text2)"> — ${d.proj.name}</span>`:''}</td>
+          <td style="text-align:right">${d.hours.toFixed(2)}</td>
+          <td style="text-align:right;color:var(--text2)">${$f(d.rate)}</td>
+          <td style="text-align:right">${$f(d.hours*d.rate)}</td>
+        </tr>`).join('');
+      })()}
+      <tr class="tr-strong"><td colspan="2">${invHours.toFixed(1)}h total</td><td colspan="3" style="text-align:right">${$f(invTimeAmt)}</td></tr>
+    </tbody>
+  </table>`:'';
 
-  esec.innerHTML=invE.length?`
-    <div class="sec-title">Expenses</div>
-    <table style="margin-bottom:1.25rem">
-      <thead><tr>
-        <th style="width:20%">Date</th><th style="width:20%">Category</th>
-        <th>Description</th><th style="text-align:right;width:90px">Amount</th>
-      </tr></thead>
-      <tbody>
-        ${invE.map(e=>`<tr class="tr-sep">
-          <td style="color:var(--text2);font-size:12px">${fmtDate(e.date)}</td>
-          <td style="color:var(--text2)">${e.category}</td>
-          <td>${e.description}</td>
-          <td style="text-align:right">${$f(e.amount)}</td>
-        </tr>`).join('')}
-        <tr class="tr-strong"><td colspan="3">Subtotal expenses</td><td style="text-align:right">${$f(invExpAmt)}</td></tr>
-      </tbody>
-    </table>`:'';
+  esec.innerHTML=invE.length?`<div class="sec-title">Expenses</div>
+  <table style="margin-bottom:1.25rem">
+    <thead><tr><th style="width:18%">Date</th><th style="width:18%">Category</th><th>Description</th><th style="text-align:right;width:85px">Amount</th></tr></thead>
+    <tbody>
+      ${invE.map(e=>`<tr class="tr-sep"><td style="color:var(--text2);font-size:12px">${fmtDate(e.date)}</td><td style="color:var(--text2)">${e.category}</td><td>${e.description}</td><td style="text-align:right">${$f(e.amount)}</td></tr>`).join('')}
+      <tr class="tr-strong"><td colspan="3">Subtotal expenses</td><td style="text-align:right">${$f(invExpAmt)}</td></tr>
+    </tbody>
+  </table>`:'';
 
   totals.innerHTML=`<div class="totals">
-    <div class="total-final"><span>Total due</span><span>${$f(invTotal)}</span></div>
+    <div class="total-row"><span style="color:var(--text2)">Subtotal</span><span>${$f(invTotal)}</span></div>
+    ${retainerApplied>0?`<div class="total-row"><span style="color:var(--text2)">Retainer applied</span><span>(${$f(retainerApplied)})</span></div>`:''}
+    <div class="total-final"><span>Balance due</span><span>${$f(balance)}</span></div>
+    ${balance===0&&invTotal>0?'<div style="font-size:12px;color:var(--success);margin-top:6px"><i class="ti ti-circle-check"></i> Fully covered by retainer</div>':''}
   </div>`;
 }
 
-// ── Timer ──
-let timerInterval=null,timerStart_=0,timerRunning=false;
-function fmtTimer(ms){const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h+':'+(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;}
+// ═══════════════════════════════════════════════
+//  EDIT TOGGLE
+// ═══════════════════════════════════════════════
+function toggleEdit(section,id){
+  editing[section]=editing[section]===id?null:id;
+  if(section==='time')renderTimeList();
+  else if(section==='expenses')renderExpenseList();
+  else if(section==='projects')renderProjectList();
+  else if(section==='clients')renderClientList();
+}
 
+// ═══════════════════════════════════════════════
+//  ALL DROPDOWN REFRESH
+// ═══════════════════════════════════════════════
+function allDropdownRefresh(){
+  refreshClientDropdown();
+  refreshExpenseClientDropdown();
+  refreshProjectClientDropdown();
+  refreshTimeProjectDropdown();
+  refreshExpenseProjectDropdown();
+  refreshExpenseCategoryDropdown();
+  refreshInvoiceProjectFilter();
+}
+
+// ═══════════════════════════════════════════════
+//  TIMER
+// ═══════════════════════════════════════════════
+let timerInterval=null,timerStart_=0,timerRunning=false,timerPaused=false,timerAccum=0;
+function fmtTimer(ms){const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h+':'+(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;}
 function timerStart(){
   if(timerRunning)return;
-  timerStart_=Date.now();timerRunning=true;
+  timerAccum=0;timerStart_=Date.now();timerRunning=true;timerPaused=false;
   document.getElementById('btn-start').style.display='none';
+  document.getElementById('btn-pause').style.display='inline-flex';
   document.getElementById('btn-stop').style.display='inline-flex';
   document.getElementById('btn-discard').style.display='inline-flex';
   document.getElementById('timer-card').classList.add('timer-running');
   const t=document.getElementById('t-task').value.trim();
   document.getElementById('timer-task-label').textContent=t?'Timing: '+t:'';
-  timerInterval=setInterval(()=>{document.getElementById('timer-display').textContent=fmtTimer(Date.now()-timerStart_);},1000);
+  timerInterval=setInterval(()=>{document.getElementById('timer-display').textContent=fmtTimer(timerAccum+(Date.now()-timerStart_));},1000);
 }
-
+function timerPause(){
+  if(!timerRunning||timerPaused)return;
+  timerPaused=true;
+  timerAccum+=Date.now()-timerStart_;
+  clearInterval(timerInterval);
+  document.getElementById('timer-card').classList.remove('timer-running');
+  document.getElementById('timer-task-label').textContent='Paused';
+  document.getElementById('btn-pause').style.display='none';
+  document.getElementById('btn-resume').style.display='inline-flex';
+}
+function timerResume(){
+  if(!timerPaused)return;
+  timerPaused=false;timerStart_=Date.now();
+  document.getElementById('timer-card').classList.add('timer-running');
+  const t=document.getElementById('t-task').value.trim();
+  document.getElementById('timer-task-label').textContent=t?'Timing: '+t:'';
+  document.getElementById('btn-resume').style.display='none';
+  document.getElementById('btn-pause').style.display='inline-flex';
+  timerInterval=setInterval(()=>{document.getElementById('timer-display').textContent=fmtTimer(timerAccum+(Date.now()-timerStart_));},1000);
+}
 function timerStop(){
   if(!timerRunning)return;
   clearInterval(timerInterval);timerRunning=false;
-  const elapsed=(Date.now()-timerStart_)/1000/3600;
-  const rounded=Math.round(elapsed*4)/4;
+  const elapsed=timerPaused?timerAccum:timerAccum+(Date.now()-timerStart_);
+  const rounded=Math.round((elapsed/3600000)*4)/4;
   document.getElementById('t-hours').value=rounded>0?rounded.toFixed(2):'0.25';
   document.getElementById('t-date').value=today();
   timerReset();document.getElementById('t-task').focus();
 }
-
-function timerDiscard(){clearInterval(timerInterval);timerRunning=false;timerReset();}
-
+function timerDiscard(){clearInterval(timerInterval);timerRunning=false;timerPaused=false;timerAccum=0;timerReset();}
 function timerReset(){
-  timerStart_=0;
+  timerStart_=0;timerAccum=0;timerPaused=false;
   document.getElementById('timer-display').textContent='0:00:00';
   document.getElementById('timer-task-label').textContent='';
   document.getElementById('btn-start').style.display='inline-flex';
+  document.getElementById('btn-pause').style.display='none';
+  document.getElementById('btn-resume').style.display='none';
   document.getElementById('btn-stop').style.display='none';
   document.getElementById('btn-discard').style.display='none';
   document.getElementById('timer-card').classList.remove('timer-running');
 }
 
-// ── Boot ──
-window.gapiLoaded=gapiLoaded; // called by gapi script onload
-// Manually check if gapi already loaded (race condition)
-if(typeof gapi!=='undefined') gapiLoaded();
+// ═══════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════
+window.gapiLoaded=gapiLoaded;
 allDropdownRefresh();
 refreshAll();
 </script>
