@@ -264,7 +264,7 @@ td{padding:8px 0;vertical-align:top}
       </div>
       <div class="grid2">
         <div><label>Client</label><select id="t-client" onchange="refreshTimeProjectDropdown()"><option value="">— No client —</option></select></div>
-        <div><label>Project</label><select id="t-project"><option value="">— No project —</option></select></div>
+        <div><label>Project</label><select id="t-project" onchange="autoFillClientFromProject()"><option value="">— No project —</option></select></div>
       </div>
       <div class="field"><label>Task / description</label><input type="text" id="t-task" placeholder="Homepage design review" onkeydown="if(event.key==='Enter')addTime()"></div>
       <div class="field"><label>Notes (optional)</label><input type="text" id="t-notes" placeholder="Additional context" onkeydown="if(event.key==='Enter')addTime()"></div>
@@ -881,6 +881,20 @@ function refreshTimeProjectDropdown(){
   sel.innerHTML='<option value="">— No project —</option>';
   (cid?projects.filter(p=>p.clientId===cid):projects).forEach(p=>{sel.appendChild(new Option(p.name,p.id));});
   if(prev&&(cid?projects.filter(p=>p.clientId===cid):projects).find(p=>p.id===prev))sel.value=prev;
+}
+
+function autoFillClientFromProject(){
+  const pid=document.getElementById('t-project').value;
+  if(!pid)return;
+  const proj=projects.find(p=>p.id===pid);
+  if(!proj||!proj.clientId)return;
+  const clientSel=document.getElementById('t-client');
+  if(clientSel.value===proj.clientId)return; // already set
+  clientSel.value=proj.clientId;
+  // Refresh project dropdown filtered to this client, keeping current selection
+  const prev=pid;
+  refreshTimeProjectDropdown();
+  document.getElementById('t-project').value=prev;
 }
 
 function renderTimeList(){
@@ -1701,6 +1715,20 @@ function timerReset(){
 window.gapiLoaded=gapiLoaded;
 allDropdownRefresh();
 refreshAll();
+
+// Report content height to parent so Squarespace iframe resizes to fit
+(function initHeightReporter(){
+  function reportHeight(){
+    const h=document.documentElement.scrollHeight;
+    if(window.parent!==window){
+      window.parent.postMessage({type:'tracker_height',height:h},'*');
+    }
+  }
+  // Report on load, tab switches, and any DOM size changes
+  reportHeight();
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setTimeout(reportHeight,50)));
+  new ResizeObserver(reportHeight).observe(document.getElementById('app'));
+})();
 </script>
 </body>
 </html>
