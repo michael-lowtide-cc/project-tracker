@@ -420,8 +420,10 @@ function initTokenClient(){
   tokenClient=google.accounts.oauth2.initTokenClient({
     client_id:GD_CLIENT_ID,
     scope:GD_SCOPE,
+    ux_mode:'popup',
     callback:async(resp)=>{
       if(resp.error){
+        console.error('OAuth error:',resp);
         setSyncUI('error','Drive auth failed — click to retry',true,'Retry');
         return;
       }
@@ -431,6 +433,14 @@ function initTokenClient(){
       setSyncUI('pending','Connecting to Google Drive…');
       await findOrCreateFile();
       await loadFromDrive();
+    },
+    error_callback:(err)=>{
+      console.error('Token error:',err);
+      if(err.type==='popup_closed'){
+        setSyncUI('offline','Sign-in cancelled',true,'Connect Drive');
+      } else {
+        setSyncUI('error','Auth error: '+err.type,true,'Retry');
+      }
     }
   });
 }
