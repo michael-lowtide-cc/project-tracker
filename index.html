@@ -462,8 +462,9 @@ async function findOrCreateFile(){
       await writeToDrive();
     }
   } catch(e){
-    setSyncUI('error','Could not access Drive — click to retry',true,'Retry');
-    console.error(e);
+    const msg=e.result?.error?.message||e.message||JSON.stringify(e);
+    console.error('findOrCreateFile error:',e);
+    setSyncUI('error','Drive error: '+msg,true,'Retry');
   }
 }
 
@@ -474,7 +475,10 @@ async function loadFromDrive(){
     const res=await fetch(`https://www.googleapis.com/drive/v3/files/${gdFileId}?alt=media`,{
       headers:{Authorization:`Bearer ${gdToken}`}
     });
-    if(!res.ok) throw new Error('fetch failed: '+res.status);
+    if(!res.ok){
+      const errText=await res.text();
+      throw new Error(`HTTP ${res.status}: ${errText}`);
+    }
     const data=await res.json();
     GD_KEYS.forEach(k=>{if(data[k]!==undefined)localStorage.setItem(k,JSON.stringify(data[k]));});
     settings    = load('tracker:settings',{hourlyRate:'150',invoicePrefix:'INV',currency:'USD'});
@@ -492,8 +496,9 @@ async function loadFromDrive(){
     refreshAll();
     setSyncUI('idle',`Synced with Google Drive · ${new Date().toLocaleTimeString()}`);
   } catch(e){
-    setSyncUI('error','Could not load from Drive — using local data',true,'Retry');
-    console.error(e);
+    const msg=e.message||JSON.stringify(e);
+    console.error('loadFromDrive error:',e);
+    setSyncUI('error','Could not load from Drive: '+msg,true,'Retry');
   }
 }
 
