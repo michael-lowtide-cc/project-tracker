@@ -377,7 +377,8 @@ const GD_CLIENT_ID  = '964475055610-sb4e62npukeqrno43qpjnse5pa05ca5n.apps.google
 const GD_SCOPE      = 'https://www.googleapis.com/auth/drive.file';
 const GD_FILENAME   = 'tracker-data.json';
 const GD_KEYS       = ['tracker:settings','tracker:time','tracker:expenses','tracker:clients','tracker:projects','tracker:clientInvs'];
-const GD_REDIRECT   = 'https://michael-lowtide-cc.github.io/project-tracker/';
+// Dynamic redirect — always matches the exact URL the app is running on
+const GD_REDIRECT   = window.location.origin + window.location.pathname;
 
 let gdToken   = null;
 let gdFileId  = null;
