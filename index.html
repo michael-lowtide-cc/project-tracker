@@ -479,7 +479,8 @@ async function loadFromDrive(){
       const errText=await res.text();
       throw new Error(`HTTP ${res.status}: ${errText}`);
     }
-    const data=await res.json().catch(()=>({}));
+    const raw=await res.text();
+    const data=(raw&&raw!=='null'&&raw.trim()!=='')?JSON.parse(raw):{};
     // Only restore keys that have actual data (not null)
     GD_KEYS.forEach(k=>{if(data[k]!=null)localStorage.setItem(k,JSON.stringify(data[k]));});
     settings    = load('tracker:settings',{}) ; settings = Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD'}, settings||{});
