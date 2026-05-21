@@ -31,8 +31,8 @@ h1{font-size:22px;font-weight:500}
 .met{background:var(--bg2);border-radius:var(--radius-sm);padding:1rem}
 .met-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
 .met-val{font-size:20px;font-weight:500}
-.tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:.5px solid var(--border);margin-bottom:1.25rem}
-.tab{background:none;border:none;border-bottom:2px solid transparent;padding:9px 12px;font-size:13px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:-1px;transition:color .15s}
+.tabs{display:flex;border-bottom:.5px solid var(--border);margin-bottom:1.25rem}
+.tab{background:none;border:none;border-bottom:2px solid transparent;padding:9px 4px;font-size:18px;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;margin-bottom:-1px;transition:color .15s;flex:1}
 .tab.active{border-bottom-color:var(--accent);font-weight:500;color:var(--accent)}
 .tab:hover{color:var(--text)}
 label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
@@ -156,10 +156,25 @@ td{padding:8px 0;vertical-align:top}
 .period-btn:hover{background:var(--bg2);color:var(--text)}
 .period-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 /* Tab drag-reorder */
-.tab{cursor:grab;user-select:none}
 .tab.dragging{opacity:.4;cursor:grabbing}
 .tab.drag-over{border-left:2px solid var(--accent)}
-/* Section page headers */
+/* Toggle switch */
+.toggle-wrap{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-slider{position:absolute;inset:0;background:var(--bg2);border:.5px solid var(--border2);border-radius:20px;cursor:pointer;transition:background .2s}
+.toggle-slider:before{content:'';position:absolute;height:14px;width:14px;left:2px;top:2px;background:var(--text3);border-radius:50%;transition:.2s}
+.toggle input:checked~.toggle-slider{background:var(--accent);border-color:var(--accent)}
+.toggle input:checked~.toggle-slider:before{transform:translateX(16px);background:#fff}
+/* Client autofill suggestions */
+.autofill-wrap{position:relative}
+.autofill-list{position:absolute;top:100%;left:0;right:0;background:var(--bg);border:.5px solid var(--border2);border-radius:var(--radius-sm);z-index:100;max-height:180px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.1)}
+.autofill-item{padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:.5px solid var(--border)}
+.autofill-item:last-child{border-bottom:none}
+.autofill-item:hover{background:var(--bg2)}
+/* Add-project collapse */
+#add-project-form{display:none}
+#add-project-form.open{display:block}
 .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
 .page-title{font-size:20px;font-weight:600;color:var(--text)}
 /* Color palette */
@@ -185,7 +200,7 @@ td{padding:8px 0;vertical-align:top}
   #app{max-width:100%;padding:1rem}
   .tabs,.header button,.no-print{display:none!important}
   #invoice-section{display:block!important}
-  #dashboard-section,#time-section,#expenses-section,#projects-section,#clients-section,#team-section,#gantt-section,#reports-section{display:none!important}
+  #dashboard-section,#time-section,#expenses-section,#projects-section,#clients-section,#team-section,#reports-section{display:none!important}
 }
 @media(max-width:520px){.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}}
 </style>
@@ -236,7 +251,6 @@ td{padding:8px 0;vertical-align:top}
     <div style="height:.5px;background:var(--border);margin-bottom:12px"></div>
     <div class="sec-title">Global settings</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      <div><label>Default hourly rate ($)</label><input id="s-rate" type="number" placeholder="150" oninput="saveSetting('hourlyRate',this.value);refreshAll()"></div>
       <div><label>Invoice prefix</label><input id="s-prefix" type="text" placeholder="INV" oninput="saveSetting('invoicePrefix',this.value);refreshAll()"></div>
       <div><label>Currency</label>
         <select id="s-currency" onchange="saveSetting('currency',this.value);refreshAll()">
@@ -256,15 +270,14 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- TABS -->
   <div class="tabs no-print" id="tabs-container">
-    <button class="tab active" id="tab-dashboard" data-tab="dashboard" draggable="true"><i class="ti ti-layout-dashboard" title="Dashboard"></i></button>
-    <button class="tab" id="tab-time" data-tab="time" draggable="true"><i class="ti ti-clock" title="Time"></i></button>
-    <button class="tab" id="tab-expenses" data-tab="expenses" draggable="true"><i class="ti ti-receipt" title="Expenses"></i></button>
-    <button class="tab" id="tab-projects" data-tab="projects" draggable="true"><i class="ti ti-folder" title="Projects"></i></button>
-    <button class="tab" id="tab-clients" data-tab="clients" draggable="true"><i class="ti ti-users" title="Clients"></i></button>
-    <button class="tab" id="tab-invoice" data-tab="invoice" draggable="true"><i class="ti ti-file-invoice" title="Invoice"></i></button>
-    <button class="tab" id="tab-team" data-tab="team" draggable="true"><i class="ti ti-users-group" title="Team"></i></button>
-    <button class="tab" id="tab-gantt" data-tab="gantt" draggable="true"><i class="ti ti-chart-gantt" title="Gantt"></i></button>
-    <button class="tab" id="tab-reports" data-tab="reports" draggable="true"><i class="ti ti-chart-bar" title="Reports"></i></button>
+    <button class="tab active" id="tab-dashboard" data-tab="dashboard" title="Dashboard"><i class="ti ti-layout-dashboard"></i></button>
+    <button class="tab" id="tab-time" data-tab="time" title="Time"><i class="ti ti-clock"></i></button>
+    <button class="tab" id="tab-projects" data-tab="projects" title="Projects"><i class="ti ti-folder"></i></button>
+    <button class="tab" id="tab-team" data-tab="team" title="Team"><i class="ti ti-users-group"></i></button>
+    <button class="tab" id="tab-clients" data-tab="clients" title="Clients"><i class="ti ti-users"></i></button>
+    <button class="tab" id="tab-expenses" data-tab="expenses" title="Expenses"><i class="ti ti-receipt"></i></button>
+    <button class="tab" id="tab-invoice" data-tab="invoice" title="Invoices"><i class="ti ti-file-invoice"></i></button>
+    <button class="tab" id="tab-reports" data-tab="reports" title="Reports"><i class="ti ti-chart-bar"></i></button>
   </div>
 
   <!-- DASHBOARD -->
@@ -366,9 +379,12 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- PROJECTS -->
   <div id="projects-section" style="display:none">
-    <div class="page-header"><h2 class="page-title">Projects</h2></div>
+    <div class="page-header">
+      <h2 class="page-title">Projects</h2>
+      <button class="btn primary" onclick="toggleAddProject()" id="add-project-btn"><i class="ti ti-plus"></i> Add project</button>
+    </div>
+    <div id="add-project-form">
     <div class="card">
-      <div class="sec-title">Add project</div>
       <div class="grid3">
         <div><label>Project #</label><input type="text" id="p-num" placeholder="PRJ-001"></div>
         <div style="grid-column:span 2"><label>Project name</label><input type="text" id="p-name" placeholder="Website Redesign"></div>
@@ -437,9 +453,12 @@ td{padding:8px 0;vertical-align:top}
         <div id="p-team-assign" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
         <div style="font-size:11px;color:var(--text3);margin-top:4px">Click team members to assign them to this project</div>
       </div>
-      <div style="display:flex;justify-content:flex-end"><button class="btn primary" onclick="addProject()"><i class="ti ti-plus"></i> Add project</button></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn" onclick="toggleAddProject()">Cancel</button>
+        <button class="btn primary" onclick="addProject()"><i class="ti ti-plus"></i> Add project</button>
+      </div>
     </div>
-    <div class="sec-title">All projects</div>
+    </div><!-- /#add-project-form -->
     <div id="project-list"></div>
   </div>
 
@@ -515,27 +534,39 @@ td{padding:8px 0;vertical-align:top}
     <div class="page-header"><h2 class="page-title">Team</h2></div>
     <div class="card">
       <div class="sec-title">Add team member</div>
-      <div class="grid2" style="margin-bottom:8px">
-        <div><label>Type</label>
-          <select id="tm-type" onchange="toggleTeamMemberType()">
-            <option value="internal">Internal</option>
-            <option value="external">External / Contractor</option>
-          </select>
+      <!-- Same layout as Add Client -->
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+        <div style="flex-shrink:0;text-align:center">
+          <div id="add-tm-photo-preview" class="client-avatar" onclick="document.getElementById('add-tm-photo-input').click()" title="Upload photo" style="width:54px;height:54px;font-size:18px;cursor:pointer">
+            <i class="ti ti-camera" style="font-size:20px;color:var(--text3)"></i>
+          </div>
+          <input type="file" id="add-tm-photo-input" accept="image/*" style="display:none" onchange="previewClientPhoto(this,'add-tm-photo-preview','add-tm-photo-data')">
+          <input type="hidden" id="add-tm-photo-data">
+          <div style="font-size:10px;color:var(--text3);margin-top:3px">Photo</div>
         </div>
-        <div><label>Name</label><input type="text" id="tm-name" placeholder="Alex Rivera"></div>
+        <div style="flex:1">
+          <div class="grid2" style="margin-bottom:0">
+            <div class="field">
+              <label>Name</label>
+              <div class="autofill-wrap">
+                <input type="text" id="tm-name" placeholder="Alex Rivera" autocomplete="off" oninput="tmNameAutofill(this.value)">
+                <div class="autofill-list" id="tm-autofill" style="display:none"></div>
+              </div>
+            </div>
+            <div class="field"><label>Role / title</label><input type="text" id="tm-role" placeholder="Designer"></div>
+          </div>
+          <div class="grid2" style="margin-bottom:0">
+            <div class="field"><label>Email</label><input type="email" id="tm-email" placeholder="alex@studio.com"></div>
+            <div class="field"><label>Phone</label><input type="tel" id="tm-phone" placeholder="+1 (555) 000-0000"></div>
+          </div>
+        </div>
       </div>
-      <div class="grid3">
-        <div><label>Role / title</label><input type="text" id="tm-role" placeholder="Designer"></div>
-        <div><label>Email</label><input type="email" id="tm-email" placeholder="alex@studio.com"></div>
-        <div id="tm-company-wrap"><label>Company</label><input type="text" id="tm-company" placeholder="Their studio"></div>
-      </div>
+      <div id="tm-company-wrap" class="field"><label>Company</label><input type="text" id="tm-company" placeholder="Their studio or agency"></div>
       <div class="grid2" id="tm-rate-row">
         <div><label>Hourly cost ($/hr)</label><input type="number" id="tm-rate" min="0" step="5" placeholder="80"></div>
-        <div>
-          <label>Link to existing client</label>
-          <select id="tm-client-link"><option value="">— None —</option></select>
-        </div>
+        <div></div>
       </div>
+      <div class="field"><label>Notes (optional)</label><input type="text" id="tm-notes" placeholder="Timezone, specialty, etc."></div>
       <div class="field">
         <label>Color</label>
         <div class="color-palette" id="tm-color-palette"></div>
@@ -544,20 +575,6 @@ td{padding:8px 0;vertical-align:top}
     </div>
     <div class="sec-title">Team</div>
     <div id="team-list"></div>
-  </div>
-
-  <!-- GANTT -->
-  <div id="gantt-section" style="display:none">
-    <div class="page-header"><h2 class="page-title">Gantt</h2></div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
-      <label style="font-size:14px;color:var(--text2);margin:0">Project</label>
-      <select id="gantt-project-filter" style="width:220px" onchange="renderGantt()"><option value="">All projects</option></select>
-      <label style="font-size:14px;color:var(--text2);margin:0;margin-left:8px">View</label>
-      <select id="gantt-view" style="width:140px" onchange="renderGantt()">
-        <option value="month">Month</option><option value="quarter">Quarter</option><option value="year">Year</option>
-      </select>
-    </div>
-    <div id="gantt-chart" class="card" style="overflow-x:auto;padding:1rem"></div>
   </div>
 
   <!-- REPORTS -->
@@ -792,7 +809,6 @@ document.getElementById('p-client').addEventListener('change',function(){
   refreshProjectClientDropdown();
 });
 (function loadSettingsForm(){
-  document.getElementById('s-rate').value=settings.hourlyRate||'150';
   document.getElementById('s-prefix').value=settings.invoicePrefix||'INV';
   document.getElementById('s-currency').value=settings.currency||'USD';
   document.getElementById('s-myname').value=myProfile.name||'';
@@ -856,12 +872,43 @@ function updateProfileAvatar(){
   });
 })();
 
-// ── TEAM TYPE TOGGLE ──
-function toggleTeamMemberType(){
-  const ext=document.getElementById('tm-type').value==='external';
-  document.getElementById('tm-rate-row').style.display=ext?'none':'grid';
-  document.getElementById('tm-company-wrap').style.display='block';
+// ── TEAM TYPE TOGGLE (per-card toggle switch) ──
+function toggleMemberType(id){
+  const m=teamMembers.find(x=>x.id===id);if(!m)return;
+  m.type=m.type==='internal'?'external':'internal';
+  save('tracker:team',teamMembers);renderTeamList();allDropdownRefresh();
 }
+
+// ── CLIENT NAME AUTOFILL FOR TEAM MEMBER FORM ──
+function tmNameAutofill(val){
+  const list=document.getElementById('tm-autofill');if(!list)return;
+  if(!val||val.length<2){list.style.display='none';return;}
+  const matches=clients.filter(c=>{
+    const n=(c.contactName||'').toLowerCase();
+    const co=(c.company||'').toLowerCase();
+    return n.includes(val.toLowerCase())||co.includes(val.toLowerCase());
+  }).slice(0,5);
+  if(!matches.length){list.style.display='none';return;}
+  list.innerHTML=matches.map(c=>`<div class="autofill-item" onclick="tmAutofill('${c.id}')">${c.contactName||c.company}${c.company&&c.contactName?' · <span style="color:var(--text2)">${c.company}</span>':''}</div>`).join('');
+  list.style.display='block';
+}
+
+function tmAutofill(clientId){
+  const c=clients.find(x=>x.id===clientId);if(!c)return;
+  document.getElementById('tm-name').value=c.contactName||'';
+  document.getElementById('tm-email').value=c.email||'';
+  document.getElementById('tm-phone').value=c.phone||'';
+  document.getElementById('tm-company').value=c.company||'';
+  document.getElementById('tm-autofill').style.display='none';
+  // Store link
+  document.getElementById('tm-name').dataset.clientLink=clientId;
+}
+
+// Close autofill on outside click
+document.addEventListener('click',e=>{
+  const af=document.getElementById('tm-autofill');
+  if(af&&!af.contains(e.target)&&e.target.id!=='tm-name')af.style.display='none';
+});
 
 // ── TEAM COLOR PALETTE ──
 function renderColorPalette(containerId, selectedColor, callbackFnName, disableMine=false){
@@ -963,7 +1010,7 @@ function toggleSettings(){
 
 function switchTab(t){
   currentTab=t;
-  ['dashboard','time','expenses','projects','clients','invoice','team','gantt','reports'].forEach(id=>{
+  ['dashboard','time','expenses','projects','clients','invoice','team','reports'].forEach(id=>{
     const sec=document.getElementById(id+'-section');
     const btn=document.getElementById('tab-'+id);
     if(sec)sec.style.display=id===t?'block':'none';
@@ -972,14 +1019,24 @@ function switchTab(t){
   if(t==='invoice')renderInvoice();
   if(t==='clients')renderClientList();
   if(t==='projects'){renderProjectList();refreshTeamAssignChipsForNewProject();}
-  if(t==='team'){renderTeamList();renderColorPalette('tm-color-palette',_newTmColorVal,'pickNewTmColor',true);refreshTeamClientLinkDropdown();}
-  if(t==='gantt')renderGantt();
+  if(t==='team'){renderTeamList();renderColorPalette('tm-color-palette',_newTmColorVal,'pickNewTmColor',true);}
   if(t==='reports'){initReportFilters();renderReports();}
 }
 
 function pickNewTmColor(hex){
   _newTmColorVal=hex;
-  renderColorPalette('tm-color-palette',hex,"pickNewTmColor('__COLOR__')",true);
+}
+
+function toggleAddProject(){
+  const form=document.getElementById('add-project-form');
+  const btn=document.getElementById('add-project-btn');
+  const open=form.classList.toggle('open');
+  btn.innerHTML=open?'<i class="ti ti-x"></i> Cancel':'<i class="ti ti-plus"></i> Add project';
+  if(open)refreshTeamAssignChipsForNewProject();
+}
+
+function getProjRate(proj){
+  return parseFloat((proj&&proj.rate)?proj.rate:(myProfile&&myProfile.rate)?myProfile.rate:settings.hourlyRate||150);
 }
 
 function refreshTeamAssignChipsForNewProject(){
@@ -1467,6 +1524,7 @@ function renderProjectList(){
         <div class="gauge-bar" style="height:7px"><div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div></div>
       </div>`:''}
       ${p.desc?`<div style="font-size:13px;color:var(--text2);margin-top:8px">${p.desc}</div>`:''}
+      ${renderMiniGantt(p)}
       ${renderTasksAndMilestones(p)}
       ${isEditing?renderProjectEditForm(p):''}
     </div>`;
@@ -1982,7 +2040,6 @@ function allDropdownRefresh(){
   refreshExpenseProjectDropdown();
   refreshExpenseCategoryDropdown();
   refreshInvoiceProjectFilter();
-  refreshGanttProjectFilter();
   refreshTimeAssigneeDropdown();
 }
 
@@ -2002,28 +2059,39 @@ function renderTeamList(){
   if(!teamMembers.length){el.innerHTML='<div class="empty">No team members yet.</div>';return;}
   el.innerHTML=teamMembers.map(m=>{
     const isEditing=editing.team===m.id;
+    const isInternal=m.type==='internal';
     const totalHours=timeEntries.filter(e=>e.assigneeId===m.id).reduce((s,e)=>s+parseFloat(e.hours||0),0);
     const linkedClient=m.clientLink?clients.find(c=>c.id===m.clientLink):null;
     const assignedProjs=projects.filter(p=>(p.teamIds||[]).includes(m.id));
+    const avatar=m.photo?`<img src="${m.photo}" alt="photo">`:`<span>${initials(m.contactName||m.name)}</span>`;
     return`<div class="card" style="margin-bottom:10px;padding:1rem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="display:flex;gap:12px;align-items:center">
-          <div style="width:38px;height:38px;border-radius:50%;background:${m.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px;flex-shrink:0">${(m.name||'?').charAt(0).toUpperCase()}</div>
+          <div style="width:42px;height:42px;border-radius:50%;background:${m.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;overflow:hidden;border:2px solid ${m.color||'var(--accent)'}">
+            ${m.photo?`<img src="${m.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:(m.name||'?').charAt(0).toUpperCase()}
+          </div>
           <div>
-            <div style="font-weight:500;font-size:14px;display:flex;align-items:center;gap:6px">
-              ${m.name}
-              <span class="type-badge type-${m.type||'internal'}">${m.type==='external'?'External':'Internal'}</span>
-            </div>
-            <div style="font-size:12px;color:var(--text2);margin-top:2px">
-              ${m.role||''}${m.company?' · '+m.company:''}${m.email?' · <a href="mailto:'+m.email+'" style="color:var(--accent)">'+m.email+'</a>':''}${m.rate&&m.type!=='external'?' · '+$f(m.rate)+'/hr':''}
+            <div style="font-weight:500;font-size:14px">${m.name}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:1px">
+              ${m.role||''}${m.company?' · '+m.company:''}${m.email?' · <a href="mailto:'+m.email+'" style="color:var(--accent)">'+m.email+'</a>':''}${m.phone?' · '+m.phone:''}${isInternal&&m.rate?' · '+$f(m.rate)+'/hr':''}
             </div>
             <div style="font-size:11px;color:var(--text3);margin-top:2px">
-              ${totalHours.toFixed(1)}h logged${linkedClient?' · Linked to: '+(linkedClient.company||linkedClient.contactName):''}
-              ${assignedProjs.length?' · Projects: '+assignedProjs.map(p=>p.name).join(', '):''}
+              ${totalHours.toFixed(1)}h logged${linkedClient?' · Client: '+(linkedClient.company||linkedClient.contactName):''}
+              ${assignedProjs.length?' · '+assignedProjs.map(p=>p.name).join(', '):''}
             </div>
           </div>
         </div>
-        <button class="icon-action" onclick="toggleEdit('team','${m.id}')"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+          <!-- Internal/External toggle -->
+          <div class="toggle-wrap">
+            <span style="font-size:11px;color:${isInternal?'var(--accent)':'var(--text3)'}">${isInternal?'Internal':'External'}</span>
+            <label class="toggle" title="Toggle Internal/External">
+              <input type="checkbox" ${isInternal?'checked':''} onchange="toggleMemberType('${m.id}')">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <button class="icon-action" onclick="toggleEdit('team','${m.id}')"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
+        </div>
       </div>
       ${isEditing?renderTeamEditForm(m):''}
     </div>`;
@@ -2031,28 +2099,33 @@ function renderTeamList(){
 }
 
 function renderTeamEditForm(m){
+  const isInternal=m.type==='internal';
   const colorPaletteId=`etm-colors-${m.id}`;
   const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===m.clientLink?' selected':''}>${c.company||c.contactName}</option>`).join('');
-  const ext=m.type==='external';
   return`<div class="edit-form" style="margin-top:12px">
-    <div class="grid2">
-      <div><label>Type</label><select id="etm-type-${m.id}" onchange="document.getElementById('etm-rate-wrap-${m.id}').style.display=this.value==='external'?'none':'block'">
-        <option value="internal"${m.type!=='external'?' selected':''}>Internal</option>
-        <option value="external"${m.type==='external'?' selected':''}>External</option>
-      </select></div>
-      <div><label>Name</label><input type="text" id="etm-name-${m.id}" value="${m.name||''}"></div>
-    </div>
-    <div class="grid3">
-      <div><label>Role</label><input type="text" id="etm-role-${m.id}" value="${m.role||''}"></div>
-      <div><label>Email</label><input type="email" id="etm-email-${m.id}" value="${m.email||''}"></div>
-      <div><label>Company</label><input type="text" id="etm-company-${m.id}" value="${m.company||''}"></div>
-    </div>
-    <div id="etm-rate-wrap-${m.id}" style="display:${ext?'none':'block'}">
-      <div class="grid2">
-        <div><label>Hourly cost ($/hr)</label><input type="number" id="etm-rate-${m.id}" value="${m.rate||''}" min="0" step="5"></div>
-        <div><label>Link to client</label><select id="etm-clink-${m.id}"><option value="">— None —</option>${clientOpts}</select></div>
+    <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+      <div style="flex-shrink:0;text-align:center">
+        <div id="etm-photo-prev-${m.id}" class="client-avatar" onclick="document.getElementById('etm-photo-inp-${m.id}').click()" style="width:50px;height:50px;cursor:pointer">${m.photo?`<img src="${m.photo}">`:`<i class="ti ti-camera" style="font-size:18px;color:var(--text3)"></i>`}</div>
+        <input type="file" id="etm-photo-inp-${m.id}" accept="image/*" style="display:none" onchange="previewClientPhoto(this,'etm-photo-prev-${m.id}','etm-photo-data-${m.id}')">
+        <input type="hidden" id="etm-photo-data-${m.id}" value="${m.photo||''}">
+      </div>
+      <div style="flex:1">
+        <div class="grid2">
+          <div><label>Name</label><input type="text" id="etm-name-${m.id}" value="${m.name||''}"></div>
+          <div><label>Role</label><input type="text" id="etm-role-${m.id}" value="${m.role||''}"></div>
+        </div>
+        <div class="grid2">
+          <div><label>Email</label><input type="email" id="etm-email-${m.id}" value="${m.email||''}"></div>
+          <div><label>Phone</label><input type="tel" id="etm-phone-${m.id}" value="${m.phone||''}"></div>
+        </div>
       </div>
     </div>
+    ${!isInternal?`<div class="grid2">
+      <div><label>Company</label><input type="text" id="etm-company-${m.id}" value="${m.company||''}"></div>
+      <div><label>Link to client</label><select id="etm-clink-${m.id}"><option value="">— None —</option>${clientOpts}</select></div>
+    </div>`:`<div id="etm-company-${m.id}" style="display:none"></div><div id="etm-clink-${m.id}" style="display:none"></div>`}
+    ${isInternal?`<div><label>Hourly cost ($/hr)</label><input type="number" id="etm-rate-${m.id}" value="${m.rate||''}" min="0" step="5"></div><br>`:''}
+    <div class="field"><label>Notes</label><input type="text" id="etm-notes-${m.id}" value="${m.notes||''}"></div>
     <div class="field"><label>Color</label><div class="color-palette" id="${colorPaletteId}"></div></div>
     <input type="hidden" id="etm-color-${m.id}" value="${m.color||TEAM_COLORS[1].hex}">
     <div class="edit-actions"><div></div><div style="display:flex;gap:8px">
@@ -2062,18 +2135,30 @@ function renderTeamEditForm(m){
   </div>`;
 }
 
-let _selectedTeamColor=TEAM_COLORS[1].hex;
 let _newTmColorVal=TEAM_COLORS[1].hex;
 
 function addTeamMember(){
   const name=document.getElementById('tm-name').value.trim();if(!name)return;
-  const type=document.getElementById('tm-type').value;
-  const ext=type==='external';
-  // Check color isn't brand purple
-  if(_newTmColorVal==='#9151a0'){alert('That color is reserved for your personal profile. Please choose another.');return;}
-  teamMembers.unshift({id:uid(),name,type,role:document.getElementById('tm-role').value.trim(),email:document.getElementById('tm-email').value.trim(),company:document.getElementById('tm-company').value.trim(),rate:ext?'':document.getElementById('tm-rate').value||'',clientLink:ext?'':document.getElementById('tm-client-link').value||'',color:_newTmColorVal});
+  if(_newTmColorVal==='#9151a0'){alert('That color is reserved for your profile. Please choose another.');return;}
+  const nameEl=document.getElementById('tm-name');
+  teamMembers.unshift({
+    id:uid(),name,
+    type:'external', // default; can toggle on card
+    role:document.getElementById('tm-role').value.trim(),
+    email:document.getElementById('tm-email').value.trim(),
+    phone:document.getElementById('tm-phone').value.trim(),
+    company:document.getElementById('tm-company').value.trim(),
+    rate:document.getElementById('tm-rate').value||'',
+    notes:document.getElementById('tm-notes').value.trim(),
+    photo:document.getElementById('add-tm-photo-data').value||'',
+    clientLink:nameEl.dataset.clientLink||'',
+    color:_newTmColorVal
+  });
   save('tracker:team',teamMembers);
-  ['tm-name','tm-role','tm-email','tm-company','tm-rate'].forEach(id=>document.getElementById(id).value='');
+  ['tm-name','tm-role','tm-email','tm-phone','tm-company','tm-rate','tm-notes','add-tm-photo-data'].forEach(id=>{
+    const el=document.getElementById(id);if(el){el.value='';delete el.dataset.clientLink;}
+  });
+  document.getElementById('add-tm-photo-preview').innerHTML='<i class="ti ti-camera" style="font-size:20px;color:var(--text3)"></i>';
   _newTmColorVal=TEAM_COLORS[1].hex;
   allDropdownRefresh();renderTeamList();
 }
@@ -2082,14 +2167,20 @@ function saveTeamMemberEdit(id){
   const m=teamMembers.find(x=>x.id===id);if(!m)return;
   const newColor=document.getElementById(`etm-color-${id}`).value;
   if(newColor==='#9151a0'){alert('That color is reserved for your personal profile.');return;}
-  m.type=document.getElementById(`etm-type-${id}`).value;
   m.name=document.getElementById(`etm-name-${id}`).value.trim();
   m.role=document.getElementById(`etm-role-${id}`).value.trim();
   m.email=document.getElementById(`etm-email-${id}`).value.trim();
-  m.company=document.getElementById(`etm-company-${id}`).value.trim();
-  m.rate=document.getElementById(`etm-rate-${id}`)?.value||'';
-  const clinkEl=document.getElementById(`etm-clink-${id}`);
-  m.clientLink=clinkEl?clinkEl.value:'';
+  m.phone=document.getElementById(`etm-phone-${id}`)?.value.trim()||'';
+  m.notes=document.getElementById(`etm-notes-${id}`)?.value.trim()||'';
+  m.photo=document.getElementById(`etm-photo-data-${id}`)?.value||m.photo||'';
+  if(m.type!=='internal'){
+    m.company=document.getElementById(`etm-company-${id}`)?.value.trim()||'';
+    const clinkEl=document.getElementById(`etm-clink-${id}`);
+    m.clientLink=clinkEl?clinkEl.value:'';
+  } else {
+    m.company='';m.clientLink='';
+    m.rate=document.getElementById(`etm-rate-${id}`)?.value||'';
+  }
   m.color=newColor;
   save('tracker:team',teamMembers);editing.team=null;allDropdownRefresh();renderTeamList();
 }
@@ -2098,6 +2189,69 @@ function deleteTeamMember(id){
   if(!confirm('Remove this team member?'))return;
   teamMembers=teamMembers.filter(m=>m.id!==id);
   save('tracker:team',teamMembers);editing.team=null;allDropdownRefresh();renderTeamList();
+}
+
+// ═══════════════════════════════════════════════
+//  MINI GANTT (inline on project card)
+// ═══════════════════════════════════════════════
+function renderMiniGantt(p){
+  if(!p.startDate)return''; // no dates, skip
+  const W=680,H=28,LW=0;
+  const start=new Date(p.startDate+'T12:00:00');
+  const endDate=p.endDate?new Date(p.endDate+'T12:00:00'):new Date(start.getFullYear(),start.getMonth()+3,start.getDate());
+  const totalDays=Math.max(1,Math.round((endDate-start)/86400000));
+  const todayD=new Date();
+  const todayPct=Math.min(100,Math.max(0,(todayD-start)/86400000/totalDays*100));
+  const tasks=(p.tasks||[]).filter(t=>t.dueDate&&t.dueDate>=p.startDate);
+  const milestones=(p.milestones||[]).filter(m=>m.date&&m.date>=p.startDate);
+  const color=p.status==='completed'?'#888':p.status==='on_hold'?'var(--warning)':'var(--accent)';
+  const phases=p.phases||[];
+
+  // Build month labels
+  let monthLabels=[];
+  let cur=new Date(start.getFullYear(),start.getMonth(),1);
+  while(cur<=endDate){
+    const pct=(cur-start)/86400000/totalDays*100;
+    if(pct>=0&&pct<=100)monthLabels.push({label:cur.toLocaleDateString('en-US',{month:'short'}),pct});
+    cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+  }
+
+  // Phase bars
+  const phaseBars=phases.filter(ph=>ph.startDate&&ph.endDate).map(ph=>{
+    const ps=new Date(ph.startDate+'T12:00:00');
+    const pe=new Date(ph.endDate+'T12:00:00');
+    const x=(ps-start)/86400000/totalDays*100;
+    const w=(pe-ps)/86400000/totalDays*100;
+    return`<rect x="${Math.max(0,x)}%" y="0" width="${Math.min(100-x,w)}%" height="8" fill="${color}" opacity="0.3" rx="2"/>`;
+  }).join('');
+
+  return`<div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border)">
+    <div style="font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Timeline · ${fmtDate(p.startDate)} → ${fmtDate(p.endDate||'')}</div>
+    <svg width="100%" height="${H+18}" viewBox="0 0 ${W} ${H+18}" preserveAspectRatio="none" style="display:block;overflow:visible">
+      <!-- Month labels -->
+      ${monthLabels.map(m=>`<text x="${m.pct}%" y="${H+14}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif">${m.label}</text>`).join('')}
+      <!-- Track -->
+      <rect x="0" y="0" width="100%" height="${H}" fill="var(--bg2)" rx="4"/>
+      <!-- Main bar -->
+      <rect x="0" y="4" width="100%" height="${H-8}" fill="${color}" opacity="0.2" rx="3"/>
+      <!-- Phase bars -->
+      ${phaseBars}
+      <!-- Today marker -->
+      <line x1="${todayPct}%" y1="0" x2="${todayPct}%" y2="${H}" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="3,2"/>
+      <!-- Task dots -->
+      ${tasks.map(t=>{
+        const tp=Math.min(100,Math.max(0,(new Date(t.dueDate+'T12:00:00')-start)/86400000/totalDays*100));
+        const tc=t.status==='done'?'var(--success)':t.taskType==='critical'?'var(--danger)':'var(--text2)';
+        return`<circle cx="${tp}%" cy="${H/2}" r="4" fill="${tc}" opacity="0.85"><title>${t.title}</title></circle>`;
+      }).join('')}
+      <!-- Milestones -->
+      ${milestones.map(ms=>{
+        const mp=Math.min(100,Math.max(0,(new Date(ms.date+'T12:00:00')-start)/86400000/totalDays*100));
+        const mc=ms.completed?'var(--success)':'var(--accent)';
+        return`<polygon points="${mp}%,2 calc(${mp}% + 6px),${H/2} ${mp}%,${H-2} calc(${mp}% - 6px),${H/2}" fill="${mc}" opacity="0.9"><title>${ms.title}</title></polygon>`;
+      }).join('')}
+    </svg>
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════
