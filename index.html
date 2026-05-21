@@ -1246,7 +1246,7 @@ function renderDashBudgets(){
 // Helper — get display label for a client
 function clientLabel(c){
   if(!c)return'';
-  return [c.company,(c.primaryContact||c.contactName?.()||'')].filter(Boolean).join(' — ') || '(unnamed)';
+  return [c.company,(c.primaryContact?.name||c.contactName||'')].filter(Boolean).join(' — ') || '(unnamed)';
 }
 
 function refreshClientDropdown(){
