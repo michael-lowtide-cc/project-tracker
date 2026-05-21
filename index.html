@@ -638,8 +638,8 @@ function setSyncUI(state,msg,showBtn=false,btnLabel=''){
 }
 
 async function forcSync(){
-  if(!gdToken||!gdFileId){setSyncUI('error','Not connected — click Connect Drive first',true,'Connect Drive');return;}
-  setSyncUI('saving','Syncing now…');
+  if(!gdToken||!gdFileId){setSyncUI('error','Not connected -- click Connect Drive first',true,'Connect Drive');return;}
+  setSyncUI('saving','Syncing now...');
   clearTimeout(syncTimer);
   await writeToDrive();
 }
@@ -652,7 +652,7 @@ function handleDriveAuth(){
   url.searchParams.set('scope',GD_SCOPE);
   url.searchParams.set('include_granted_scopes','true');
   url.searchParams.set('prompt','select_account');
-  setSyncUI('pending','Waiting for Google sign-in…');
+  setSyncUI('pending','Waiting for Google sign-in...');
   const popup=window.open(url.toString(),'gdrive-auth','width=500,height=620');
   window.addEventListener('message',async function h(e){
     if(e.data&&e.data.type==='gd_token'){
@@ -664,7 +664,7 @@ function handleDriveAuth(){
     }
     if(e.data&&e.data.type==='gd_error'){
       window.removeEventListener('message',h);
-      setSyncUI('error','Sign-in failed — click to retry',true,'Retry');
+      setSyncUI('error','Sign-in failed -- click to retry',true,'Retry');
     }
   });
 }
@@ -683,7 +683,7 @@ function checkHashToken(){
 }
 
 async function initDriveWithToken(){
-  setSyncUI('pending','Connecting to Google Drive…');
+  setSyncUI('pending','Connecting to Google Drive...');
   await gapi.client.init({});
   await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
   gapi.client.setToken({access_token:gdToken});
@@ -700,7 +700,7 @@ function gapiLoaded(){
 }
 
 async function findOrCreateFile(){
-  setSyncUI('pending','Looking for data file…');
+  setSyncUI('pending','Looking for data file...');
   try{
     const res=await gapi.client.drive.files.list({q:`name='${GD_FILENAME}' and trashed=false`,spaces:'drive',fields:'files(id,name)'});
     const files=res.result.files;
@@ -715,7 +715,7 @@ async function findOrCreateFile(){
 
 async function loadFromDrive(){
   if(!gdFileId||!gdToken)return;
-  setSyncUI('pending','Loading from Drive…');
+  setSyncUI('pending','Loading from Drive...');
   try{
     const res=await fetch(`https://www.googleapis.com/drive/v3/files/${gdFileId}?alt=media`,{headers:{Authorization:`Bearer ${gdToken}`}});
     if(!res.ok)throw new Error(`HTTP ${res.status}`);
@@ -725,7 +725,7 @@ async function loadFromDrive(){
     reloadState();
     allDropdownRefresh();
     refreshAll();
-    setSyncUI('idle',`Synced · ${new Date().toLocaleTimeString()}`);
+    setSyncUI('idle',`Synced . ${new Date().toLocaleTimeString()}`);
     document.getElementById('sync-force-btn').style.display='inline-flex';
   }catch(e){setSyncUI('error','Load failed: '+e.message,true,'Retry');console.error(e);}
 }
@@ -740,14 +740,14 @@ async function writeToDrive(){
       headers:{'Content-Type':'application/json','Authorization':`Bearer ${gdToken}`},
       body:JSON.stringify(data)
     });
-    setSyncUI('idle',`Saved · ${new Date().toLocaleTimeString()}`);
+    setSyncUI('idle',`Saved . ${new Date().toLocaleTimeString()}`);
     document.getElementById('sync-force-btn').style.display='inline-flex';
-  }catch(e){setSyncUI('error','Save failed — data safe locally',true,'Retry');console.error(e);}
+  }catch(e){setSyncUI('error','Save failed -- data safe locally',true,'Retry');console.error(e);}
 }
 
 function scheduleDriveSync(){
   if(!gdToken||!gdFileId)return;
-  setSyncUI('saving','Saving…');
+  setSyncUI('saving','Saving...');
   clearTimeout(syncTimer);
   syncTimer=setTimeout(writeToDrive,1500);
 }
@@ -761,7 +761,7 @@ function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}schedul
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
-// Harmonious palette with #9151a0 — complementary, analogous, triadic, neutrals
+// Harmonious palette with #9151a0 -- complementary, analogous, triadic, neutrals
 const TEAM_COLORS=[
   {hex:'#9151a0',label:'Brand purple',mine:true},
   {hex:'#c27fd4',label:'Lavender'},
@@ -811,7 +811,7 @@ function getProjBudget(proj){
   const min=parseFloat(proj.budget||0);
   const isRange=proj.budgetType==='range'&&proj.budgetMax;
   const max=isRange?parseFloat(proj.budgetMax||0):min;
-  return{min,max,isRange,display:isRange?$f(min)+' – '+$f(max):$f(min)};
+  return{min,max,isRange,display:isRange?$f(min)+' - '+$f(max):$f(min)};
 }
 function getCategories(){return settings.expenseCategories||DEF_CATS;}
 
@@ -854,7 +854,7 @@ function updateProfileAvatar(){
   av.textContent=(myProfile.name||'L').charAt(0).toUpperCase();
 }
 
-// ── TAB DRAG REORDER ──
+// -- TAB DRAG REORDER --
 (function initTabDrag(){
   const container=document.getElementById('tabs-container');
   let dragSrc=null;
@@ -893,14 +893,14 @@ function updateProfileAvatar(){
   });
 })();
 
-// ── TEAM TYPE TOGGLE (per-card toggle switch) ──
+// -- TEAM TYPE TOGGLE (per-card toggle switch) --
 function toggleMemberType(id){
   const m=teamMembers.find(x=>x.id===id);if(!m)return;
   m.type=m.type==='internal'?'external':'internal';
   save('tracker:team',teamMembers);renderTeamList();allDropdownRefresh();
 }
 
-// ── CLIENT NAME AUTOFILL FOR TEAM MEMBER FORM ──
+// -- CLIENT NAME AUTOFILL FOR TEAM MEMBER FORM --
 function tmNameAutofill(val){
   const list=document.getElementById('tm-autofill');if(!list)return;
   if(!val||val.length<2){list.style.display='none';return;}
@@ -910,7 +910,7 @@ function tmNameAutofill(val){
     return n.includes(val.toLowerCase())||co.includes(val.toLowerCase());
   }).slice(0,5);
   if(!matches.length){list.style.display='none';return;}
-  list.innerHTML=matches.map(c=>`<div class="autofill-item" onclick="tmAutofill('${c.id}')">${c.contactName||c.company}${c.company&&c.contactName?' · <span style="color:var(--text2)">${c.company}</span>':''}</div>`).join('');
+  list.innerHTML=matches.map(c=>`<div class="autofill-item" onclick="tmAutofill('${c.id}')">${c.contactName||c.company}${c.company&&c.contactName?' . <span style="color:var(--text2)">${c.company}</span>':''}</div>`).join('');
   list.style.display='block';
 }
 
@@ -931,7 +931,7 @@ document.addEventListener('click',e=>{
   if(af&&!af.contains(e.target)&&e.target.id!=='tm-name')af.style.display='none';
 });
 
-// ── TEAM COLOR PALETTE ──
+// -- TEAM COLOR PALETTE --
 function renderColorPalette(containerId, selectedColor, callbackFnName, disableMine=false){
   const el=document.getElementById(containerId);if(!el)return;
   el.dataset.callback=callbackFnName;
@@ -939,7 +939,7 @@ function renderColorPalette(containerId, selectedColor, callbackFnName, disableM
   el.innerHTML=TEAM_COLORS.map(c=>`
     <div class="color-swatch${c.hex===selectedColor?' selected':''}${disableMine&&c.mine?' disabled':''}"
       style="background:${c.hex}" data-hex="${c.hex}" data-mine="${c.mine?'1':'0'}"
-      title="${c.label}${c.mine?' (your brand color — reserved for you)':''}">
+      title="${c.label}${c.mine?' (your brand color -- reserved for you)':''}">
       ${c.mine?'<i class="ti ti-star" style="font-size:12px;color:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;height:100%"></i>':''}
     </div>`).join('');
   // Attach click handler via JS (no inline onclick)
@@ -958,10 +958,10 @@ function renderColorPalette(containerId, selectedColor, callbackFnName, disableM
   });
 }
 
-// Palette callbacks — named functions so they work with the registry above
+// Palette callbacks -- named functions so they work with the registry above
 function pickNewTmColor(hex){
   _newTmColorVal=hex;
-  // No re-render needed — event handler already updated visuals
+  // No re-render needed -- event handler already updated visuals
 }
 
 function pickEditTmColor(hex, containerId){
@@ -972,10 +972,10 @@ function pickEditTmColor(hex, containerId){
 }
 
 function pickEditProjTeamColor(hex, containerId){
-  // no-op for project team chips — handled separately
+  // no-op for project team chips -- handled separately
 }
 
-// ── TEAM MEMBER ASSIGNMENT CHIPS ──
+// -- TEAM MEMBER ASSIGNMENT CHIPS --
 function renderTeamAssignChips(containerId, selectedIds=[], projId=null){
   const el=document.getElementById(containerId);if(!el)return;
   const allMembers=[
@@ -1185,7 +1185,7 @@ function refreshAll(){
   if(!filteredTime.length){el.innerHTML='<div class="empty">No time logged for this period.</div>';return;}
   el.innerHTML=[...filteredTime].slice(0,6).map(e=>{
     const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
-    return`<div class="entry-row"><div><div class="entry-title">${e.task}</div><div class="entry-meta">${fmtDate(e.date)}${proj?' · '+proj.name:''}${e.billable?'':' · non-billable'}</div></div><span class="amt">${e.hours}h</span></div>`;
+    return`<div class="entry-row"><div><div class="entry-title">${e.task}</div><div class="entry-meta">${fmtDate(e.date)}${proj?' . '+proj.name:''}${e.billable?'':' . non-billable'}</div></div><span class="amt">${e.hours}h</span></div>`;
   }).join('');
 
   renderTimeList();
@@ -1222,8 +1222,8 @@ function renderDashBudgets(){
     return`<div class="card gauge-wrap">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div>
-          <span style="font-size:14px;font-weight:500">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} — </span>`:''}${p.name}</span>
-          ${clientLabel?`<span style="font-size:12px;color:var(--text2);margin-left:6px">· ${clientLabel}</span>`:''}
+          <span style="font-size:14px;font-weight:500">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} -- </span>`:''}${p.name}</span>
+          ${clientLabel?`<span style="font-size:12px;color:var(--text2);margin-left:6px">. ${clientLabel}</span>`:''}
         </div>
         <span style="font-size:13px;font-weight:500;white-space:nowrap">${$f(billed)}${budgetMax?' / '+budget.display:''}</span>
       </div>
@@ -1233,9 +1233,9 @@ function renderDashBudgets(){
         ${budget.isRange&&minPct>0?`<div class="gauge-mark" style="width:${minPct.toFixed(1)}%;border-color:rgba(255,200,0,.8)"></div>`:''}
       </div>
       <div class="gauge-row">
-        <span>${pct.toFixed(0)}% used${p.retainerOn?` · Retainer ${$f(retainer)}${retainerInBudget?' (in budget)':''}${p.retainerPaid?' ✓':''}`:''}</span>
+        <span>${pct.toFixed(0)}% used${p.retainerOn?` . Retainer ${$f(retainer)}${retainerInBudget?' (in budget)':''}${p.retainerPaid?' ✓':''}`:''}</span>
         ${remaining!==null?`<span style="color:${remaining<0?'var(--danger)':'var(--text2)'}">${remaining<0?$f(Math.abs(remaining))+' over':$f(remaining)+' remaining'}</span>`:''}
-      </div>`:'<div style="font-size:12px;color:var(--text3)">No budget set · '+$f(billed)+' billed</div>'}
+      </div>`:'<div style="font-size:12px;color:var(--text3)">No budget set . '+$f(billed)+' billed</div>'}
     </div>`;
   }).join('');
 }
@@ -1243,16 +1243,16 @@ function renderDashBudgets(){
 // ═══════════════════════════════════════════════
 //  TIME
 // ═══════════════════════════════════════════════
-// Helper — get display label for a client
+// Helper -- get display label for a client
 function clientLabel(c){
   if(!c)return'';
-  return [c.company,(c.primaryContact?.name||c.contactName||'')].filter(Boolean).join(' — ') || '(unnamed)';
+  return [c.company,(c.primaryContact?.name||c.contactName||'')].filter(Boolean).join(' -- ') || '(unnamed)';
 }
 
 function refreshClientDropdown(){
   const sel=document.getElementById('t-client');if(!sel)return;
   const prev=sel.value;
-  sel.innerHTML='<option value="">— No client —</option>';
+  sel.innerHTML='<option value="">-- No client --</option>';
   clients.forEach(c=>sel.appendChild(new Option(clientLabel(c),c.id)));
   if(prev)sel.value=prev;
   refreshTimeProjectDropdown();
@@ -1261,7 +1261,7 @@ function refreshClientDropdown(){
 function refreshExpenseClientDropdown(){
   const sel=document.getElementById('e-client');if(!sel)return;
   const prev=sel.value;
-  sel.innerHTML='<option value="">— No client —</option>';
+  sel.innerHTML='<option value="">-- No client --</option>';
   clients.forEach(c=>sel.appendChild(new Option(clientLabel(c),c.id)));
   if(prev)sel.value=prev;
   refreshExpenseProjectDropdown();
@@ -1270,7 +1270,7 @@ function refreshExpenseClientDropdown(){
 function refreshProjectClientDropdown(){
   const sel=document.getElementById('p-client');if(!sel)return;
   const prev=sel.value;
-  sel.innerHTML='<option value="">— No client —</option><option value="__new__">+ Add new client…</option>';
+  sel.innerHTML='<option value="">-- No client --</option><option value="__new__">+ Add new client...</option>';
   clients.forEach(c=>sel.appendChild(new Option(clientLabel(c),c.id)));
   if(prev&&prev!=='__new__')sel.value=prev;
 }
@@ -1278,7 +1278,7 @@ function refreshProjectClientDropdown(){
 function refreshTeamClientLinkDropdown(){
   const sel=document.getElementById('tm-client-link');if(!sel)return;
   const prev=sel.value;
-  sel.innerHTML='<option value="">— None —</option>';
+  sel.innerHTML='<option value="">-- None --</option>';
   clients.forEach(c=>sel.appendChild(new Option(clientLabel(c),c.id)));
   if(prev)sel.value=prev;
 }
@@ -1287,7 +1287,7 @@ function refreshTimeProjectDropdown(){
   const sel=document.getElementById('t-project');if(!sel)return;
   const cid=document.getElementById('t-client').value||'';
   const prev=sel.value;
-  sel.innerHTML='<option value="">— No project —</option>';
+  sel.innerHTML='<option value="">-- No project --</option>';
   (cid?projects.filter(p=>p.clientId===cid):projects).forEach(p=>{sel.appendChild(new Option(p.name,p.id));});
   if(prev&&(cid?projects.filter(p=>p.clientId===cid):projects).find(p=>p.id===prev))sel.value=prev;
 }
@@ -1327,7 +1327,7 @@ function renderTimeList(){
     return`<div style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid var(--border2);margin-bottom:2px">
         <span style="font-size:12px;font-weight:600;color:var(--accent)">${fmtDate(date)}</span>
-        <span style="font-size:12px;color:var(--text2)">${dayHours.toFixed(1)}h${dayAmt>0?' · '+$f(dayAmt):''}</span>
+        <span style="font-size:12px;color:var(--text2)">${dayHours.toFixed(1)}h${dayAmt>0?' . '+$f(dayAmt):''}</span>
       </div>
       ${entries.map(e=>{
         const client=e.clientId?clients.find(c=>c.id===e.clientId):null;
@@ -1338,7 +1338,7 @@ function renderTimeList(){
           <div class="entry-row" style="padding:8px 0">
             <div style="flex:1">
               <div class="entry-title">${e.task}</div>
-              <div class="entry-meta">${client?''+( client.company||client.contactName):''}${proj?( client?' · ':'')+proj.name:''}${e.notes?' · '+e.notes:''}${e.billable?'':' · non-billable'}</div>
+              <div class="entry-meta">${client?''+( client.company||client.contactName):''}${proj?( client?' . ':'')+proj.name:''}${e.notes?' . '+e.notes:''}${e.billable?'':' . non-billable'}</div>
             </div>
             <div class="entry-right">
               <span class="amt">${e.hours}h</span>
@@ -1354,7 +1354,7 @@ function renderTimeList(){
 }
 
 function renderTimeEditForm(e){
-  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName}</option>`).join('');
+  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' -- '+c.contactName:c.company||c.contactName}</option>`).join('');
   const projOpts=projects.map(p=>`<option value="${p.id}"${p.id===e.projectId?' selected':''}>${p.name}</option>`).join('');
   return`<div class="edit-form">
     <div class="grid2">
@@ -1362,8 +1362,8 @@ function renderTimeEditForm(e){
       <div><label>Hours</label><input type="number" id="et-hours-${e.id}" value="${e.hours}" min=".25" step=".25"></div>
     </div>
     <div class="grid2">
-      <div><label>Client</label><select id="et-client-${e.id}"><option value="">— No client —</option>${clientOpts}</select></div>
-      <div><label>Project</label><select id="et-project-${e.id}"><option value="">— No project —</option>${projOpts}</select></div>
+      <div><label>Client</label><select id="et-client-${e.id}"><option value="">-- No client --</option>${clientOpts}</select></div>
+      <div><label>Project</label><select id="et-project-${e.id}"><option value="">-- No project --</option>${projOpts}</select></div>
     </div>
     <div class="field"><label>Task</label><input type="text" id="et-task-${e.id}" value="${e.task}"></div>
     <div class="field"><label>Notes</label><input type="text" id="et-notes-${e.id}" value="${e.notes||''}"></div>
@@ -1411,7 +1411,7 @@ function refreshExpenseProjectDropdown(){
   const sel=document.getElementById('e-project');if(!sel)return;
   const cid=document.getElementById('e-client').value||'';
   const prev=sel.value;
-  sel.innerHTML='<option value="">— No project —</option>';
+  sel.innerHTML='<option value="">-- No project --</option>';
   (cid?projects.filter(p=>p.clientId===cid):projects).forEach(p=>{sel.appendChild(new Option(p.name,p.id));});
   if(prev)sel.value=prev;
 }
@@ -1427,7 +1427,7 @@ function renderExpenseList(){
       <div class="entry-row">
         <div style="flex:1">
           <div class="entry-title">${e.description}${e.recurring?`<span class="recur-tag">${e.recurringFrequency||'recurring'}</span>`:''}</div>
-          <div class="entry-meta">${fmtDate(e.date)} · ${e.category}${client?' · '+(client.company||client.contactName):''}${proj?' · '+proj.name:''}${e.billable?'':' · non-billable'}</div>
+          <div class="entry-meta">${fmtDate(e.date)} . ${e.category}${client?' . '+(client.company||client.contactName):''}${proj?' . '+proj.name:''}${e.billable?'':' . non-billable'}</div>
         </div>
         <div class="entry-right">
           <span class="amt">${$f(e.amount)}</span>
@@ -1440,7 +1440,7 @@ function renderExpenseList(){
 }
 
 function renderExpenseEditForm(e){
-  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName}</option>`).join('');
+  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' -- '+c.contactName:c.company||c.contactName}</option>`).join('');
   const projOpts=projects.map(p=>`<option value="${p.id}"${p.id===e.projectId?' selected':''}>${p.name}</option>`).join('');
   const catOpts=getCategories().map(c=>`<option value="${c}"${c===e.category?' selected':''}>${c}</option>`).join('');
   const freqOpts=['weekly','monthly','quarterly','annually'].map(f=>`<option value="${f}"${f===e.recurringFrequency?' selected':''}>${f.charAt(0).toUpperCase()+f.slice(1)}</option>`).join('');
@@ -1454,8 +1454,8 @@ function renderExpenseEditForm(e){
       <div><label>Description</label><input type="text" id="ee-desc-${e.id}" value="${e.description}"></div>
     </div>
     <div class="grid2">
-      <div><label>Client</label><select id="ee-client-${e.id}"><option value="">— No client —</option>${clientOpts}</select></div>
-      <div><label>Project</label><select id="ee-project-${e.id}"><option value="">— No project —</option>${projOpts}</select></div>
+      <div><label>Client</label><select id="ee-client-${e.id}"><option value="">-- No client --</option>${clientOpts}</select></div>
+      <div><label>Project</label><select id="ee-project-${e.id}"><option value="">-- No project --</option>${projOpts}</select></div>
     </div>
     <div class="grid2" style="margin-bottom:${e.recurring?'8px':'0'}">
       <label class="check-label"><input type="checkbox" id="ee-bill-${e.id}" ${e.billable?'checked':''}> Billable</label>
@@ -1526,7 +1526,7 @@ function renderProjectList(){
     return`<div class="project-card">
       <div class="project-header">
         <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:500">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} — </span>`:''}${p.name}</div>
+          <div style="font-size:15px;font-weight:500">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} -- </span>`:''}${p.name}</div>
           <div class="project-meta">
             ${clientLabel?`<span><i class="ti ti-building" style="font-size:12px"></i> ${clientLabel}</span>`:''}
             ${p.startDate?`<span><i class="ti ti-calendar" style="font-size:12px"></i> ${fmtDate(p.startDate)}</span>`:''}
@@ -1554,7 +1554,7 @@ function renderProjectList(){
 }
 
 function renderProjectEditForm(p){
-  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===p.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' — '+c.contactName:c.company||c.contactName}</option>`).join('');
+  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===p.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' -- '+c.contactName:c.company||c.contactName}</option>`).join('');
   const statusOpts=['active','on_hold','completed'].map(s=>`<option value="${s}"${s===p.status?' selected':''}>${s==='on_hold'?'On Hold':s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('');
   const endType=p.endDateType||'none';
   return`<div class="edit-form" style="margin-top:12px">
@@ -1563,7 +1563,7 @@ function renderProjectEditForm(p){
       <div style="grid-column:span 2"><label>Name</label><input type="text" id="ep-name-${p.id}" value="${p.name}"></div>
     </div>
     <div class="grid2">
-      <div><label>Client</label><select id="ep-client-${p.id}"><option value="">— No client —</option>${clientOpts}</select></div>
+      <div><label>Client</label><select id="ep-client-${p.id}"><option value="">-- No client --</option>${clientOpts}</select></div>
       <div><label>Status</label><select id="ep-status-${p.id}">${statusOpts}</select></div>
     </div>
     <div class="grid2">
@@ -1666,14 +1666,14 @@ function renderClientList(){
           ${retainerOn?`<span style="font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;background:${retainerPaid?'#e1f5ee':'#fdf0f0'};color:${retainerPaid?'#0f6e56':'#8b2020'}">${retainerPaid?'Retainer paid':'Retainer unpaid'}</span>`:``}
           ${retainerOn?`<button class="btn sm" onclick="toggleRetainerPaid('${proj.id}')">${retainerPaid?'Mark unpaid':'Mark paid'}</button>`:''}
         </div>
-        ${retainerOn&&retainerPaid?`<div style="font-size:12px;color:var(--text2);margin-bottom:6px;padding:6px 10px;background:var(--bg2);border-radius:var(--radius-sm)">Retainer: ${$f(retainerAmt)} · Used: ${$f(retainerUsed)} · Remaining: ${$f(retainerRemaining)}${retainerRemaining<=0?` <span style="color:var(--danger)">· ${$f(Math.abs(retainerRemaining))} over</span>`:''}</div>`:''}
+        ${retainerOn&&retainerPaid?`<div style="font-size:12px;color:var(--text2);margin-bottom:6px;padding:6px 10px;background:var(--bg2);border-radius:var(--radius-sm)">Retainer: ${$f(retainerAmt)} . Used: ${$f(retainerUsed)} . Remaining: ${$f(retainerRemaining)}${retainerRemaining<=0?` <span style="color:var(--danger)">. ${$f(Math.abs(retainerRemaining))} over</span>`:''}</div>`:''}
         ${invs.map(inv=>{
           const overdue=!inv.paid&&inv.dueDate&&inv.dueDate<todayStr;
           const badge=inv.paid?'paid-yes':overdue?'paid-overdue':'paid-no';
           const isEditingInv=editing.clients===`inv-${c.id}-${inv.id}`;
           return`<div><div class="inv-row">
-            <div style="flex:1;min-width:0"><div style="font-weight:500">${inv.num||'—'}</div>
-              <div style="font-size:11px;color:var(--text2)">${fmtDate(inv.date)}${inv.dueDate?' · Due '+fmtDate(inv.dueDate):''}${inv.notes?' · '+inv.notes:''}</div>
+            <div style="flex:1;min-width:0"><div style="font-weight:500">${inv.num||'--'}</div>
+              <div style="font-size:11px;color:var(--text2)">${fmtDate(inv.date)}${inv.dueDate?' . Due '+fmtDate(inv.dueDate):''}${inv.notes?' . '+inv.notes:''}</div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
               <span style="font-weight:500">${$f(parseFloat(inv.amount||0))}</span>
@@ -1694,12 +1694,12 @@ function renderClientList(){
         <div class="client-avatar" onclick="document.getElementById('photo-input-${c.id}').click()" title="Change photo" style="width:48px;height:48px">${avatar}</div>
         <input type="file" id="photo-input-${c.id}" accept="image/*" style="display:none" onchange="updateClientPhoto('${c.id}',this)">
         <div style="flex:1;min-width:0">
-          <div style="font-size:16px;font-weight:600">${c.company||'—'}</div>
+          <div style="font-size:16px;font-weight:600">${c.company||'--'}</div>
           ${c.website?`<a href="https://${c.website.replace(/^https?:\/\//,'')}" target="_blank" style="font-size:12px;color:var(--accent)">${c.website}</a>`:''}
           ${c.notes?`<div style="font-size:12px;color:var(--text3);margin-top:2px">${c.notes}</div>`:''}
           <!-- Primary contact -->
           ${pc.name?`<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border)">
-            <div style="font-size:13px;font-weight:500">${pc.name}${pc.role?` <span style="font-size:11px;font-weight:400;color:var(--text2)">· ${pc.role}</span>`:''}</div>
+            <div style="font-size:13px;font-weight:500">${pc.name}${pc.role?` <span style="font-size:11px;font-weight:400;color:var(--text2)">. ${pc.role}</span>`:''}</div>
             <div class="client-details" style="margin-top:4px">
               ${pc.email?`<span class="client-detail"><i class="ti ti-mail" style="font-size:13px"></i><a href="mailto:${pc.email}">${pc.email}</a></span>`:''}
               ${pc.phone?`<span class="client-detail"><i class="ti ti-phone" style="font-size:13px"></i><a href="tel:${pc.phone}">${pc.phone}</a></span>`:''}
@@ -1707,7 +1707,7 @@ function renderClientList(){
           </div>`:''}
           <!-- Additional contacts -->
           ${(c.additionalContacts||[]).map(ac=>`<div style="margin-top:6px;padding-top:6px;border-top:.5px dashed var(--border)">
-            <div style="font-size:12px;font-weight:500">${ac.name||''}${ac.role?` <span style="font-weight:400;color:var(--text2)">· ${ac.role}</span>`:''}</div>
+            <div style="font-size:12px;font-weight:500">${ac.name||''}${ac.role?` <span style="font-weight:400;color:var(--text2)">. ${ac.role}</span>`:''}</div>
             <div class="client-details" style="margin-top:2px">
               ${ac.email?`<span class="client-detail"><i class="ti ti-mail" style="font-size:12px"></i><a href="mailto:${ac.email}">${ac.email}</a></span>`:''}
               ${ac.phone?`<span class="client-detail"><i class="ti ti-phone" style="font-size:12px"></i><a href="tel:${ac.phone}">${ac.phone}</a></span>`:''}
@@ -1728,16 +1728,6 @@ function renderClientList(){
     </div>`;
   }).join('');
 }
-    const projGroups=Object.entries(byProj).map(([pid,invs])=>{
-      const proj=pid!=='__none__'?projects.find(p=>p.id===pid):null;
-      const retainerOn=proj&&proj.retainerOn;
-      const retainerPaid=proj&&proj.retainerPaid;
-      const retainerAmt=proj?parseFloat(proj.retainerAmt||0):0;
-      const projRate=proj?getProjRate(proj):parseFloat(settings.hourlyRate||0);
-      // Calculate billed time against project retainer
-      const totalBilledTime=proj?timeEntries.filter(e=>e.projectId===proj.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*projRate,0):0;
-      const totalBilledExp=proj?expenses.filter(e=>e.projectId===proj.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0):0;
-      const totalBilled=totalBilledTime+totalBilledExp;
 function renderInvAddFormHTML(cid,pid){
   const projOpts=projects.filter(p=>p.clientId===cid).map(p=>`<option value="${p.id}"${p.id===pid?' selected':''}>${p.name}</option>`).join('');
   return`<div class="grid3" style="margin-bottom:8px">
@@ -1747,7 +1737,7 @@ function renderInvAddFormHTML(cid,pid){
   </div>
   <div class="grid2" style="margin-bottom:8px">
     <div><label>Amount ($)</label><input type="number" id="if-amt-${cid}-${pid}" min="0" step=".01" placeholder="1500.00"></div>
-    <div><label>Project</label><select id="if-proj-${cid}-${pid}"><option value="">— No project —</option>${projOpts}</select></div>
+    <div><label>Project</label><select id="if-proj-${cid}-${pid}"><option value="">-- No project --</option>${projOpts}</select></div>
   </div>
   <div class="field"><label>Notes</label><input type="text" id="if-notes-${cid}-${pid}" placeholder="May services"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -1766,7 +1756,7 @@ function renderInvEditForm(cid,inv){
     </div>
     <div class="grid2">
       <div><label>Amount ($)</label><input type="number" id="ie-amt-${cid}-${inv.id}" value="${inv.amount||''}"></div>
-      <div><label>Project</label><select id="ie-proj-${cid}-${inv.id}"><option value="">— No project —</option>${projOpts}</select></div>
+      <div><label>Project</label><select id="ie-proj-${cid}-${inv.id}"><option value="">-- No project --</option>${projOpts}</select></div>
     </div>
     <div class="field"><label>Notes</label><input type="text" id="ie-notes-${cid}-${inv.id}" value="${inv.notes||''}"></div>
     <div class="edit-actions">
@@ -1976,7 +1966,7 @@ function renderInvoice(){
   const rSec=document.getElementById('inv-retainer-section');
   rSec.innerHTML=retainerOn?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:1rem;font-size:13px">
     <strong>Retainer on account:</strong> ${$f(retainerAmt)} paid
-    <span style="color:var(--success);margin-left:8px">· ${$f(retainerApplied)} applied this invoice</span>
+    <span style="color:var(--success);margin-left:8px">. ${$f(retainerApplied)} applied this invoice</span>
   </div>`:'';
 
   const tsec=document.getElementById('inv-time-section');
@@ -2010,7 +2000,7 @@ function renderInvoice(){
         });
         return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date)).map(d=>`<tr class="tr-sep">
           <td style="color:var(--text2);font-size:12px">${fmtDate(d.date)}</td>
-          <td>${d.tasks.join('<br>')}${d.proj&&!pid?`<span style="font-size:11px;color:var(--text2)"> — ${d.proj.name}</span>`:''}</td>
+          <td>${d.tasks.join('<br>')}${d.proj&&!pid?`<span style="font-size:11px;color:var(--text2)"> -- ${d.proj.name}</span>`:''}</td>
           <td style="text-align:right">${d.hours.toFixed(2)}</td>
           <td style="text-align:right;color:var(--text2)">${$f(d.rate)}</td>
           <td style="text-align:right">${$f(d.hours*d.rate)}</td>
@@ -2108,11 +2098,11 @@ function renderTeamList(){
           <div>
             <div style="font-weight:500;font-size:14px">${m.name}</div>
             <div style="font-size:12px;color:var(--text2);margin-top:1px">
-              ${m.role||''}${m.company?' · '+m.company:''}${m.email?' · <a href="mailto:'+m.email+'" style="color:var(--accent)">'+m.email+'</a>':''}${m.phone?' · '+m.phone:''}${isInternal&&m.rate?' · '+$f(m.rate)+'/hr':''}
+              ${m.role||''}${m.company?' . '+m.company:''}${m.email?' . <a href="mailto:'+m.email+'" style="color:var(--accent)">'+m.email+'</a>':''}${m.phone?' . '+m.phone:''}${isInternal&&m.rate?' . '+$f(m.rate)+'/hr':''}
             </div>
             <div style="font-size:11px;color:var(--text3);margin-top:2px">
-              ${totalHours.toFixed(1)}h logged${linkedClient?' · Client: '+(linkedClient.company||linkedClient.contactName):''}
-              ${assignedProjs.length?' · '+assignedProjs.map(p=>p.name).join(', '):''}
+              ${totalHours.toFixed(1)}h logged${linkedClient?' . Client: '+(linkedClient.company||linkedClient.contactName):''}
+              ${assignedProjs.length?' . '+assignedProjs.map(p=>p.name).join(', '):''}
             </div>
           </div>
         </div>
@@ -2157,7 +2147,7 @@ function renderTeamEditForm(m){
     </div>
     ${!isInternal?`<div class="grid2">
       <div><label>Company</label><input type="text" id="etm-company-${m.id}" value="${m.company||''}"></div>
-      <div><label>Link to client</label><select id="etm-clink-${m.id}"><option value="">— None —</option>${clientOpts}</select></div>
+      <div><label>Link to client</label><select id="etm-clink-${m.id}"><option value="">-- None --</option>${clientOpts}</select></div>
     </div>`:`<div id="etm-company-${m.id}" style="display:none"></div><div id="etm-clink-${m.id}" style="display:none"></div>`}
     ${isInternal?`<div><label>Hourly cost ($/hr)</label><input type="number" id="etm-rate-${m.id}" value="${m.rate||''}" min="0" step="5"></div><br>`:''}
     <div class="field"><label>Notes</label><input type="text" id="etm-notes-${m.id}" value="${m.notes||''}"></div>
@@ -2261,7 +2251,7 @@ function renderMiniGantt(p){
   }).join('');
 
   return`<div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border)">
-    <div style="font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Timeline · ${fmtDate(p.startDate)} → ${fmtDate(p.endDate||'')}</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Timeline . ${fmtDate(p.startDate)} → ${fmtDate(p.endDate||'')}</div>
     <svg width="100%" height="${H+18}" viewBox="0 0 ${W} ${H+18}" preserveAspectRatio="none" style="display:block;overflow:visible">
       <!-- Month labels -->
       ${monthLabels.map(m=>`<text x="${m.pct}%" y="${H+14}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif">${m.label}</text>`).join('')}
@@ -2409,7 +2399,7 @@ function renderTasksAndMilestones(p){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <span class="sec-title" style="margin:0">Phases & Tasks <span style="font-weight:400;color:var(--text3)">(${doneTasks}/${tasks.length})</span></span>
     </div>
-    ${phases.length===0&&tasks.length===0?'<div style="font-size:12px;color:var(--text3);margin-bottom:8px">No tasks yet — add a phase or task below.</div>':''}
+    ${phases.length===0&&tasks.length===0?'<div style="font-size:12px;color:var(--text3);margin-bottom:8px">No tasks yet -- add a phase or task below.</div>':''}
 
     <!-- Ungrouped tasks -->
     ${ungrouped.length>0?`<div style="margin-bottom:10px">${ungrouped.map(renderTaskRow).join('')}</div>`:''}
@@ -2429,7 +2419,7 @@ function renderTasksAndMilestones(p){
     <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-top:4px">
       <div style="font-size:11px;color:var(--text3);margin-bottom:6px">ADD TASK</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
-        <input type="text" id="task-inp-${p.id}" placeholder="Task title…" style="flex:1;min-width:140px;font-size:13px;padding:5px 8px">
+        <input type="text" id="task-inp-${p.id}" placeholder="Task title..." style="flex:1;min-width:140px;font-size:13px;padding:5px 8px">
         <select id="task-type-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
           <option value="">Normal</option><option value="open">Open</option><option value="critical">Critical</option>
         </select>
@@ -2451,7 +2441,7 @@ function renderTasksAndMilestones(p){
 
     <!-- Add phase row -->
     <div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end;flex-wrap:wrap">
-      <input type="text" id="phase-inp-${p.id}" placeholder="Phase name (e.g. Discovery)…" style="flex:2;min-width:140px;font-size:13px;padding:5px 8px">
+      <input type="text" id="phase-inp-${p.id}" placeholder="Phase name (e.g. Discovery)..." style="flex:2;min-width:140px;font-size:13px;padding:5px 8px">
       <input type="date" id="phase-start-${p.id}" style="width:140px;font-size:13px;padding:5px 8px" title="Phase start date">
       <input type="date" id="phase-end-${p.id}" style="width:140px;font-size:13px;padding:5px 8px" title="Phase end date">
       <button class="btn sm" onclick="addPhase('${p.id}')"><i class="ti ti-layers-subtract"></i> Add phase</button>
@@ -2471,7 +2461,7 @@ function renderTasksAndMilestones(p){
         </div>`;
       }).join('')}
       <div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end">
-        <input type="text" id="ms-inp-${p.id}" placeholder="Milestone name…" style="flex:1;font-size:13px;padding:5px 8px">
+        <input type="text" id="ms-inp-${p.id}" placeholder="Milestone name..." style="flex:1;font-size:13px;padding:5px 8px">
         <input type="date" id="ms-date-${p.id}" style="width:150px;font-size:13px;padding:5px 8px">
         <button class="btn sm primary" onclick="addMilestone('${p.id}')"><i class="ti ti-plus"></i> Add</button>
       </div>
@@ -2588,7 +2578,7 @@ function renderGantt(){
         const mx=toX(ms.date);const my=y+ROW_H/2;const r=5;
         const done=ms.completed;
         const mColor=done?'var(--success)':new Date(ms.date+'T12:00:00')<new Date()?'var(--danger)':'#9151a0';
-        svgRows+=`<polygon points="${mx},${my-r} ${mx+r},${my} ${mx},${my+r} ${mx-r},${my}" fill="${mColor}" opacity="0.9"><title>${esc(ms.title)} · ${fmtDate(ms.date)}</title></polygon>`;
+        svgRows+=`<polygon points="${mx},${my-r} ${mx+r},${my} ${mx},${my+r} ${mx-r},${my}" fill="${mColor}" opacity="0.9"><title>${esc(ms.title)} . ${fmtDate(ms.date)}</title></polygon>`;
       });
     } else {
       // Phase row
@@ -2603,7 +2593,7 @@ function renderGantt(){
         svgRows+=`<rect x="${bx}" y="${y+5}" width="${bw}" height="${ROW_H-10}" fill="${phColor}" rx="4"/>`;
         if(bw>30)svgRows+=`<text x="${bx+8}" y="${y+ROW_H*0.62}" font-size="11" fill="#fff" font-family="${FONT}" font-weight="500">${esc(ph.title.slice(0,Math.floor(bw/7)))}</text>`;
       } else if(ph.startDate||ph.endDate) {
-        // Only one date — draw a partial bar or marker
+        // Only one date -- draw a partial bar or marker
         const dx=toX(ph.startDate||ph.endDate);
         svgRows+=`<rect x="${dx}" y="${y+8}" width="60" height="${ROW_H-16}" fill="${phColor}" rx="4" opacity="0.6"/>`;
       }
@@ -2755,7 +2745,7 @@ function renderReports(){
         const proj=k!=='__none__'?projects.find(p=>p.id===k):null;
         const client=proj&&proj.clientId?clients.find(c=>c.id===proj.clientId):null;
         return`<tr class="tr-sep"><td style="padding:8px 12px;font-weight:500">${proj?proj.name:'No project'}</td>
-          <td style="padding:8px 12px;color:var(--text2)">${client?client.company||client.contactName:'—'}</td>
+          <td style="padding:8px 12px;color:var(--text2)">${client?client.company||client.contactName:'--'}</td>
           <td style="text-align:right;padding:8px 12px">${d.hours.toFixed(1)}h</td>
           <td style="text-align:right;padding:8px 12px">${d.billableHours.toFixed(1)}h</td>
           <td style="text-align:right;padding:8px 12px">${$f(d.amount)}</td></tr>`;
@@ -2795,11 +2785,11 @@ function renderReports(){
         const rate=getProjRate(proj);
         return`<tr class="tr-sep">
           <td style="padding:6px 12px;color:var(--text2);font-size:12px">${fmtDate(e.date)}</td>
-          <td style="padding:6px 12px">${e.task}${e.notes?`<span style="font-size:11px;color:var(--text3)"> — ${e.notes}</span>`:''}</td>
-          <td style="padding:6px 12px;color:var(--text2)">${proj?proj.name:'—'}</td>
-          <td style="padding:6px 12px;color:var(--text2)">${member?member.name:'—'}</td>
+          <td style="padding:6px 12px">${e.task}${e.notes?`<span style="font-size:11px;color:var(--text3)"> -- ${e.notes}</span>`:''}</td>
+          <td style="padding:6px 12px;color:var(--text2)">${proj?proj.name:'--'}</td>
+          <td style="padding:6px 12px;color:var(--text2)">${member?member.name:'--'}</td>
           <td style="text-align:right;padding:6px 12px">${e.hours}h</td>
-          <td style="text-align:right;padding:6px 12px">${e.billable?$f(e.hours*rate):'—'}</td>
+          <td style="text-align:right;padding:6px 12px">${e.billable?$f(e.hours*rate):'--'}</td>
         </tr>`;
       }).join('')}
     </tbody></table>
@@ -2825,7 +2815,7 @@ function exportProjectOverviewPDF(){
   const projTeam=teamIds.map(tid=>tid==='__me__'?{name:myProfile.name||'Me',color:'#9151a0'}:teamMembers.find(m=>m.id===tid)).filter(Boolean);
   const done=tasks.filter(t=>t.status==='done').length;
   const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${p.name} — Project Overview</title>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${p.name} -- Project Overview</title>
   <style>body{font-family:-apple-system,sans-serif;color:#2A2829;max-width:800px;margin:40px auto;padding:0 2rem}
   h1{font-size:24px;font-weight:600;margin-bottom:4px}h2{font-size:14px;font-weight:500;color:#6b686a;margin:0 0 24px}
   h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9a979a;margin:24px 0 8px}
@@ -2838,8 +2828,8 @@ function exportProjectOverviewPDF(){
   .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;margin-right:4px;margin-bottom:4px}
   @media print{button{display:none}}</style></head><body>
   <button onclick="window.print()" style="float:right;padding:8px 16px;background:#9151a0;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Print / Save PDF</button>
-  <h1>${p.num?p.num+' — ':''}${p.name}</h1>
-  <h2>${client?'Client: '+(client.company||client.contactName)+' · ':''} Status: ${p.status==='on_hold'?'On Hold':p.status==='active'?'Active':'Completed'}</h2>
+  <h1>${p.num?p.num+' -- ':''}${p.name}</h1>
+  <h2>${client?'Client: '+(client.company||client.contactName)+' . ':''} Status: ${p.status==='on_hold'?'On Hold':p.status==='active'?'Active':'Completed'}</h2>
   <div class="meta">
     ${p.startDate?`<span><b>Start:</b> ${fmtDate(p.startDate)}</span>`:''}
     ${p.endDate?`<span><b>End:</b> ${fmtDate(p.endDate)}</span>`:''}
