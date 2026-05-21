@@ -155,12 +155,37 @@ td{padding:8px 0;vertical-align:top}
 .period-btn{background:none;border:.5px solid var(--border2);border-radius:20px;padding:2px 10px;font-size:11px;cursor:pointer;color:var(--text2);font-family:inherit;transition:all .15s}
 .period-btn:hover{background:var(--bg2);color:var(--text)}
 .period-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* Tab drag-reorder */
+.tab{cursor:grab;user-select:none}
+.tab.dragging{opacity:.4;cursor:grabbing}
+.tab.drag-over{border-left:2px solid var(--accent)}
+/* Section page headers */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.page-title{font-size:20px;font-weight:600;color:var(--text)}
+/* Color palette */
+.color-palette{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.color-swatch{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .15s,border-color .15s;flex-shrink:0}
+.color-swatch:hover{transform:scale(1.15)}
+.color-swatch.selected{border-color:var(--text);transform:scale(1.1)}
+.color-swatch.disabled{opacity:.25;cursor:not-allowed}
+/* Phase badges */
+.phase-label{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500}
+.phase-open{background:var(--bg2);color:var(--text2)}
+.phase-critical{background:#f5e1e1;color:var(--danger)}
+@media(prefers-color-scheme:dark){.phase-critical{background:#4a1010;color:#f0b0b0}}
+/* Team type badge */
+.type-badge{font-size:10px;padding:1px 7px;border-radius:10px;font-weight:500}
+.type-internal{background:#e8e0f5;color:#5a2d82}
+.type-external{background:var(--bg2);color:var(--text2)}
+@media(prefers-color-scheme:dark){.type-internal{background:#3d1f5c;color:#c49fe8}}
+/* Profile avatar in settings */
+.profile-avatar{width:54px;height:54px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0}
 @media print{
   body{background:white}
   #app{max-width:100%;padding:1rem}
   .tabs,.header button,.no-print{display:none!important}
   #invoice-section{display:block!important}
-  #dashboard-section,#time-section,#expenses-section,#projects-section,#clients-section{display:none!important}
+  #dashboard-section,#time-section,#expenses-section,#projects-section,#clients-section,#team-section,#gantt-section,#reports-section{display:none!important}
 }
 @media(max-width:520px){.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}}
 </style>
@@ -174,11 +199,6 @@ td{padding:8px 0;vertical-align:top}
       <h1 id="proj-name-display">Lowtide.cc Project Tracker</h1>
       <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
         <div class="sub" id="proj-meta-display"></div>
-        <div style="display:flex;gap:4px" id="period-filters">
-          <button class="period-btn active" onclick="setPeriod('month')" id="pb-month">Month</button>
-          <button class="period-btn" onclick="setPeriod('year')" id="pb-year">Year</button>
-          <button class="period-btn" onclick="setPeriod('all')" id="pb-all">All time</button>
-        </div>
       </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -199,6 +219,21 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- SETTINGS -->
   <div id="settings-panel" class="card" style="display:none">
+    <div class="sec-title">My profile</div>
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+      <div class="profile-avatar" id="my-profile-avatar">L</div>
+      <div style="flex:1">
+        <div class="grid2" style="margin-bottom:8px">
+          <div><label>My name</label><input id="s-myname" type="text" placeholder="Your name" oninput="saveMyProfile()"></div>
+          <div><label>My role</label><input id="s-myrole" type="text" placeholder="Creative Director" oninput="saveMyProfile()"></div>
+        </div>
+        <div class="grid2" style="margin-bottom:0">
+          <div><label>My email</label><input id="s-myemail" type="email" placeholder="you@lowtide.cc" oninput="saveMyProfile()"></div>
+          <div><label>My hourly rate ($/hr)</label><input id="s-myrate" type="number" placeholder="150" oninput="saveMyProfile();refreshAll()"></div>
+        </div>
+      </div>
+    </div>
+    <div style="height:.5px;background:var(--border);margin-bottom:12px"></div>
     <div class="sec-title">Global settings</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div><label>Default hourly rate ($)</label><input id="s-rate" type="number" placeholder="150" oninput="saveSetting('hourlyRate',this.value);refreshAll()"></div>
@@ -220,17 +255,27 @@ td{padding:8px 0;vertical-align:top}
   </div>
 
   <!-- TABS -->
-  <div class="tabs no-print">
-    <button class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
-    <button class="tab" id="tab-time" onclick="switchTab('time')"><i class="ti ti-clock"></i> Time</button>
-    <button class="tab" id="tab-expenses" onclick="switchTab('expenses')"><i class="ti ti-receipt"></i> Expenses</button>
-    <button class="tab" id="tab-projects" onclick="switchTab('projects')"><i class="ti ti-folder"></i> Projects</button>
-    <button class="tab" id="tab-clients" onclick="switchTab('clients')"><i class="ti ti-users"></i> Clients</button>
-    <button class="tab" id="tab-invoice" onclick="switchTab('invoice')"><i class="ti ti-file-invoice"></i> Invoice</button>
+  <div class="tabs no-print" id="tabs-container">
+    <button class="tab active" id="tab-dashboard" data-tab="dashboard" draggable="true"><i class="ti ti-layout-dashboard" title="Dashboard"></i></button>
+    <button class="tab" id="tab-time" data-tab="time" draggable="true"><i class="ti ti-clock" title="Time"></i></button>
+    <button class="tab" id="tab-expenses" data-tab="expenses" draggable="true"><i class="ti ti-receipt" title="Expenses"></i></button>
+    <button class="tab" id="tab-projects" data-tab="projects" draggable="true"><i class="ti ti-folder" title="Projects"></i></button>
+    <button class="tab" id="tab-clients" data-tab="clients" draggable="true"><i class="ti ti-users" title="Clients"></i></button>
+    <button class="tab" id="tab-invoice" data-tab="invoice" draggable="true"><i class="ti ti-file-invoice" title="Invoice"></i></button>
+    <button class="tab" id="tab-team" data-tab="team" draggable="true"><i class="ti ti-users-group" title="Team"></i></button>
+    <button class="tab" id="tab-gantt" data-tab="gantt" draggable="true"><i class="ti ti-chart-gantt" title="Gantt"></i></button>
+    <button class="tab" id="tab-reports" data-tab="reports" draggable="true"><i class="ti ti-chart-bar" title="Reports"></i></button>
   </div>
 
   <!-- DASHBOARD -->
   <div id="dashboard-section">
+    <div class="page-header"><h2 class="page-title">Dashboard</h2>
+      <div style="display:flex;gap:4px" id="period-filters">
+        <button class="period-btn active" onclick="setPeriod('month')" id="pb-month">Month</button>
+        <button class="period-btn" onclick="setPeriod('year')" id="pb-year">Year</button>
+        <button class="period-btn" onclick="setPeriod('all')" id="pb-all">All time</button>
+      </div>
+    </div>
     <div id="dash-project-budgets"></div>
     <div class="met-grid">
       <div class="met"><div class="met-label">Hours logged</div><div class="met-val" id="m-hours">0h</div></div>
@@ -244,6 +289,7 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- TIME -->
   <div id="time-section" style="display:none">
+    <div class="page-header"><h2 class="page-title">Time</h2></div>
     <div class="timer-card" id="timer-card">
       <div class="sec-title" style="margin-bottom:4px">Live timer</div>
       <div class="timer-display" id="timer-display">0:00:00</div>
@@ -260,13 +306,16 @@ td{padding:8px 0;vertical-align:top}
       <div class="sec-title">Log time manually</div>
       <div class="grid2">
         <div><label>Date</label><input type="date" id="t-date"></div>
-        <div><label>Hours</label><input type="number" id="t-hours" min=".25" step=".25" placeholder="2.5"></div>
+        <div><label>Hours</label><input type="number" id="t-hours" min=".25" step=".25" value="1" placeholder="1"></div>
       </div>
       <div class="grid2">
-        <div><label>Client</label><select id="t-client" onchange="refreshTimeProjectDropdown()"><option value="">— No client —</option></select></div>
         <div><label>Project</label><select id="t-project" onchange="autoFillClientFromProject()"><option value="">— No project —</option></select></div>
+        <div><label>Client</label><select id="t-client" onchange="refreshTimeProjectDropdown()"><option value="">— No client —</option></select></div>
       </div>
-      <div class="field"><label>Task / description</label><input type="text" id="t-task" placeholder="Homepage design review" onkeydown="if(event.key==='Enter')addTime()"></div>
+      <div class="grid2">
+        <div><label>Assignee</label><select id="t-assignee"><option value="">— Me / unassigned —</option></select></div>
+        <div><label>Task / description</label><input type="text" id="t-task" placeholder="Homepage design review" onkeydown="if(event.key==='Enter')addTime()"></div>
+      </div>
       <div class="field"><label>Notes (optional)</label><input type="text" id="t-notes" placeholder="Additional context" onkeydown="if(event.key==='Enter')addTime()"></div>
       <div class="row-action">
         <label class="check-label"><input type="checkbox" id="t-billable" checked> Billable</label>
@@ -279,6 +328,7 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- EXPENSES -->
   <div id="expenses-section" style="display:none">
+    <div class="page-header"><h2 class="page-title">Expenses</h2></div>
     <div class="card">
       <div class="sec-title">Log expense</div>
       <div class="grid2">
@@ -316,6 +366,7 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- PROJECTS -->
   <div id="projects-section" style="display:none">
+    <div class="page-header"><h2 class="page-title">Projects</h2></div>
     <div class="card">
       <div class="sec-title">Add project</div>
       <div class="grid3">
@@ -381,6 +432,11 @@ td{padding:8px 0;vertical-align:top}
         </div>
       </div>
       <div class="field"><label>Description (optional)</label><input type="text" id="p-desc" placeholder="Brief project overview" onkeydown="if(event.key==='Enter')addProject()"></div>
+      <div class="field">
+        <label>Team members</label>
+        <div id="p-team-assign" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Click team members to assign them to this project</div>
+      </div>
       <div style="display:flex;justify-content:flex-end"><button class="btn primary" onclick="addProject()"><i class="ti ti-plus"></i> Add project</button></div>
     </div>
     <div class="sec-title">All projects</div>
@@ -389,6 +445,7 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- CLIENTS -->
   <div id="clients-section" style="display:none">
+    <div class="page-header"><h2 class="page-title">Clients</h2></div>
     <div class="card">
       <div class="sec-title">Add client</div>
       <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
@@ -423,6 +480,7 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- INVOICE (print) -->
   <div id="invoice-section" style="display:none">
+    <div class="page-header no-print"><h2 class="page-title">Invoice</h2></div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem" class="no-print">
       <label style="font-size:14px;color:var(--text2);margin:0">Period</label>
       <input type="month" id="inv-month" style="width:180px" oninput="renderInvoice()">
@@ -452,6 +510,73 @@ td{padding:8px 0;vertical-align:top}
     <button class="btn no-print" style="margin-top:1rem" onclick="window.print()"><i class="ti ti-printer"></i> Print / save as PDF</button>
   </div>
 
+  <!-- TEAM -->
+  <div id="team-section" style="display:none">
+    <div class="page-header"><h2 class="page-title">Team</h2></div>
+    <div class="card">
+      <div class="sec-title">Add team member</div>
+      <div class="grid2" style="margin-bottom:8px">
+        <div><label>Type</label>
+          <select id="tm-type" onchange="toggleTeamMemberType()">
+            <option value="internal">Internal</option>
+            <option value="external">External / Contractor</option>
+          </select>
+        </div>
+        <div><label>Name</label><input type="text" id="tm-name" placeholder="Alex Rivera"></div>
+      </div>
+      <div class="grid3">
+        <div><label>Role / title</label><input type="text" id="tm-role" placeholder="Designer"></div>
+        <div><label>Email</label><input type="email" id="tm-email" placeholder="alex@studio.com"></div>
+        <div id="tm-company-wrap"><label>Company</label><input type="text" id="tm-company" placeholder="Their studio"></div>
+      </div>
+      <div class="grid2" id="tm-rate-row">
+        <div><label>Hourly cost ($/hr)</label><input type="number" id="tm-rate" min="0" step="5" placeholder="80"></div>
+        <div>
+          <label>Link to existing client</label>
+          <select id="tm-client-link"><option value="">— None —</option></select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Color</label>
+        <div class="color-palette" id="tm-color-palette"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end"><button class="btn primary" onclick="addTeamMember()"><i class="ti ti-plus"></i> Add member</button></div>
+    </div>
+    <div class="sec-title">Team</div>
+    <div id="team-list"></div>
+  </div>
+
+  <!-- GANTT -->
+  <div id="gantt-section" style="display:none">
+    <div class="page-header"><h2 class="page-title">Gantt</h2></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;flex-wrap:wrap">
+      <label style="font-size:14px;color:var(--text2);margin:0">Project</label>
+      <select id="gantt-project-filter" style="width:220px" onchange="renderGantt()"><option value="">All projects</option></select>
+      <label style="font-size:14px;color:var(--text2);margin:0;margin-left:8px">View</label>
+      <select id="gantt-view" style="width:140px" onchange="renderGantt()">
+        <option value="month">Month</option><option value="quarter">Quarter</option><option value="year">Year</option>
+      </select>
+    </div>
+    <div id="gantt-chart" class="card" style="overflow-x:auto;padding:1rem"></div>
+  </div>
+
+  <!-- REPORTS -->
+  <div id="reports-section" style="display:none">
+    <div class="page-header"><h2 class="page-title">Reports</h2></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end">
+      <div><label>From</label><input type="date" id="rpt-from" style="width:160px"></div>
+      <div><label>To</label><input type="date" id="rpt-to" style="width:160px"></div>
+      <div><label>Client</label><select id="rpt-client" style="width:180px" onchange="renderReports()"><option value="">All clients</option></select></div>
+      <div><label>Project</label><select id="rpt-project" style="width:180px" onchange="renderReports()"><option value="">All projects</option></select></div>
+      <button class="btn primary" onclick="renderReports()"><i class="ti ti-refresh"></i> Run</button>
+    </div>
+    <div id="reports-output"></div>
+    <div style="display:flex;gap:8px;margin-top:1rem" id="rpt-export-btns" style="display:none">
+      <button class="btn" onclick="exportReportCSV()"><i class="ti ti-file-spreadsheet"></i> Export CSV</button>
+      <button class="btn" onclick="exportProjectOverviewPDF()"><i class="ti ti-printer"></i> Project Overview PDF</button>
+    </div>
+  </div>
+
 </div><!-- #app -->
 
 <script>
@@ -461,7 +586,7 @@ td{padding:8px 0;vertical-align:top}
 const GD_CLIENT_ID = '964475055610-sb4e62npukeqrno43qpjnse5pa05ca5n.apps.googleusercontent.com';
 const GD_SCOPE     = 'https://www.googleapis.com/auth/drive.file';
 const GD_FILENAME  = 'tracker-data.json';
-const GD_KEYS      = ['tracker:settings','tracker:time','tracker:expenses','tracker:clients','tracker:projects','tracker:clientInvs'];
+const GD_KEYS      = ['tracker:settings','tracker:time','tracker:expenses','tracker:clients','tracker:projects','tracker:clientInvs','tracker:team','tracker:myProfile'];
 
 let gdToken=null, gdFileId=null, syncTimer=null;
 
@@ -600,17 +725,35 @@ function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}schedul
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
+// Harmonious palette with #9151a0 — complementary, analogous, triadic, neutrals
+const TEAM_COLORS=[
+  {hex:'#9151a0',label:'Brand purple',mine:true},
+  {hex:'#c27fd4',label:'Lavender'},
+  {hex:'#6b3fa0',label:'Deep violet'},
+  {hex:'#4a90d9',label:'Sky blue'},
+  {hex:'#2d6fa8',label:'Ocean blue'},
+  {hex:'#5ba08a',label:'Sage green'},
+  {hex:'#2d8a6b',label:'Teal'},
+  {hex:'#d4756b',label:'Dusty rose'},
+  {hex:'#c0514a',label:'Terra cotta'},
+  {hex:'#d4a056',label:'Warm amber'},
+  {hex:'#8a7a6b',label:'Warm gray'},
+  {hex:'#5a5068',label:'Slate purple'},
+];
+
 const DEF_CATS=['Software','Travel','Equipment','Subcontractor','Meals','Office','Other'];
-let settings, timeEntries, expenses, clients, projects, clientInvs, currentTab='dashboard';
-let editing={time:null,expenses:null,projects:null,clients:null};
+let settings, timeEntries, expenses, clients, projects, clientInvs, teamMembers, myProfile, currentTab='dashboard';
+let editing={time:null,expenses:null,projects:null,clients:null,team:null};
 
 function reloadState(){
-  settings   =Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD',expenseCategories:DEF_CATS},load('tracker:settings',{})||{});
-  timeEntries=load('tracker:time',[])||[];
-  expenses   =load('tracker:expenses',[])||[];
-  clients    =load('tracker:clients',[])||[];
-  projects   =load('tracker:projects',[])||[];
-  clientInvs =load('tracker:clientInvs',{})||{};
+  settings    =Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD',expenseCategories:DEF_CATS},load('tracker:settings',{})||{});
+  timeEntries =load('tracker:time',[])||[];
+  expenses    =load('tracker:expenses',[])||[];
+  clients     =load('tracker:clients',[])||[];
+  projects    =load('tracker:projects',[])||[];
+  clientInvs  =load('tracker:clientInvs',{})||{};
+  teamMembers =load('tracker:team',[])||[];
+  myProfile   =Object.assign({name:'',role:'',email:'',rate:''},load('tracker:myProfile',{})||{});
 }
 reloadState();
 
@@ -652,7 +795,164 @@ document.getElementById('p-client').addEventListener('change',function(){
   document.getElementById('s-rate').value=settings.hourlyRate||'150';
   document.getElementById('s-prefix').value=settings.invoicePrefix||'INV';
   document.getElementById('s-currency').value=settings.currency||'USD';
+  document.getElementById('s-myname').value=myProfile.name||'';
+  document.getElementById('s-myrole').value=myProfile.role||'';
+  document.getElementById('s-myemail').value=myProfile.email||'';
+  document.getElementById('s-myrate').value=myProfile.rate||'';
+  updateProfileAvatar();
 })();
+
+function saveMyProfile(){
+  myProfile.name=document.getElementById('s-myname').value.trim();
+  myProfile.role=document.getElementById('s-myrole').value.trim();
+  myProfile.email=document.getElementById('s-myemail').value.trim();
+  myProfile.rate=document.getElementById('s-myrate').value;
+  save('tracker:myProfile',myProfile);
+  updateProfileAvatar();
+}
+
+function updateProfileAvatar(){
+  const av=document.getElementById('my-profile-avatar');
+  if(!av)return;
+  av.textContent=(myProfile.name||'L').charAt(0).toUpperCase();
+}
+
+// ── TAB DRAG REORDER ──
+(function initTabDrag(){
+  const container=document.getElementById('tabs-container');
+  let dragSrc=null;
+  container.addEventListener('dragstart',e=>{
+    dragSrc=e.target.closest('.tab');
+    if(dragSrc)dragSrc.classList.add('dragging');
+  });
+  container.addEventListener('dragover',e=>{
+    e.preventDefault();
+    const target=e.target.closest('.tab');
+    if(target&&target!==dragSrc){
+      container.querySelectorAll('.tab').forEach(t=>t.classList.remove('drag-over'));
+      target.classList.add('drag-over');
+    }
+  });
+  container.addEventListener('drop',e=>{
+    e.preventDefault();
+    const target=e.target.closest('.tab');
+    if(target&&target!==dragSrc&&dragSrc){
+      const tabs=[...container.querySelectorAll('.tab')];
+      const srcIdx=tabs.indexOf(dragSrc);
+      const tgtIdx=tabs.indexOf(target);
+      if(srcIdx<tgtIdx)container.insertBefore(dragSrc,target.nextSibling);
+      else container.insertBefore(dragSrc,target);
+    }
+    container.querySelectorAll('.tab').forEach(t=>t.classList.remove('drag-over','dragging'));
+    dragSrc=null;
+  });
+  container.addEventListener('dragend',()=>{
+    container.querySelectorAll('.tab').forEach(t=>t.classList.remove('dragging','drag-over'));
+    dragSrc=null;
+  });
+  // Wire click on each tab button
+  container.querySelectorAll('.tab').forEach(btn=>{
+    btn.addEventListener('click',()=>switchTab(btn.dataset.tab));
+  });
+})();
+
+// ── TEAM TYPE TOGGLE ──
+function toggleTeamMemberType(){
+  const ext=document.getElementById('tm-type').value==='external';
+  document.getElementById('tm-rate-row').style.display=ext?'none':'grid';
+  document.getElementById('tm-company-wrap').style.display='block';
+}
+
+// ── TEAM COLOR PALETTE ──
+function renderColorPalette(containerId, selectedColor, callbackFnName, disableMine=false){
+  const el=document.getElementById(containerId);if(!el)return;
+  el.dataset.callback=callbackFnName;
+  el.dataset.disableMine=disableMine?'1':'0';
+  el.innerHTML=TEAM_COLORS.map(c=>`
+    <div class="color-swatch${c.hex===selectedColor?' selected':''}${disableMine&&c.mine?' disabled':''}"
+      style="background:${c.hex}" data-hex="${c.hex}" data-mine="${c.mine?'1':'0'}"
+      title="${c.label}${c.mine?' (your brand color — reserved for you)':''}">
+      ${c.mine?'<i class="ti ti-star" style="font-size:12px;color:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;height:100%"></i>':''}
+    </div>`).join('');
+  // Attach click handler via JS (no inline onclick)
+  el.querySelectorAll('.color-swatch').forEach(swatch=>{
+    swatch.addEventListener('click',()=>{
+      const hex=swatch.dataset.hex;
+      const isMine=swatch.dataset.mine==='1';
+      if(disableMine&&isMine)return;
+      // Update selection visuals
+      el.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('selected'));
+      swatch.classList.add('selected');
+      // Call the named callback
+      const fn=el.dataset.callback;
+      if(fn&&window[fn])window[fn](hex,containerId);
+    });
+  });
+}
+
+// Palette callbacks — named functions so they work with the registry above
+function pickNewTmColor(hex){
+  _newTmColorVal=hex;
+  // No re-render needed — event handler already updated visuals
+}
+
+function pickEditTmColor(hex, containerId){
+  // Extract the member id from containerId e.g. "etm-colors-abc123"
+  const id=containerId.replace('etm-colors-','');
+  const inp=document.getElementById(`etm-color-${id}`);
+  if(inp)inp.value=hex;
+}
+
+function pickEditProjTeamColor(hex, containerId){
+  // no-op for project team chips — handled separately
+}
+
+function refreshTeamClientLinkDropdown(){
+  const sel=document.getElementById('tm-client-link');if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— None —</option>';
+  clients.forEach(c=>sel.appendChild(new Option((c.company||'')+(c.contactName?' — '+c.contactName:''),c.id)));
+  if(prev)sel.value=prev;
+}
+
+// ── TEAM MEMBER ASSIGNMENT CHIPS ──
+function renderTeamAssignChips(containerId, selectedIds=[], projId=null){
+  const el=document.getElementById(containerId);if(!el)return;
+  const allMembers=[
+    {id:'__me__',name:myProfile.name||'Me',color:'#9151a0',type:'internal'},
+    ...teamMembers
+  ];
+  el.innerHTML=allMembers.map(m=>{
+    const sel=selectedIds.includes(m.id);
+    return`<span onclick="toggleTeamAssign('${containerId}','${m.id}')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'var(--bg2)'};color:${sel?m.color:'var(--text2)'};font-weight:${sel?'500':'400'}">
+      <span style="width:10px;height:10px;border-radius:50%;background:${m.color};flex-shrink:0"></span>
+      ${m.name}
+    </span>`;
+  }).join('');
+}
+
+function toggleTeamAssign(containerId, memberId){
+  const el=document.getElementById(containerId);if(!el)return;
+  // Read current state from chip classes
+  const chips=[...el.querySelectorAll('span[onclick]')];
+  const selected=chips.filter(c=>c.style.fontWeight==='500').map(c=>c.getAttribute('onclick').match(/'([^']+)'\)$/)?.[1]);
+  // Build updated list
+  const updated=selected.includes(memberId)?selected.filter(x=>x!==memberId):[...selected,memberId];
+  el.dataset.selected=JSON.stringify(updated);
+  // Re-render chips with new selection
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0',type:'internal'},...teamMembers];
+  el.innerHTML=allMembers.map(m=>{
+    const sel=updated.includes(m.id);
+    return`<span onclick="toggleTeamAssign('${containerId}','${m.id}')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'var(--bg2)'};color:${sel?m.color:'var(--text2)'};font-weight:${sel?'500':'400'}">
+      <span style="width:10px;height:10px;border-radius:50%;background:${m.color};flex-shrink:0"></span>${m.name}</span>`;
+  }).join('');
+}
+
+function getTeamAssignSelected(containerId){
+  const el=document.getElementById(containerId);
+  if(!el)return[];
+  try{return JSON.parse(el.dataset.selected||'[]');}catch{return[];}
+}
 
 function toggleSettings(){
   const p=document.getElementById('settings-panel');
@@ -663,13 +963,27 @@ function toggleSettings(){
 
 function switchTab(t){
   currentTab=t;
-  ['dashboard','time','expenses','projects','clients','invoice'].forEach(id=>{
-    document.getElementById(id+'-section').style.display=id===t?'block':'none';
-    document.getElementById('tab-'+id).classList.toggle('active',id===t);
+  ['dashboard','time','expenses','projects','clients','invoice','team','gantt','reports'].forEach(id=>{
+    const sec=document.getElementById(id+'-section');
+    const btn=document.getElementById('tab-'+id);
+    if(sec)sec.style.display=id===t?'block':'none';
+    if(btn)btn.classList.toggle('active',id===t);
   });
   if(t==='invoice')renderInvoice();
   if(t==='clients')renderClientList();
-  if(t==='projects')renderProjectList();
+  if(t==='projects'){renderProjectList();refreshTeamAssignChipsForNewProject();}
+  if(t==='team'){renderTeamList();renderColorPalette('tm-color-palette',_newTmColorVal,'pickNewTmColor',true);refreshTeamClientLinkDropdown();}
+  if(t==='gantt')renderGantt();
+  if(t==='reports'){initReportFilters();renderReports();}
+}
+
+function pickNewTmColor(hex){
+  _newTmColorVal=hex;
+  renderColorPalette('tm-color-palette',hex,"pickNewTmColor('__COLOR__')",true);
+}
+
+function refreshTeamAssignChipsForNewProject(){
+  renderTeamAssignChips('p-team-assign',[]);
 }
 
 function toggleEndDateType(){
@@ -989,9 +1303,9 @@ function addTime(){
   const task=document.getElementById('t-task').value.trim();
   const hours=parseFloat(document.getElementById('t-hours').value);
   if(!date||!task||!hours)return;
-  timeEntries.unshift({id:uid(),date,task,hours,notes:document.getElementById('t-notes').value.trim(),billable:document.getElementById('t-billable').checked,clientId:document.getElementById('t-client').value||'',projectId:document.getElementById('t-project').value||''});
+  timeEntries.unshift({id:uid(),date,task,hours,notes:document.getElementById('t-notes').value.trim(),billable:document.getElementById('t-billable').checked,clientId:document.getElementById('t-client').value||'',projectId:document.getElementById('t-project').value||'',assigneeId:document.getElementById('t-assignee').value||''});
   save('tracker:time',timeEntries);
-  document.getElementById('t-task').value='';document.getElementById('t-hours').value='';document.getElementById('t-notes').value='';
+  document.getElementById('t-task').value='';document.getElementById('t-hours').value='1';document.getElementById('t-notes').value='';
   refreshAll();
 }
 
@@ -1153,6 +1467,7 @@ function renderProjectList(){
         <div class="gauge-bar" style="height:7px"><div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div></div>
       </div>`:''}
       ${p.desc?`<div style="font-size:13px;color:var(--text2);margin-top:8px">${p.desc}</div>`:''}
+      ${renderTasksAndMilestones(p)}
       ${isEditing?renderProjectEditForm(p):''}
     </div>`;
   }).join('');
@@ -1188,6 +1503,7 @@ function renderProjectEditForm(p){
       <div style="display:flex;align-items:flex-end;padding-bottom:2px"><label class="check-label"><input type="checkbox" id="ep-ret-inbud-${p.id}" ${p.retainerInBudget?'checked':''}> In total budget</label></div>
     </div>
     <div class="field"><label>Description</label><input type="text" id="ep-desc-${p.id}" value="${p.desc||''}"></div>
+    <div class="field"><label>Team members</label><div class="color-palette" id="ep-team-${p.id}" style="flex-wrap:wrap;gap:6px"></div></div>
     <div class="edit-actions">
       <div></div>
       <div style="display:flex;gap:8px">
@@ -1214,6 +1530,7 @@ function saveProjectEdit(id){
   p.retainerAmt=document.getElementById(`ep-ret-amt-${id}`).value;
   p.retainerInBudget=document.getElementById(`ep-ret-inbud-${id}`).checked;
   p.desc=document.getElementById(`ep-desc-${id}`).value.trim();
+  p.teamIds=getTeamAssignSelected(`ep-team-${id}`);
   save('tracker:projects',projects);
   editing.projects=null;
   allDropdownRefresh();
@@ -1228,7 +1545,8 @@ function addProject(){
   const endType=document.getElementById('p-end-type').value;
   const budType=document.getElementById('p-budget-type').value;
   const bmax=document.getElementById('p-budget-max').value;
-  projects.unshift({id:uid(),num:document.getElementById('p-num').value.trim(),name,clientId:document.getElementById('p-client').value||'',status:document.getElementById('p-status').value,startDate:document.getElementById('p-start').value,endDateType:endType,endDate:endType==='specific'?document.getElementById('p-end-date').value:'',endDateMonth:endType==='monthyear'?document.getElementById('p-end-month').value:'',duration:document.getElementById('p-duration').value.trim(),budget:document.getElementById('p-budget').value||'',budgetMax:budType==='range'?bmax:'',budgetType:budType,rate:document.getElementById('p-rate').value||'',retainerOn,retainerAmt:retainerOn?document.getElementById('p-retainer-amt').value:'',retainerInBudget:retainerOn&&document.getElementById('p-retainer-in-budget').checked,retainerPaid:retainerOn&&document.getElementById('p-retainer-paid').checked,desc:document.getElementById('p-desc').value.trim()});
+  const teamIds=getTeamAssignSelected('p-team-assign');
+  projects.unshift({id:uid(),num:document.getElementById('p-num').value.trim(),name,clientId:document.getElementById('p-client').value||'',status:document.getElementById('p-status').value,startDate:document.getElementById('p-start').value,endDateType:endType,endDate:endType==='specific'?document.getElementById('p-end-date').value:'',endDateMonth:endType==='monthyear'?document.getElementById('p-end-month').value:'',duration:document.getElementById('p-duration').value.trim(),budget:document.getElementById('p-budget').value||'',budgetMax:budType==='range'?bmax:'',budgetType:budType,rate:document.getElementById('p-rate').value||'',retainerOn,retainerAmt:retainerOn?document.getElementById('p-retainer-amt').value:'',retainerInBudget:retainerOn&&document.getElementById('p-retainer-in-budget').checked,retainerPaid:retainerOn&&document.getElementById('p-retainer-paid').checked,desc:document.getElementById('p-desc').value.trim(),teamIds,tasks:[],milestones:[],phases:[]});
   save('tracker:projects',projects);
   ['p-num','p-name','p-budget','p-budget-max','p-rate','p-retainer-amt','p-desc','p-end-date','p-end-month','p-duration'].forEach(id=>{document.getElementById(id).value='';});
   document.getElementById('p-retainer-on').checked=false;document.getElementById('retainer-fields').style.display='none';
@@ -1630,10 +1948,26 @@ function renderInvoice(){
 //  EDIT TOGGLE
 // ═══════════════════════════════════════════════
 function toggleEdit(section,id){
+  if(section==='team'){editing.team=editing.team===id?null:id;renderTeamList();
+    if(editing.team){
+      const m=teamMembers.find(x=>x.id===id);
+      if(m)setTimeout(()=>{
+        renderColorPalette(`etm-colors-${id}`,m.color||TEAM_COLORS[1].hex,'pickEditTmColor',true);
+      },0);
+    }
+    return;
+  }
   editing[section]=editing[section]===id?null:id;
   if(section==='time')renderTimeList();
   else if(section==='expenses')renderExpenseList();
-  else if(section==='projects')renderProjectList();
+  else if(section==='projects'){renderProjectList();
+    if(editing.projects){
+      setTimeout(()=>{
+        const p=projects.find(x=>x.id===id);
+        if(p)renderTeamAssignChips(`ep-team-${id}`,p.teamIds||[]);
+      },0);
+    }
+  }
   else if(section==='clients')renderClientList();
 }
 
@@ -1648,10 +1982,645 @@ function allDropdownRefresh(){
   refreshExpenseProjectDropdown();
   refreshExpenseCategoryDropdown();
   refreshInvoiceProjectFilter();
+  refreshGanttProjectFilter();
+  refreshTimeAssigneeDropdown();
 }
 
 // ═══════════════════════════════════════════════
-//  TIMER
+//  TEAM MEMBERS
+// ═══════════════════════════════════════════════
+function refreshTimeAssigneeDropdown(){
+  const sel=document.getElementById('t-assignee');if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML=`<option value="__me__">${myProfile.name||'Me (you)'}</option>`;
+  teamMembers.filter(m=>m.type!=='external').forEach(m=>{sel.appendChild(new Option(m.name+(m.role?' ('+m.role+')':''),m.id));});
+  if(prev)sel.value=prev;
+}
+
+function renderTeamList(){
+  const el=document.getElementById('team-list');
+  if(!teamMembers.length){el.innerHTML='<div class="empty">No team members yet.</div>';return;}
+  el.innerHTML=teamMembers.map(m=>{
+    const isEditing=editing.team===m.id;
+    const totalHours=timeEntries.filter(e=>e.assigneeId===m.id).reduce((s,e)=>s+parseFloat(e.hours||0),0);
+    const linkedClient=m.clientLink?clients.find(c=>c.id===m.clientLink):null;
+    const assignedProjs=projects.filter(p=>(p.teamIds||[]).includes(m.id));
+    return`<div class="card" style="margin-bottom:10px;padding:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div style="width:38px;height:38px;border-radius:50%;background:${m.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px;flex-shrink:0">${(m.name||'?').charAt(0).toUpperCase()}</div>
+          <div>
+            <div style="font-weight:500;font-size:14px;display:flex;align-items:center;gap:6px">
+              ${m.name}
+              <span class="type-badge type-${m.type||'internal'}">${m.type==='external'?'External':'Internal'}</span>
+            </div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px">
+              ${m.role||''}${m.company?' · '+m.company:''}${m.email?' · <a href="mailto:'+m.email+'" style="color:var(--accent)">'+m.email+'</a>':''}${m.rate&&m.type!=='external'?' · '+$f(m.rate)+'/hr':''}
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">
+              ${totalHours.toFixed(1)}h logged${linkedClient?' · Linked to: '+(linkedClient.company||linkedClient.contactName):''}
+              ${assignedProjs.length?' · Projects: '+assignedProjs.map(p=>p.name).join(', '):''}
+            </div>
+          </div>
+        </div>
+        <button class="icon-action" onclick="toggleEdit('team','${m.id}')"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
+      </div>
+      ${isEditing?renderTeamEditForm(m):''}
+    </div>`;
+  }).join('');
+}
+
+function renderTeamEditForm(m){
+  const colorPaletteId=`etm-colors-${m.id}`;
+  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===m.clientLink?' selected':''}>${c.company||c.contactName}</option>`).join('');
+  const ext=m.type==='external';
+  return`<div class="edit-form" style="margin-top:12px">
+    <div class="grid2">
+      <div><label>Type</label><select id="etm-type-${m.id}" onchange="document.getElementById('etm-rate-wrap-${m.id}').style.display=this.value==='external'?'none':'block'">
+        <option value="internal"${m.type!=='external'?' selected':''}>Internal</option>
+        <option value="external"${m.type==='external'?' selected':''}>External</option>
+      </select></div>
+      <div><label>Name</label><input type="text" id="etm-name-${m.id}" value="${m.name||''}"></div>
+    </div>
+    <div class="grid3">
+      <div><label>Role</label><input type="text" id="etm-role-${m.id}" value="${m.role||''}"></div>
+      <div><label>Email</label><input type="email" id="etm-email-${m.id}" value="${m.email||''}"></div>
+      <div><label>Company</label><input type="text" id="etm-company-${m.id}" value="${m.company||''}"></div>
+    </div>
+    <div id="etm-rate-wrap-${m.id}" style="display:${ext?'none':'block'}">
+      <div class="grid2">
+        <div><label>Hourly cost ($/hr)</label><input type="number" id="etm-rate-${m.id}" value="${m.rate||''}" min="0" step="5"></div>
+        <div><label>Link to client</label><select id="etm-clink-${m.id}"><option value="">— None —</option>${clientOpts}</select></div>
+      </div>
+    </div>
+    <div class="field"><label>Color</label><div class="color-palette" id="${colorPaletteId}"></div></div>
+    <input type="hidden" id="etm-color-${m.id}" value="${m.color||TEAM_COLORS[1].hex}">
+    <div class="edit-actions"><div></div><div style="display:flex;gap:8px">
+      <button class="btn danger sm" onclick="deleteTeamMember('${m.id}')"><i class="ti ti-trash"></i> Delete</button>
+      <button class="btn primary sm" onclick="saveTeamMemberEdit('${m.id}')"><i class="ti ti-check"></i> Save</button>
+    </div></div>
+  </div>`;
+}
+
+let _selectedTeamColor=TEAM_COLORS[1].hex;
+let _newTmColorVal=TEAM_COLORS[1].hex;
+
+function addTeamMember(){
+  const name=document.getElementById('tm-name').value.trim();if(!name)return;
+  const type=document.getElementById('tm-type').value;
+  const ext=type==='external';
+  // Check color isn't brand purple
+  if(_newTmColorVal==='#9151a0'){alert('That color is reserved for your personal profile. Please choose another.');return;}
+  teamMembers.unshift({id:uid(),name,type,role:document.getElementById('tm-role').value.trim(),email:document.getElementById('tm-email').value.trim(),company:document.getElementById('tm-company').value.trim(),rate:ext?'':document.getElementById('tm-rate').value||'',clientLink:ext?'':document.getElementById('tm-client-link').value||'',color:_newTmColorVal});
+  save('tracker:team',teamMembers);
+  ['tm-name','tm-role','tm-email','tm-company','tm-rate'].forEach(id=>document.getElementById(id).value='');
+  _newTmColorVal=TEAM_COLORS[1].hex;
+  allDropdownRefresh();renderTeamList();
+}
+
+function saveTeamMemberEdit(id){
+  const m=teamMembers.find(x=>x.id===id);if(!m)return;
+  const newColor=document.getElementById(`etm-color-${id}`).value;
+  if(newColor==='#9151a0'){alert('That color is reserved for your personal profile.');return;}
+  m.type=document.getElementById(`etm-type-${id}`).value;
+  m.name=document.getElementById(`etm-name-${id}`).value.trim();
+  m.role=document.getElementById(`etm-role-${id}`).value.trim();
+  m.email=document.getElementById(`etm-email-${id}`).value.trim();
+  m.company=document.getElementById(`etm-company-${id}`).value.trim();
+  m.rate=document.getElementById(`etm-rate-${id}`)?.value||'';
+  const clinkEl=document.getElementById(`etm-clink-${id}`);
+  m.clientLink=clinkEl?clinkEl.value:'';
+  m.color=newColor;
+  save('tracker:team',teamMembers);editing.team=null;allDropdownRefresh();renderTeamList();
+}
+
+function deleteTeamMember(id){
+  if(!confirm('Remove this team member?'))return;
+  teamMembers=teamMembers.filter(m=>m.id!==id);
+  save('tracker:team',teamMembers);editing.team=null;allDropdownRefresh();renderTeamList();
+}
+
+// ═══════════════════════════════════════════════
+//  TASKS & MILESTONES (stored inside projects)
+// ═══════════════════════════════════════════════
+function getProjectTasks(projId){
+  const p=projects.find(x=>x.id===projId);return p?p.tasks||[]:[]; }
+function getProjectMilestones(projId){
+  const p=projects.find(x=>x.id===projId);return p?p.milestones||[]:[]; }
+
+function addTask(projId){
+  const inp=document.getElementById(`task-inp-${projId}`);
+  const due=document.getElementById(`task-due-${projId}`);
+  const assignee=document.getElementById(`task-assign-${projId}`);
+  const priority=document.getElementById(`task-pri-${projId}`);
+  const phaseEl=document.getElementById(`task-phase-${projId}`);
+  const typeEl=document.getElementById(`task-type-${projId}`);
+  const title=inp.value.trim();if(!title)return;
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  if(!p.tasks)p.tasks=[];
+  p.tasks.push({id:uid(),title,dueDate:due.value||'',assigneeId:assignee.value||'',priority:priority.value||'medium',status:'todo',phaseId:phaseEl?phaseEl.value:'',taskType:typeEl?typeEl.value:''});
+  save('tracker:projects',projects);
+  inp.value='';due.value='';
+  renderProjectList();
+}
+
+function updateTaskStatus(projId,taskId,status){
+  const p=projects.find(x=>x.id===projId);if(!p||!p.tasks)return;
+  const t=p.tasks.find(x=>x.id===taskId);if(t)t.status=status;
+  save('tracker:projects',projects);renderProjectList();renderDashBudgets();
+}
+
+function deleteTask(projId,taskId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  p.tasks=(p.tasks||[]).filter(t=>t.id!==taskId);
+  save('tracker:projects',projects);renderProjectList();
+}
+
+function addMilestone(projId){
+  const inp=document.getElementById(`ms-inp-${projId}`);
+  const date=document.getElementById(`ms-date-${projId}`);
+  const title=inp.value.trim();if(!title||!date.value)return;
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  if(!p.milestones)p.milestones=[];
+  p.milestones.push({id:uid(),title,date:date.value,completed:false});
+  save('tracker:projects',projects);
+  inp.value='';date.value='';
+  renderProjectList();
+}
+
+function toggleMilestone(projId,msId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const ms=(p.milestones||[]).find(x=>x.id===msId);
+  if(ms)ms.completed=!ms.completed;
+  save('tracker:projects',projects);renderProjectList();
+}
+
+function deleteMilestone(projId,msId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  p.milestones=(p.milestones||[]).filter(m=>m.id!==msId);
+  save('tracker:projects',projects);renderProjectList();
+}
+
+function addPhase(projId){
+  const inp=document.getElementById(`phase-inp-${projId}`);
+  const title=inp.value.trim();if(!title)return;
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  if(!p.phases)p.phases=[];
+  p.phases.push({id:uid(),title});
+  save('tracker:projects',projects);inp.value='';renderProjectList();
+}
+
+function deletePhase(projId,phId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  p.phases=(p.phases||[]).filter(x=>x.id!==phId);
+  // unassign tasks from deleted phase
+  (p.tasks||[]).forEach(t=>{if(t.phaseId===phId)t.phaseId='';});
+  save('tracker:projects',projects);renderProjectList();
+}
+
+function renderTasksAndMilestones(p){
+  const tasks=p.tasks||[];
+  const milestones=p.milestones||[];
+  const phases=p.phases||[];
+  const todayStr=today();
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  const memberOpts=allMembers.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+  const phaseOpts=phases.map(ph=>`<option value="${ph.id}">${ph.title}</option>`).join('');
+  const priBadge=pri=>pri==='high'?'color:var(--danger);font-size:11px':pri==='low'?'color:var(--text3);font-size:11px':'color:var(--warning);font-size:11px';
+  const statusOpts=(cur)=>['todo','in_progress','done'].map(s=>`<option value="${s}"${s===cur?' selected':''}>${s==='todo'?'To do':s==='in_progress'?'In progress':'Done'}</option>`).join('');
+  const typeBadge=(t)=>t.taskType==='critical'?'<span class="phase-label phase-critical">Critical</span>':t.taskType==='open'?'<span class="phase-label phase-open">Open</span>':'';
+  const doneTasks=tasks.filter(t=>t.status==='done').length;
+
+  // Group tasks by phase
+  const ungrouped=tasks.filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId));
+  const grouped=phases.map(ph=>({phase:ph,tasks:tasks.filter(t=>t.phaseId===ph.id)}));
+
+  function renderTaskRow(t){
+    const assignee=t.assigneeId?allMembers.find(m=>m.id===t.assigneeId):null;
+    const overdue=t.dueDate&&t.dueDate<todayStr&&t.status!=='done';
+    return`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:.5px solid var(--border);font-size:13px">
+      <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
+      ${typeBadge(t)}
+      <span style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1">${t.title}${t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'};margin-left:5px">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}</span>
+      ${assignee?`<span style="font-size:10px;background:${assignee.color||'var(--accent)'};color:#fff;padding:1px 6px;border-radius:10px">${assignee.name.split(' ')[0]}</span>`:''}
+      <select onchange="updateTaskStatus('${p.id}','${t.id}',this.value)" style="width:auto;font-size:11px;padding:2px 4px">${statusOpts(t.status)}</select>
+      <button class="icon-action danger" onclick="deleteTask('${p.id}','${t.id}')" style="font-size:12px"><i class="ti ti-x"></i></button>
+    </div>`;
+  }
+
+  return`<div style="margin-top:14px;border-top:.5px solid var(--border);padding-top:12px">
+    <!-- PHASES -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span class="sec-title" style="margin:0">Phases & Tasks <span style="font-weight:400;color:var(--text3)">(${doneTasks}/${tasks.length})</span></span>
+    </div>
+    ${phases.length===0&&tasks.length===0?'<div style="font-size:12px;color:var(--text3);margin-bottom:8px">No tasks yet — add a phase or task below.</div>':''}
+
+    <!-- Ungrouped tasks -->
+    ${ungrouped.length>0?`<div style="margin-bottom:10px">${ungrouped.map(renderTaskRow).join('')}</div>`:''}
+
+    <!-- Phase groups -->
+    ${grouped.map(({phase,tasks:pts})=>`<div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:600;color:var(--accent)"><i class="ti ti-layers-subtract" style="font-size:12px"></i> ${phase.title}</span>
+        <button class="icon-action danger" onclick="deletePhase('${p.id}','${phase.id}')" style="font-size:12px"><i class="ti ti-x"></i></button>
+      </div>
+      ${pts.length?pts.map(renderTaskRow).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">No tasks in this phase</div>'}
+    </div>`).join('')}
+
+    <!-- Add task row -->
+    <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-top:4px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">ADD TASK</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
+        <input type="text" id="task-inp-${p.id}" placeholder="Task title…" style="flex:1;min-width:140px;font-size:13px;padding:5px 8px">
+        <select id="task-type-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
+          <option value="">Normal</option><option value="open">Open</option><option value="critical">Critical</option>
+        </select>
+        <select id="task-phase-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
+          <option value="">No phase</option>${phaseOpts}
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+        <input type="date" id="task-due-${p.id}" style="width:140px;font-size:13px;padding:5px 8px">
+        <select id="task-assign-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
+          <option value="">Unassigned</option>${memberOpts}
+        </select>
+        <select id="task-pri-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
+          <option value="low">Low</option><option value="medium" selected>Med</option><option value="high">High</option>
+        </select>
+        <button class="btn sm primary" onclick="addTask('${p.id}')"><i class="ti ti-plus"></i> Add task</button>
+      </div>
+    </div>
+
+    <!-- Add phase row -->
+    <div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end">
+      <input type="text" id="phase-inp-${p.id}" placeholder="Phase name (e.g. Discovery)…" style="flex:1;font-size:13px;padding:5px 8px">
+      <button class="btn sm" onclick="addPhase('${p.id}')"><i class="ti ti-layers-subtract"></i> Add phase</button>
+    </div>
+
+    <!-- MILESTONES -->
+    <div style="margin-top:14px;padding-top:12px;border-top:.5px solid var(--border)">
+      <span class="sec-title" style="margin-bottom:8px;display:block">Milestones</span>
+      ${milestones.map(ms=>{
+        const overdue=!ms.completed&&ms.date<todayStr;
+        return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid var(--border);font-size:13px">
+          <input type="checkbox" ${ms.completed?'checked':''} onchange="toggleMilestone('${p.id}','${ms.id}')" style="width:auto;flex-shrink:0">
+          <i class="ti ti-flag-2" style="color:${ms.completed?'var(--success)':overdue?'var(--danger)':'var(--accent)'};font-size:14px"></i>
+          <span style="${ms.completed?'text-decoration:line-through;color:var(--text3);':''}flex:1">${ms.title}</span>
+          <span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'}">${overdue?'⚠ ':''}${fmtDate(ms.date)}</span>
+          <button class="icon-action danger" onclick="deleteMilestone('${p.id}','${ms.id}')" style="font-size:13px"><i class="ti ti-x"></i></button>
+        </div>`;
+      }).join('')}
+      <div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end">
+        <input type="text" id="ms-inp-${p.id}" placeholder="Milestone name…" style="flex:1;font-size:13px;padding:5px 8px">
+        <input type="date" id="ms-date-${p.id}" style="width:150px;font-size:13px;padding:5px 8px">
+        <button class="btn sm primary" onclick="addMilestone('${p.id}')"><i class="ti ti-plus"></i> Add</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════
+//  GANTT CHART
+// ═══════════════════════════════════════════════
+function refreshGanttProjectFilter(){
+  const sel=document.getElementById('gantt-project-filter');if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML='<option value="">All projects</option>';
+  projects.forEach(p=>sel.appendChild(new Option(p.name,p.id)));
+  if(prev)sel.value=prev;
+}
+
+function renderGantt(){
+  const el=document.getElementById('gantt-chart');if(!el)return;
+  const pid=document.getElementById('gantt-project-filter').value||'';
+  const view=document.getElementById('gantt-view').value||'month';
+  const projs=pid?projects.filter(p=>p.id===pid):projects.filter(p=>p.startDate);
+  if(!projs.length){el.innerHTML='<div class="empty">No projects with start dates to display. Add start dates to your projects.</div>';return;}
+
+  // Determine date range
+  const now=new Date();
+  let rangeStart,rangeEnd;
+  if(view==='month'){rangeStart=new Date(now.getFullYear(),now.getMonth(),1);rangeEnd=new Date(now.getFullYear(),now.getMonth()+1,0);}
+  else if(view==='quarter'){const q=Math.floor(now.getMonth()/3);rangeStart=new Date(now.getFullYear(),q*3,1);rangeEnd=new Date(now.getFullYear(),q*3+3,0);}
+  else{rangeStart=new Date(now.getFullYear(),0,1);rangeEnd=new Date(now.getFullYear(),11,31);}
+
+  // Expand to fit all projects
+  projs.forEach(p=>{
+    if(p.startDate){const d=new Date(p.startDate+'T12:00:00');if(d<rangeStart)rangeStart=new Date(d.getFullYear(),d.getMonth(),1);}
+    if(p.endDate){const d=new Date(p.endDate+'T12:00:00');if(d>rangeEnd)rangeEnd=new Date(d.getFullYear(),d.getMonth()+1,0);}
+  });
+
+  const totalDays=Math.max(1,Math.round((rangeEnd-rangeStart)/86400000)+1);
+  const ROW_H=38,LABEL_W=160,BAR_AREA=600,HEADER_H=36,MILESTONE_R=6;
+  const svgH=HEADER_H+projs.length*ROW_H+60; // extra for tasks/milestones
+  const dayW=BAR_AREA/totalDays;
+
+  function dateToX(d){
+    const dt=new Date(d+'T12:00:00');
+    const diff=Math.round((dt-rangeStart)/86400000);
+    return LABEL_W+Math.max(0,Math.min(BAR_AREA,diff*dayW));
+  }
+
+  // Build month headers
+  let months=[];
+  let cur=new Date(rangeStart);
+  while(cur<=rangeEnd){
+    const label=cur.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+    const x=LABEL_W+Math.max(0,(cur-rangeStart)/86400000*dayW);
+    months.push({label,x});
+    cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+  }
+
+  // Today marker
+  const todayX=LABEL_W+(new Date()-rangeStart)/86400000*dayW;
+  const showToday=todayX>=LABEL_W&&todayX<=LABEL_W+BAR_AREA;
+
+  // Build rows
+  let rows='';
+  let rowIdx=0;
+  projs.forEach(p=>{
+    const y=HEADER_H+rowIdx*ROW_H;
+    const rowBg=rowIdx%2===0?'var(--bg2)':'var(--bg)';
+    const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
+    const barX=p.startDate?dateToX(p.startDate):LABEL_W;
+    const endDate=p.endDate||(p.startDate?today():'');
+    const barW=endDate&&p.startDate?Math.max(8,dateToX(endDate)-barX):0;
+    const tasks=p.tasks||[];
+    const done=tasks.filter(t=>t.status==='done').length;
+    const pct=tasks.length?done/tasks.length:0;
+    const color=p.status==='completed'?'#888':p.status==='on_hold'?'var(--warning)':'var(--accent)';
+    rows+=`<rect x="0" y="${y}" width="${LABEL_W+BAR_AREA}" height="${ROW_H}" fill="${rowBg}" rx="0"/>`;
+    rows+=`<text x="8" y="${y+22}" font-size="12" fill="var(--text)" font-family="-apple-system,sans-serif" font-weight="500">${p.name.slice(0,20)}</text>`;
+    if(client)rows+=`<text x="8" y="${y+33}" font-size="10" fill="var(--text2)" font-family="-apple-system,sans-serif">${(client.company||client.contactName).slice(0,22)}</text>`;
+    if(p.startDate&&endDate){
+      rows+=`<rect x="${barX}" y="${y+8}" width="${barW}" height="16" fill="${color}" rx="4" opacity="0.85"/>`;
+      if(pct>0)rows+=`<rect x="${barX}" y="${y+8}" width="${Math.max(4,barW*pct)}" height="16" fill="${color}" rx="4" opacity="1"/>`;
+      if(tasks.length)rows+=`<text x="${barX+barW+4}" y="${y+20}" font-size="10" fill="var(--text2)" font-family="-apple-system,sans-serif">${done}/${tasks.length}</text>`;
+    }
+    // Milestones on bar
+    (p.milestones||[]).forEach(ms=>{
+      if(!ms.date)return;
+      const mx=dateToX(ms.date);
+      if(mx<LABEL_W||mx>LABEL_W+BAR_AREA)return;
+      const mColor=ms.completed?'var(--success)':new Date(ms.date+'T12:00:00')<new Date()?'var(--danger)':'var(--accent)';
+      rows+=`<polygon points="${mx},${y+4} ${mx+MILESTONE_R},${y+14} ${mx},${y+24} ${mx-MILESTONE_R},${y+14}" fill="${mColor}"/>`;
+      rows+=`<title>${ms.title} · ${fmtDate(ms.date)}</title>`;
+    });
+    rowIdx++;
+  });
+
+  const svgH2=HEADER_H+rowIdx*ROW_H;
+  el.innerHTML=`<div style="overflow-x:auto">
+  <svg width="${LABEL_W+BAR_AREA}" height="${svgH2}" style="display:block;font-family:-apple-system,sans-serif">
+    <!-- BG -->
+    <rect width="${LABEL_W+BAR_AREA}" height="${svgH2}" fill="var(--bg)" rx="0"/>
+    <!-- Month headers -->
+    <rect x="0" y="0" width="${LABEL_W+BAR_AREA}" height="${HEADER_H}" fill="var(--bg2)"/>
+    <text x="8" y="22" font-size="11" fill="var(--text2)" font-weight="500">Project</text>
+    ${months.map(m=>`<text x="${m.x+4}" y="22" font-size="11" fill="var(--text2)">${m.label}</text><line x1="${m.x}" y1="0" x2="${m.x}" y2="${svgH2}" stroke="var(--border)" stroke-width="1"/>`).join('')}
+    <!-- Rows -->
+    ${rows}
+    <!-- Today -->
+    ${showToday?`<line x1="${todayX}" y1="${HEADER_H}" x2="${todayX}" y2="${svgH2}" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="4,3"/><text x="${todayX+3}" y="${HEADER_H+12}" font-size="10" fill="var(--danger)">Today</text>`:''}
+    <!-- Row dividers -->
+    ${projs.map((_,i)=>`<line x1="0" y1="${HEADER_H+(i+1)*ROW_H}" x2="${LABEL_W+BAR_AREA}" y2="${HEADER_H+(i+1)*ROW_H}" stroke="var(--border)" stroke-width=".5"/>`).join('')}
+  </svg>
+  </div>
+  <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;font-size:11px;color:var(--text2)">
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--accent);margin-right:4px;vertical-align:middle"></span>Active</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--warning);margin-right:4px;vertical-align:middle"></span>On Hold</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#888;margin-right:4px;vertical-align:middle"></span>Completed</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:var(--accent);clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);margin-right:4px;vertical-align:middle"></span>Milestone</span>
+    <span><span style="display:inline-block;width:2px;height:12px;background:var(--danger);margin-right:4px;vertical-align:middle;display:inline-block"></span>Today</span>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════
+//  REPORTS
+// ═══════════════════════════════════════════════
+function initReportFilters(){
+  const fc=document.getElementById('rpt-client');
+  const fp=document.getElementById('rpt-project');
+  if(!fc||!fp)return;
+  const pc=fc.value,pp=fp.value;
+  fc.innerHTML='<option value="">All clients</option>';
+  clients.forEach(c=>fc.appendChild(new Option(c.company||c.contactName,c.id)));
+  fp.innerHTML='<option value="">All projects</option>';
+  projects.forEach(p=>fp.appendChild(new Option(p.name,p.id)));
+  if(pc)fc.value=pc;if(pp)fp.value=pp;
+  if(!document.getElementById('rpt-from').value){
+    const d=new Date();document.getElementById('rpt-from').value=new Date(d.getFullYear(),d.getMonth(),1).toISOString().split('T')[0];
+    document.getElementById('rpt-to').value=today();
+  }
+}
+
+let lastReportData=[];
+
+function renderReports(){
+  const from=document.getElementById('rpt-from').value;
+  const to=document.getElementById('rpt-to').value;
+  const cid=document.getElementById('rpt-client').value||'';
+  const pid=document.getElementById('rpt-project').value||'';
+  const el=document.getElementById('reports-output');
+
+  // Filter entries
+  const filtT=timeEntries.filter(e=>{
+    if(from&&e.date<from)return false;
+    if(to&&e.date>to)return false;
+    if(cid&&e.clientId!==cid)return false;
+    if(pid&&e.projectId!==pid)return false;
+    return true;
+  });
+  const filtE=expenses.filter(e=>{
+    if(from&&e.date<from)return false;
+    if(to&&e.date>to)return false;
+    if(cid&&e.clientId!==cid)return false;
+    if(pid&&e.projectId!==pid)return false;
+    return true;
+  });
+
+  // Store for CSV export
+  lastReportData=filtT;
+
+  // Group time by project
+  const byProj={};
+  filtT.forEach(e=>{
+    const k=e.projectId||'__none__';
+    if(!byProj[k])byProj[k]={hours:0,billableHours:0,amount:0,entries:[]};
+    const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+    const rate=getProjRate(proj);
+    byProj[k].hours+=parseFloat(e.hours||0);
+    if(e.billable){byProj[k].billableHours+=parseFloat(e.hours||0);byProj[k].amount+=parseFloat(e.hours||0)*rate;}
+    byProj[k].entries.push(e);
+  });
+
+  const totalHours=filtT.reduce((s,e)=>s+parseFloat(e.hours||0),0);
+  const totalBillable=filtT.filter(e=>e.billable).reduce((s,e)=>{
+    const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+    return s+parseFloat(e.hours||0)*getProjRate(proj);
+  },0);
+  const totalExp=filtE.filter(e=>e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+
+  // By assignee breakdown
+  const byAssignee={};
+  filtT.forEach(e=>{
+    const k=e.assigneeId||'__me__';
+    if(!byAssignee[k])byAssignee[k]={hours:0,amount:0};
+    const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+    byAssignee[k].hours+=parseFloat(e.hours||0);
+    if(e.billable)byAssignee[k].amount+=parseFloat(e.hours||0)*getProjRate(proj);
+  });
+
+  el.innerHTML=`
+  <!-- Summary metrics -->
+  <div class="met-grid" style="margin-bottom:1.5rem">
+    <div class="met"><div class="met-label">Total hours</div><div class="met-val">${totalHours.toFixed(1)}h</div></div>
+    <div class="met"><div class="met-label">Billable revenue</div><div class="met-val">${$f(totalBillable)}</div></div>
+    <div class="met"><div class="met-label">Expenses</div><div class="met-val">${$f(totalExp)}</div></div>
+    <div class="met"><div class="met-label">Total</div><div class="met-val">${$f(totalBillable+totalExp)}</div></div>
+  </div>
+
+  <!-- By Project -->
+  <div class="sec-title">Time by project</div>
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:1rem">
+    <table><thead><tr>
+      <th style="padding:8px 12px">Project</th><th style="padding:8px 12px">Client</th>
+      <th style="text-align:right;padding:8px 12px">Hours</th>
+      <th style="text-align:right;padding:8px 12px">Billable hrs</th>
+      <th style="text-align:right;padding:8px 12px">Amount</th>
+    </tr></thead><tbody>
+      ${Object.entries(byProj).map(([k,d])=>{
+        const proj=k!=='__none__'?projects.find(p=>p.id===k):null;
+        const client=proj&&proj.clientId?clients.find(c=>c.id===proj.clientId):null;
+        return`<tr class="tr-sep"><td style="padding:8px 12px;font-weight:500">${proj?proj.name:'No project'}</td>
+          <td style="padding:8px 12px;color:var(--text2)">${client?client.company||client.contactName:'—'}</td>
+          <td style="text-align:right;padding:8px 12px">${d.hours.toFixed(1)}h</td>
+          <td style="text-align:right;padding:8px 12px">${d.billableHours.toFixed(1)}h</td>
+          <td style="text-align:right;padding:8px 12px">${$f(d.amount)}</td></tr>`;
+      }).join('')}
+    </tbody></table>
+  </div>
+
+  <!-- By Assignee -->
+  ${Object.keys(byAssignee).length>1?`<div class="sec-title">Time by team member</div>
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:1rem">
+    <table><thead><tr>
+      <th style="padding:8px 12px">Member</th>
+      <th style="text-align:right;padding:8px 12px">Hours</th>
+      <th style="text-align:right;padding:8px 12px">Billable</th>
+    </tr></thead><tbody>
+      ${Object.entries(byAssignee).map(([k,d])=>{
+        const member=k!=='__me__'?teamMembers.find(m=>m.id===k):null;
+        return`<tr class="tr-sep"><td style="padding:8px 12px;font-weight:500">${member?member.name:'Me / Unassigned'}</td>
+          <td style="text-align:right;padding:8px 12px">${d.hours.toFixed(1)}h</td>
+          <td style="text-align:right;padding:8px 12px">${$f(d.amount)}</td></tr>`;
+      }).join('')}
+    </tbody></table>
+  </div>`:''}
+
+  <!-- Detailed time log -->
+  <div class="sec-title">Detailed time log</div>
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:1rem">
+    <table><thead><tr>
+      <th style="padding:8px 12px">Date</th><th style="padding:8px 12px">Task</th>
+      <th style="padding:8px 12px">Project</th><th style="padding:8px 12px">Assignee</th>
+      <th style="text-align:right;padding:8px 12px">Hrs</th>
+      <th style="text-align:right;padding:8px 12px">Amount</th>
+    </tr></thead><tbody>
+      ${filtT.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>{
+        const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+        const member=e.assigneeId?teamMembers.find(m=>m.id===e.assigneeId):null;
+        const rate=getProjRate(proj);
+        return`<tr class="tr-sep">
+          <td style="padding:6px 12px;color:var(--text2);font-size:12px">${fmtDate(e.date)}</td>
+          <td style="padding:6px 12px">${e.task}${e.notes?`<span style="font-size:11px;color:var(--text3)"> — ${e.notes}</span>`:''}</td>
+          <td style="padding:6px 12px;color:var(--text2)">${proj?proj.name:'—'}</td>
+          <td style="padding:6px 12px;color:var(--text2)">${member?member.name:'—'}</td>
+          <td style="text-align:right;padding:6px 12px">${e.hours}h</td>
+          <td style="text-align:right;padding:6px 12px">${e.billable?$f(e.hours*rate):'—'}</td>
+        </tr>`;
+      }).join('')}
+    </tbody></table>
+  </div>`;
+
+  document.getElementById('rpt-export-btns').style.display='flex';
+}
+
+function exportProjectOverviewPDF(){
+  const pid=document.getElementById('rpt-project').value||'';
+  const proj=pid?projects.find(p=>p.id===pid):null;
+  // Open a new window with project overview
+  const w=window.open('','_blank');
+  const p=proj||projects[0];
+  if(!p){w.close();alert('Select a project first');return;}
+  const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
+  const rate=getProjRate(p);
+  const bTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*rate,0);
+  const bExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+  const budget=getProjBudget(p);
+  const tasks=p.tasks||[];const milestones=p.milestones||[];const phases=p.phases||[];
+  const teamIds=p.teamIds||[];
+  const projTeam=teamIds.map(tid=>tid==='__me__'?{name:myProfile.name||'Me',color:'#9151a0'}:teamMembers.find(m=>m.id===tid)).filter(Boolean);
+  const done=tasks.filter(t=>t.status==='done').length;
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${p.name} — Project Overview</title>
+  <style>body{font-family:-apple-system,sans-serif;color:#2A2829;max-width:800px;margin:40px auto;padding:0 2rem}
+  h1{font-size:24px;font-weight:600;margin-bottom:4px}h2{font-size:14px;font-weight:500;color:#6b686a;margin:0 0 24px}
+  h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9a979a;margin:24px 0 8px}
+  .meta{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:24px;font-size:13px;color:#6b686a}
+  .meta b{color:#2A2829}table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px}
+  th{text-align:left;padding:5px 0;font-weight:400;color:#9a979a;border-bottom:1px solid #eee}
+  td{padding:6px 0;border-bottom:.5px solid #f0f0f0}
+  .badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:10px;margin-left:6px}
+  .critical{background:#f5e1e1;color:#a32d2d}.open{background:#f0f0f0;color:#6b6b6b}
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;margin-right:4px;margin-bottom:4px}
+  @media print{button{display:none}}</style></head><body>
+  <button onclick="window.print()" style="float:right;padding:8px 16px;background:#9151a0;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Print / Save PDF</button>
+  <h1>${p.num?p.num+' — ':''}${p.name}</h1>
+  <h2>${client?'Client: '+(client.company||client.contactName)+' · ':''} Status: ${p.status==='on_hold'?'On Hold':p.status==='active'?'Active':'Completed'}</h2>
+  <div class="meta">
+    ${p.startDate?`<span><b>Start:</b> ${fmtDate(p.startDate)}</span>`:''}
+    ${p.endDate?`<span><b>End:</b> ${fmtDate(p.endDate)}</span>`:''}
+    ${budget.display?`<span><b>Budget:</b> ${budget.display}</span>`:''}
+    <span><b>Billed:</b> ${$f(bTime+bExp)}</span>
+    <span><b>Tasks:</b> ${done}/${tasks.length} done</span>
+  </div>
+  ${projTeam.length?`<h3>Team</h3><div>${projTeam.map(m=>`<span class="chip" style="background:${m.color}22;color:${m.color};border:.5px solid ${m.color}">${m.name}</span>`).join('')}</div>`:''}
+  <h3>Tasks by Phase</h3>
+  ${phases.length===0&&tasks.length===0?'<p style="color:#9a979a;font-size:13px">No tasks.</p>':''}
+  ${tasks.filter(t=>!t.phaseId).length?`<table><thead><tr><th>Task</th><th>Type</th><th>Assignee</th><th>Due</th><th>Status</th></tr></thead><tbody>
+    ${tasks.filter(t=>!t.phaseId).map(t=>{const m=t.assigneeId?allMembers.find(x=>x.id===t.assigneeId):null;return`<tr><td style="${t.status==='done'?'text-decoration:line-through;color:#9a979a':''}">${t.title}</td><td>${t.taskType?`<span class="badge ${t.taskType}">${t.taskType}</span>`:''}</td><td>${m?m.name:''}</td><td>${t.dueDate?fmtDate(t.dueDate):''}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In progress':'To do'}</td></tr>`;}).join('')}
+  </tbody></table>`:''}
+  ${phases.map(ph=>{const pts=tasks.filter(t=>t.phaseId===ph.id);return`<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:600;color:#9151a0;margin-bottom:6px">Phase: ${ph.title}</div>
+  ${pts.length?`<table><thead><tr><th>Task</th><th>Type</th><th>Assignee</th><th>Due</th><th>Status</th></tr></thead><tbody>
+    ${pts.map(t=>{const m=t.assigneeId?allMembers.find(x=>x.id===t.assigneeId):null;return`<tr><td style="${t.status==='done'?'text-decoration:line-through;color:#9a979a':''}">${t.title}</td><td>${t.taskType?`<span class="badge ${t.taskType}">${t.taskType}</span>`:''}</td><td>${m?m.name:''}</td><td>${t.dueDate?fmtDate(t.dueDate):''}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In progress':'To do'}</td></tr>`;}).join('')}
+  </tbody></table>`:'<p style="font-size:12px;color:#9a979a">No tasks</p>'}
+  </div>`;}).join('')}
+  ${milestones.length?`<h3>Milestones</h3><table><thead><tr><th>Milestone</th><th>Date</th><th>Status</th></tr></thead><tbody>
+    ${milestones.map(ms=>`<tr><td>${ms.title}</td><td>${fmtDate(ms.date)}</td><td>${ms.completed?'Complete':'Pending'}</td></tr>`).join('')}
+  </tbody></table>`:''}
+  </body></html>`);
+  w.document.close();
+}
+
+function exportReportCSV(){
+  const from=document.getElementById('rpt-from').value;
+  const to=document.getElementById('rpt-to').value;
+  const rows=[['Date','Task','Notes','Project','Client','Assignee','Hours','Billable','Rate','Amount']];
+  lastReportData.sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>{
+    const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
+    const client=proj&&proj.clientId?clients.find(c=>c.id===proj.clientId):null;
+    const member=e.assigneeId?teamMembers.find(m=>m.id===e.assigneeId):null;
+    const rate=getProjRate(proj);
+    rows.push([e.date,e.task,e.notes||'',proj?proj.name:'',client?client.company||client.contactName:'',member?member.name:'',e.hours,e.billable?'Yes':'No',rate,(e.billable?e.hours*rate:0).toFixed(2)]);
+  });
+  const csv=rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`time-report-${from}-to-${to}.csv`;
+  a.click();
+}
 // ═══════════════════════════════════════════════
 let timerInterval=null,timerStart_=0,timerRunning=false,timerPaused=false,timerAccum=0;
 function fmtTimer(ms){const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h+':'+(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;}
