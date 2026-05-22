@@ -737,8 +737,18 @@ async function loadFromDrive(){
 
 async function writeToDrive(){
   if(!gdFileId||!gdToken)return;
-  const data={};
-  GD_KEYS.forEach(k=>{try{data[k]=JSON.parse(localStorage.getItem(k));}catch{data[k]=null;}});
+  // Always serialize current in-memory state — don't re-read from localStorage
+  // which could be stale if another tab wrote to it
+  const data={
+    'tracker:settings':settings,
+    'tracker:time':timeEntries,
+    'tracker:expenses':expenses,
+    'tracker:clients':clients,
+    'tracker:projects':projects,
+    'tracker:clientInvs':clientInvs,
+    'tracker:team':teamMembers,
+    'tracker:myProfile':myProfile
+  };
   try{
     await fetch(`https://www.googleapis.com/upload/drive/v3/files/${gdFileId}?uploadType=media`,{
       method:'PATCH',
@@ -1218,6 +1228,14 @@ function renderDashBudgets(){
   el.innerHTML=active.map(p=>{
     const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
     const clientName=client?client.company:'';
+    const rate=getProjRate(p);
+    const budget=getProjBudget(p);
+    const bTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*rate,0);
+    const bExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+    const billed=bTime+bExp;
+    const budgetMax=budget.max||0;
+    const pct=budgetMax>0?Math.min(100,(billed/budgetMax)*100):0;
+    const barColor=pct>=100?'var(--danger)':pct>=80?'var(--warning)':'var(--success)';
 
     // Upcoming milestones within 1 month
     const upcoming=(p.milestones||[]).filter(m=>!m.completed&&m.date&&m.date>=today()&&m.date<=oneMonthStr).sort((a,b)=>a.date.localeCompare(b.date));
@@ -1225,8 +1243,8 @@ function renderDashBudgets(){
     // Tasks assigned to me
     const myTasks=(p.tasks||[]).filter(t=>t.status!=='done'&&(t.assigneeId===myId||(t.assigneeIds||[]).includes(myId)));
 
-    // Timeline (phases only, no contract dates on axis)
-    const timeline=renderMiniGantt(p);
+    // Timeline
+    const timeline=renderMiniGantt(p,{compressed:_ganttCompressed[p.id]!==false});
 
     return`<div class="card" style="margin-bottom:1rem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
@@ -1235,10 +1253,18 @@ function renderDashBudgets(){
           ${clientName?`<div style="font-size:12px;color:var(--text2);margin-top:2px">${clientName}</div>`:''}
         </div>
         <div style="text-align:right;font-size:12px;color:var(--text2)">
-          ${p.startDate?`<div>Contract start: <strong>${fmtDate(p.startDate)}</strong></div>`:''}
-          ${p.endDate?`<div>Contract end: <strong>${fmtDate(p.endDate)}</strong></div>`:''}
+          ${p.startDate?`<div>Start: <strong>${fmtDate(p.startDate)}</strong></div>`:''}
+          ${p.endDate?`<div>End: <strong>${fmtDate(p.endDate)}</strong></div>`:''}
         </div>
       </div>
+      <!-- Budget row -->
+      <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--text2);margin-bottom:6px">
+        ${p.rate?`<span><i class="ti ti-coin" style="font-size:12px"></i> ${$f(parseFloat(p.rate))}/hr</span>`:''}
+        ${budget.display?`<span><i class="ti ti-chart-bar" style="font-size:12px"></i> Budget: ${budget.display}</span>`:''}
+        <span><i class="ti ti-receipt" style="font-size:12px"></i> Billed: <strong style="color:var(--text)">${$f(billed)}</strong>${budgetMax>0?` / ${$f(budgetMax)}`:''}</span>
+        ${budgetMax>0?`<span style="color:${barColor}">${pct.toFixed(0)}% used</span>`:''}
+      </div>
+      ${budgetMax>0?`<div class="gauge-bar" style="height:5px;margin-bottom:8px"><div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${barColor}"></div></div>`:''}
       ${timeline}
       ${upcoming.length?`<div style="margin-top:10px;padding-top:8px;border-top:.5px solid var(--border)">
         <div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Upcoming milestones</div>
@@ -1586,6 +1612,7 @@ function renderProjectList(){
 function renderProjectEditForm(p){
   const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===p.clientId?' selected':''}>${clientLabel(c)}</option>`).join('');
   const statusOpts=['active','on_hold','completed'].map(s=>`<option value="${s}"${s===p.status?' selected':''}>${s==='on_hold'?'On Hold':s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('');
+  const isRange=p.budgetType==='range'&&p.budgetMax;
   return`<div class="edit-form" style="margin-top:12px">
     <div class="grid3">
       <div><label>Project #</label><input type="text" id="ep-num-${p.id}" value="${p.num||''}"></div>
@@ -1598,6 +1625,25 @@ function renderProjectEditForm(p){
     <div class="grid2">
       <div><label>Contract start date</label><input type="date" id="ep-start-${p.id}" value="${p.startDate||''}"></div>
       <div><label>Contract end date</label><input type="date" id="ep-end-${p.id}" value="${p.endDate||''}"></div>
+    </div>
+    <div class="grid2">
+      <div><label>Duration (optional)</label><input type="text" id="ep-dur-${p.id}" value="${p.duration||''}" placeholder="e.g. 3 months"></div>
+      <div><label>Hourly rate ($/hr)</label><input type="number" id="ep-rate-${p.id}" value="${p.rate||''}" min="0" step="5" placeholder="Use default"></div>
+    </div>
+    <div class="grid2">
+      <div>
+        <label>Budget</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="ep-budget-type-${p.id}" onchange="(function(){const r=document.getElementById('ep-budget-type-${p.id}').value==='range';document.getElementById('ep-budgetmax-${p.id}').style.display=r?'block':'none';document.getElementById('ep-budgetsep-${p.id}').style.display=r?'inline':'none';})()" style="width:auto;font-size:13px">
+            <option value="fixed"${!isRange?' selected':''}>Fixed</option>
+            <option value="range"${isRange?' selected':''}>Range</option>
+          </select>
+          <input type="number" id="ep-budget-${p.id}" value="${p.budget||''}" min="0" step="100" placeholder="${isRange?'Min':'Amount'}" style="flex:1">
+          <span id="ep-budgetsep-${p.id}" style="display:${isRange?'inline':'none'};color:var(--text2)">–</span>
+          <input type="number" id="ep-budgetmax-${p.id}" value="${p.budgetMax||''}" min="0" step="100" placeholder="Max" style="flex:1;display:${isRange?'block':'none'}">
+        </div>
+      </div>
+      <div></div>
     </div>
     <div class="grid2" style="margin-bottom:8px">
       <label class="check-label"><input type="checkbox" id="ep-ret-on-${p.id}" ${p.retainerOn?'checked':''} onchange="document.getElementById('ep-ret-fields-${p.id}').style.display=this.checked?'grid':'none'"> Has retainer</label>
@@ -1627,6 +1673,12 @@ function saveProjectEdit(id){
   p.status=document.getElementById(`ep-status-${id}`).value;
   p.startDate=document.getElementById(`ep-start-${id}`).value;
   p.endDate=document.getElementById(`ep-end-${id}`).value;
+  p.duration=document.getElementById(`ep-dur-${id}`)?.value.trim()||'';
+  p.rate=document.getElementById(`ep-rate-${id}`)?.value||'';
+  const btype=document.getElementById(`ep-budget-type-${id}`)?.value||'fixed';
+  p.budgetType=btype;
+  p.budget=document.getElementById(`ep-budget-${id}`)?.value||'';
+  p.budgetMax=btype==='range'?document.getElementById(`ep-budgetmax-${id}`)?.value||'':'';
   p.retainerOn=document.getElementById(`ep-ret-on-${id}`).checked;
   p.retainerPaid=document.getElementById(`ep-ret-paid-${id}`).checked;
   p.retainerAmt=document.getElementById(`ep-ret-amt-${id}`).value;
@@ -2388,14 +2440,15 @@ function renderMiniGantt(p, opts={}){
 
   // Grid lines (in vw coords)
   const grid=monthLabels.map(m=>`<line x1="${vx(m.pct)}" y1="${headerH}" x2="${vx(m.pct)}" y2="${H-labelH}" stroke="var(--border)" stroke-width="1"/>`).join('');
-  const gridLabels=monthLabels.map(m=>`<text x="${vx(m.pct)+3}" y="${H-2}" font-size="10" fill="var(--text3)" font-family="-apple-system,sans-serif">${m.label}</text>`).join('');
+  // Month labels: vertically centered in the label strip
+  const labelMidY=H-labelH/2+3;
+  const gridLabels=monthLabels.map(m=>`<text x="${vx(m.pct)+4}" y="${labelMidY}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif" dominant-baseline="middle">${m.label}</text>`).join('');
 
-  // Today pill above the chart
+  // TODAY: dashed line + red text above, no background pill
   const tvx=vx(todayPct);
   const todayLine=todayInRange?`
-    <line x1="${tvx}" y1="${headerH}" x2="${tvx}" y2="${H-labelH}" stroke="#a32d2d" stroke-width="2" stroke-dasharray="5,4"/>
-    <rect x="${tvx-22}" y="${headerH-18}" width="44" height="15" fill="#a32d2d" rx="4"/>
-    <text x="${tvx}" y="${headerH-7}" font-size="9" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" font-weight="600">TODAY</text>
+    <line x1="${tvx}" y1="${headerH}" x2="${tvx}" y2="${H-labelH}" stroke="#a32d2d" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="${tvx}" y="${headerH-4}" font-size="9" fill="#a32d2d" font-family="-apple-system,sans-serif" text-anchor="middle" font-weight="600">TODAY</text>
   `:'';
 
   // Rebuild svgRows with absolute vx coords
@@ -2413,22 +2466,20 @@ function renderMiniGantt(p, opts={}){
       // Phase label — bw in vw units, ~1000 wide; 10px font ≈ 6 units per char
       const maxChars=Math.floor((bw-8)/6.5);
       if(maxChars>=3){
-        const label=maxChars>=ph.title.length?ph.title:ph.title.slice(0,maxChars-1)+'…';
-        svgRowsVW+=`<text x="${x1+bw/2}" y="${phY+rowH/2+4}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle">${esc(label)}</text>`;
+        const label=maxChars>=ph.title.length?ph.title:ph.title.slice(0,maxChars-1)+'...';
+        svgRowsVW+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle">${esc(label)}</text>`;
       }
     }
     if(i<phases.length-1)svgRowsVW+=`<line x1="0" y1="${phY+rowH}" x2="${VW}" y2="${phY+rowH}" stroke="var(--border)" stroke-width="0.5"/>`;
 
-    // Milestones on this row
+    // Milestone diamonds: small (r=4), grey (#888)
     (msByRow[i]||[]).forEach(ms=>{
       const mp=pctOf(ms.date);
       if(mp<0||mp>100)return;
       const mx=vx(mp);
-      const mc=ms.completed?'#1d9e75':new Date(ms.date+'T12:00:00')<new Date()?'#a32d2d':'#9151a0';
       const cy=phY+rowH/2;
-      const r=7;
-      // Diamond: rotate rect 45°
-      svgRowsVW+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="${mc}" transform="rotate(45,${mx},${cy})" rx="1"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
+      const r=4;
+      svgRowsVW+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="#888" transform="rotate(45,${mx},${cy})"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
     });
   });
 
@@ -2438,9 +2489,8 @@ function renderMiniGantt(p, opts={}){
     milestones.forEach(ms=>{
       const mp=pctOf(ms.date);if(mp<0||mp>100)return;
       const mx=vx(mp);
-      const mc=ms.completed?'#1d9e75':new Date(ms.date+'T12:00:00')<new Date()?'#a32d2d':'#9151a0';
-      const r=7;
-      svgRowsVW+=`<rect x="${mx-r}" y="${msY-r}" width="${r*2}" height="${r*2}" fill="${mc}" transform="rotate(45,${mx},${msY})" rx="1"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
+      const r=4;
+      svgRowsVW+=`<rect x="${mx-r}" y="${msY-r}" width="${r*2}" height="${msY-r}" fill="#888" transform="rotate(45,${mx},${msY})"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
     });
   }
 
@@ -3335,98 +3385,4 @@ function timerReset(){
   timerStart_=0;timerAccum=0;timerPaused=false;
   document.getElementById('timer-display').textContent='0:00:00';
   document.getElementById('timer-task-label').textContent='';
-  document.getElementById('btn-start').style.display='inline-flex';
-  document.getElementById('btn-pause').style.display='none';
-  document.getElementById('btn-resume').style.display='none';
-  document.getElementById('btn-stop').style.display='none';
-  document.getElementById('btn-discard').style.display='none';
-  document.getElementById('timer-card').classList.remove('timer-running');
-}
-
-// ═══════════════════════════════════════════════
-//  TASK DRAG-TO-PHASE + UNDO
-// ═══════════════════════════════════════════════
-let _dragTaskId=null,_dragProjId=null;
-const _undoStack=[];
-const MAX_UNDO=30;
-
-function pushUndo(description,undoFn){
-  _undoStack.push({description,undoFn});
-  if(_undoStack.length>MAX_UNDO)_undoStack.shift();
-}
-
-function taskDragStart(e,projId,taskId){
-  _dragTaskId=taskId;_dragProjId=projId;
-  e.dataTransfer.effectAllowed='move';
-  e.dataTransfer.setData('text/plain',taskId);
-}
-
-function taskDropOnPhase(e,projId,phaseId){
-  e.preventDefault();e.stopPropagation();
-  e.currentTarget.style.outline='';
-  if(!_dragTaskId||_dragProjId!==projId)return;
-  const p=projects.find(x=>x.id===projId);if(!p)return;
-  const t=(p.tasks||[]).find(x=>x.id===_dragTaskId);if(!t)return;
-  const prevPhaseId=t.phaseId||'';
-  pushUndo(`Move task "${t.title}" to phase`,()=>{t.phaseId=prevPhaseId;save('tracker:projects',projects);renderProjectList();});
-  t.phaseId=phaseId;
-  save('tracker:projects',projects);
-  renderProjectList();
-  _dragTaskId=null;_dragProjId=null;
-}
-
-function taskDropOnTask(e,projId,targetTaskId){
-  e.preventDefault();e.stopPropagation();
-  e.currentTarget.style.outline='';
-  if(!_dragTaskId||_dragProjId!==projId||_dragTaskId===targetTaskId)return;
-  const p=projects.find(x=>x.id===projId);if(!p)return;
-  const tasks=p.tasks||[];
-  const srcIdx=tasks.findIndex(x=>x.id===_dragTaskId);
-  const tgtIdx=tasks.findIndex(x=>x.id===targetTaskId);
-  if(srcIdx<0||tgtIdx<0)return;
-  const prevOrder=[...tasks.map(t=>t.id)];
-  const [moved]=tasks.splice(srcIdx,1);
-  // Also copy phase from target
-  moved.phaseId=tasks[tgtIdx<srcIdx?tgtIdx:tgtIdx-1]?.phaseId||moved.phaseId;
-  tasks.splice(tgtIdx<srcIdx?tgtIdx:tgtIdx,0,moved);
-  pushUndo(`Reorder task "${moved.title}"`,()=>{
-    const reordered=prevOrder.map(id=>tasks.find(t=>t.id===id)).filter(Boolean);
-    p.tasks=reordered;save('tracker:projects',projects);renderProjectList();
-  });
-  p.tasks=tasks;
-  save('tracker:projects',projects);
-  renderProjectList();
-  _dragTaskId=null;_dragProjId=null;
-}
-
-// Ctrl+Z undo
-document.addEventListener('keydown',e=>{
-  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.shiftKey){
-    if(_undoStack.length){
-      const action=_undoStack.pop();
-      action.undoFn();
-      setSyncUI('idle',`Undid: ${action.description}`);
-    }
-    e.preventDefault();
-  }
-});
-window.gapiLoaded=gapiLoaded;
-allDropdownRefresh();
-refreshAll();
-
-// Report content height to parent so Squarespace iframe resizes to fit
-(function initHeightReporter(){
-  function reportHeight(){
-    const h=document.documentElement.scrollHeight;
-    if(window.parent!==window){
-      window.parent.postMessage({type:'tracker_height',height:h},'*');
-    }
-  }
-  // Report on load, tab switches, and any DOM size changes
-  reportHeight();
-  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setTimeout(reportHeight,50)));
-  new ResizeObserver(reportHeight).observe(document.getElementById('app'));
-})();
-</script>
-</body>
-</html>
+  document.getElementById('btn-start').style.dis
