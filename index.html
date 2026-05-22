@@ -1089,9 +1089,10 @@ function addExtraContactRow(containerId, data={}){
   row.className='add-contact-row';
   row.innerHTML=`
     <div class="field"><label>Name</label><input type="text" class="ec-name" value="${data.name||''}" placeholder="Alex Jones"></div>
+    <div class="field"><label>Suffix</label><input type="text" class="ec-suffix" value="${data.suffix||''}" placeholder="Jr., AIA" style="width:90px"></div>
     <div class="field"><label>Role / title</label><input type="text" class="ec-role" value="${data.role||''}" placeholder="Designer"></div>
     <div class="field"><label>Email</label><input type="email" class="ec-email" value="${data.email||''}" placeholder="alex@co.com"></div>
-    <div class="field"><label>Phone</label><input type="tel" class="ec-phone" value="${data.phone||''}" placeholder="+1 (555) 000"></div>
+    <div class="field"><label>Phone</label><input type="tel" class="ec-phone" value="${data.phone||''}" placeholder="(555) 000-0000" oninput="formatPhone(this)"></div>
     <button class="icon-action danger" onclick="this.parentNode.remove()" style="margin-top:18px;flex-shrink:0"><i class="ti ti-x"></i></button>`;
   wrap.appendChild(row);
 }
@@ -1100,6 +1101,7 @@ function getExtraContacts(containerId){
   const rows=document.getElementById(containerId).querySelectorAll('.add-contact-row');
   return Array.from(rows).map(r=>({
     name:r.querySelector('.ec-name').value.trim(),
+    suffix:r.querySelector('.ec-suffix')?.value.trim()||'',
     role:r.querySelector('.ec-role')?.value.trim()||'',
     email:r.querySelector('.ec-email').value.trim(),
     phone:r.querySelector('.ec-phone').value.trim()
@@ -1203,43 +1205,56 @@ function renderDashBudgets(){
   const el=document.getElementById('dash-project-budgets');
   const active=projects.filter(p=>p.status==='active');
   if(!active.length){
-    el.innerHTML='<div class="card" style="font-size:13px;color:var(--text2)">No active projects yet. Add a project to see budget tracking here.</div>';
+    el.innerHTML='<div class="card" style="font-size:13px;color:var(--text2)">No active projects yet.</div>';
     return;
   }
+  const oneMonthOut=new Date();oneMonthOut.setMonth(oneMonthOut.getMonth()+1);
+  const oneMonthStr=oneMonthOut.toISOString().split('T')[0];
+  const myId='__me__';
+
   el.innerHTML=active.map(p=>{
-    const rate=getProjRate(p);
-    const bTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*rate,0);
-    const bExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
-    const billed=bTime+bExp;
-    const budget=getProjBudget(p);
-    const retainer=p.retainerOn?parseFloat(p.retainerAmt||0):0;
-    const retainerInBudget=p.retainerOn&&p.retainerInBudget;
-    const budgetMax=budget.max||0;
-    const budgetMin=budget.min||0;
-    const pct=budgetMax>0?Math.min(100,(billed/budgetMax)*100):0;
-    const minPct=budget.isRange&&budgetMax>0?Math.min(100,(budgetMin/budgetMax)*100):0;
-    const retPct=retainerInBudget&&budgetMax>0?Math.min(100,(retainer/budgetMax)*100):0;
-    const remaining=budgetMax>0?budgetMax-billed:null;
-    const color=pct>=100?'var(--danger)':pct>=80?'var(--warning)':'var(--success)';
     const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
-    const clientLabel=client?(client.company||client.contactName):'';
-    return`<div class="card gauge-wrap">
+    const clientName=client?client.company:'';
+
+    // Upcoming milestones within 1 month
+    const upcoming=(p.milestones||[]).filter(m=>!m.completed&&m.date&&m.date>=today()&&m.date<=oneMonthStr).sort((a,b)=>a.date.localeCompare(b.date));
+
+    // Tasks assigned to me
+    const myTasks=(p.tasks||[]).filter(t=>t.status!=='done'&&(t.assigneeId===myId||(t.assigneeIds||[]).includes(myId)));
+
+    // Timeline (phases only, no contract dates on axis)
+    const timeline=renderMiniGantt(p);
+
+    return`<div class="card" style="margin-bottom:1rem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div>
-          <span style="font-size:14px;font-weight:500">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} -- </span>`:''}${p.name}</span>
-          ${clientLabel?`<span style="font-size:12px;color:var(--text2);margin-left:6px">. ${clientLabel}</span>`:''}
+          <div style="font-size:15px;font-weight:600">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} — </span>`:''}${p.name}</div>
+          ${clientName?`<div style="font-size:12px;color:var(--text2);margin-top:2px">${clientName}</div>`:''}
         </div>
-        <span style="font-size:13px;font-weight:500;white-space:nowrap">${$f(billed)}${budgetMax?' / '+budget.display:''}</span>
+        <div style="text-align:right;font-size:12px;color:var(--text2)">
+          ${p.startDate?`<div>Contract start: <strong>${fmtDate(p.startDate)}</strong></div>`:''}
+          ${p.endDate?`<div>Contract end: <strong>${fmtDate(p.endDate)}</strong></div>`:''}
+        </div>
       </div>
-      ${budgetMax>0?`<div class="gauge-bar">
-        <div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
-        ${retainerInBudget&&retPct>0?`<div class="gauge-mark" style="width:${retPct.toFixed(1)}%"></div>`:''}
-        ${budget.isRange&&minPct>0?`<div class="gauge-mark" style="width:${minPct.toFixed(1)}%;border-color:rgba(255,200,0,.8)"></div>`:''}
-      </div>
-      <div class="gauge-row">
-        <span>${pct.toFixed(0)}% used${p.retainerOn?` . Retainer ${$f(retainer)}${retainerInBudget?' (in budget)':''}${p.retainerPaid?' ✓':''}`:''}</span>
-        ${remaining!==null?`<span style="color:${remaining<0?'var(--danger)':'var(--text2)'}">${remaining<0?$f(Math.abs(remaining))+' over':$f(remaining)+' remaining'}</span>`:''}
-      </div>`:'<div style="font-size:12px;color:var(--text3)">No budget set . '+$f(billed)+' billed</div>'}
+      ${timeline}
+      ${upcoming.length?`<div style="margin-top:10px;padding-top:8px;border-top:.5px solid var(--border)">
+        <div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Upcoming milestones</div>
+        ${upcoming.map(m=>`<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0">
+          <i class="ti ti-flag-2" style="color:var(--accent);font-size:13px"></i>
+          <span style="flex:1">${m.title}</span>
+          <span style="color:var(--text2)">${fmtDate(m.date)}</span>
+        </div>`).join('')}
+      </div>`:''}
+      ${myTasks.length?`<div style="margin-top:10px;padding-top:8px;border-top:.5px solid var(--border)">
+        <div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">My tasks</div>
+        ${myTasks.slice(0,5).map(t=>`<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0">
+          <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
+          ${t.taskType==='critical'?'<span class="phase-label phase-critical" style="font-size:10px">Critical</span>':''}
+          <span style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1">${t.title}</span>
+          ${t.dueDate?`<span style="color:var(--text2)">${fmtDate(t.dueDate)}</span>`:''}
+        </div>`).join('')}
+        ${myTasks.length>5?`<div style="font-size:11px;color:var(--text3);margin-top:2px">+${myTasks.length-5} more</div>`:''}
+      </div>`:''}
     </div>`;
   }).join('');
 }
@@ -1358,19 +1373,23 @@ function renderTimeList(){
 }
 
 function renderTimeEditForm(e){
-  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' -- '+c.contactName:c.company||c.contactName}</option>`).join('');
+  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${clientLabel(c)}</option>`).join('');
   const projOpts=projects.map(p=>`<option value="${p.id}"${p.id===e.projectId?' selected':''}>${p.name}</option>`).join('');
+  const assigneeOpts=[{id:'__me__',name:myProfile.name||'Me'},...teamMembers].map(m=>`<option value="${m.id}"${m.id===e.assigneeId?' selected':''}>${m.name}</option>`).join('');
   return`<div class="edit-form">
     <div class="grid2">
       <div><label>Date</label><input type="date" id="et-date-${e.id}" value="${e.date}"></div>
       <div><label>Hours</label><input type="number" id="et-hours-${e.id}" value="${e.hours}" min=".25" step=".25"></div>
     </div>
     <div class="grid2">
+      <div><label>Project</label><select id="et-project-${e.id}" onchange="etAutoFillClient('${e.id}')"><option value="">-- No project --</option>${projOpts}</select></div>
       <div><label>Client</label><select id="et-client-${e.id}"><option value="">-- No client --</option>${clientOpts}</select></div>
-      <div><label>Project</label><select id="et-project-${e.id}"><option value="">-- No project --</option>${projOpts}</select></div>
     </div>
-    <div class="field"><label>Task</label><input type="text" id="et-task-${e.id}" value="${e.task}"></div>
-    <div class="field"><label>Notes</label><input type="text" id="et-notes-${e.id}" value="${e.notes||''}"></div>
+    <div class="grid2">
+      <div><label>Assignee</label><select id="et-assignee-${e.id}"><option value="">-- Me / unassigned --</option>${assigneeOpts}</select></div>
+      <div><label>Task / description</label><input type="text" id="et-task-${e.id}" value="${e.task}"></div>
+    </div>
+    <div class="field"><label>Notes (optional)</label><input type="text" id="et-notes-${e.id}" value="${e.notes||''}"></div>
     <div class="edit-actions">
       <label class="check-label"><input type="checkbox" id="et-bill-${e.id}" ${e.billable?'checked':''}> Billable</label>
       <div style="display:flex;gap:8px">
@@ -1381,12 +1400,22 @@ function renderTimeEditForm(e){
   </div>`;
 }
 
+function etAutoFillClient(entryId){
+  const pid=document.getElementById(`et-project-${entryId}`).value;
+  if(!pid)return;
+  const proj=projects.find(p=>p.id===pid);
+  if(!proj||!proj.clientId)return;
+  const sel=document.getElementById(`et-client-${entryId}`);
+  if(sel)sel.value=proj.clientId;
+}
+
 function saveTimeEdit(id){
   const e=timeEntries.find(x=>x.id===id);if(!e)return;
   e.date=document.getElementById(`et-date-${id}`).value;
   e.hours=parseFloat(document.getElementById(`et-hours-${id}`).value)||0;
-  e.clientId=document.getElementById(`et-client-${id}`).value||'';
   e.projectId=document.getElementById(`et-project-${id}`).value||'';
+  e.clientId=document.getElementById(`et-client-${id}`).value||'';
+  e.assigneeId=document.getElementById(`et-assignee-${id}`)?.value||'';
   e.task=document.getElementById(`et-task-${id}`).value.trim();
   e.notes=document.getElementById(`et-notes-${id}`).value.trim();
   e.billable=document.getElementById(`et-bill-${id}`).checked;
@@ -1558,9 +1587,8 @@ function renderProjectList(){
 }
 
 function renderProjectEditForm(p){
-  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===p.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' -- '+c.contactName:c.company||c.contactName}</option>`).join('');
+  const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===p.clientId?' selected':''}>${clientLabel(c)}</option>`).join('');
   const statusOpts=['active','on_hold','completed'].map(s=>`<option value="${s}"${s===p.status?' selected':''}>${s==='on_hold'?'On Hold':s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('');
-  const endType=p.endDateType||'none';
   return`<div class="edit-form" style="margin-top:12px">
     <div class="grid3">
       <div><label>Project #</label><input type="text" id="ep-num-${p.id}" value="${p.num||''}"></div>
@@ -1571,12 +1599,8 @@ function renderProjectEditForm(p){
       <div><label>Status</label><select id="ep-status-${p.id}">${statusOpts}</select></div>
     </div>
     <div class="grid2">
-      <div><label>Start date</label><input type="date" id="ep-start-${p.id}" value="${p.startDate||''}"></div>
-      <div><label>Hourly rate ($/hr)</label><input type="number" id="ep-rate-${p.id}" value="${p.rate||''}" min="0" step="5" placeholder="Use default"></div>
-    </div>
-    <div class="grid2">
-      <div><label>Budget (min / fixed)</label><input type="number" id="ep-budget-${p.id}" value="${p.budget||''}" min="0" step="100"></div>
-      <div><label>Budget max (range)</label><input type="number" id="ep-budgetmax-${p.id}" value="${p.budgetMax||''}" min="0" step="100" placeholder="Leave blank if fixed"></div>
+      <div><label>Contract start date</label><input type="date" id="ep-start-${p.id}" value="${p.startDate||''}"></div>
+      <div><label>Contract end date</label><input type="date" id="ep-end-${p.id}" value="${p.endDate||''}"></div>
     </div>
     <div class="grid2" style="margin-bottom:8px">
       <label class="check-label"><input type="checkbox" id="ep-ret-on-${p.id}" ${p.retainerOn?'checked':''} onchange="document.getElementById('ep-ret-fields-${p.id}').style.display=this.checked?'grid':'none'"> Has retainer</label>
@@ -1605,10 +1629,7 @@ function saveProjectEdit(id){
   p.clientId=document.getElementById(`ep-client-${id}`).value||'';
   p.status=document.getElementById(`ep-status-${id}`).value;
   p.startDate=document.getElementById(`ep-start-${id}`).value;
-  p.rate=document.getElementById(`ep-rate-${id}`).value;
-  p.budget=document.getElementById(`ep-budget-${id}`).value;
-  const bmax=document.getElementById(`ep-budgetmax-${id}`).value;
-  p.budgetMax=bmax;p.budgetType=bmax?'range':'fixed';
+  p.endDate=document.getElementById(`ep-end-${id}`).value;
   p.retainerOn=document.getElementById(`ep-ret-on-${id}`).checked;
   p.retainerPaid=document.getElementById(`ep-ret-paid-${id}`).checked;
   p.retainerAmt=document.getElementById(`ep-ret-amt-${id}`).value;
@@ -1787,33 +1808,46 @@ function saveInvEdit(cid,iid){
 }
 
 function renderClientEditForm(c){
-  const clientOpts=clients.map(x=>x.id!==c.id?`<option value="${x.id}">${x.company||x.contactName}</option>`:'').join('');
-  const extraContactsHtml=(c.additionalContacts||[]).map((ac,i)=>`<div class="add-contact-row">
+  const pc=c.primaryContact||{};
+  const extraContactsHtml=(c.additionalContacts||[]).map(ac=>`<div class="add-contact-row">
     <div class="field"><label>Name</label><input type="text" class="ec-name" value="${ac.name||''}"></div>
+    <div class="field"><label>Suffix</label><input type="text" class="ec-suffix" value="${ac.suffix||''}" placeholder="Jr., AIA" style="width:90px"></div>
+    <div class="field"><label>Role / title</label><input type="text" class="ec-role" value="${ac.role||''}"></div>
     <div class="field"><label>Email</label><input type="email" class="ec-email" value="${ac.email||''}"></div>
-    <div class="field"><label>Phone</label><input type="tel" class="ec-phone" value="${ac.phone||''}"></div>
+    <div class="field"><label>Phone</label><input type="tel" class="ec-phone" value="${ac.phone||''}" oninput="formatPhone(this)"></div>
     <button class="icon-action danger" onclick="this.parentNode.remove()" style="margin-top:18px;flex-shrink:0"><i class="ti ti-x"></i></button>
   </div>`).join('');
   return`<div class="edit-form" style="margin-top:12px">
+    <!-- Company info with photo -->
     <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
       <div style="flex-shrink:0;text-align:center">
-        <div id="ep-photo-prev-${c.id}" class="client-avatar" onclick="document.getElementById('ep-photo-inp-${c.id}').click()" style="width:54px;height:54px;font-size:18px;cursor:pointer">${c.photo?`<img src="${c.photo}">`:`<i class="ti ti-camera" style="font-size:20px;color:var(--text3)"></i>`}</div>
+        <div id="ep-photo-prev-${c.id}" class="client-avatar" onclick="document.getElementById('ep-photo-inp-${c.id}').click()" title="Company logo / photo" style="width:54px;height:54px;font-size:18px;cursor:pointer">${c.photo?`<img src="${c.photo}">`:`<i class="ti ti-camera" style="font-size:18px;color:var(--text3)"></i>`}</div>
         <input type="file" id="ep-photo-inp-${c.id}" accept="image/*" style="display:none" onchange="previewClientPhoto(this,'ep-photo-prev-${c.id}','ep-photo-data-${c.id}')">
         <input type="hidden" id="ep-photo-data-${c.id}" value="${c.photo||''}">
-        <div style="font-size:10px;color:var(--text3);margin-top:3px">Photo</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">Logo</div>
       </div>
       <div style="flex:1">
-        <div class="grid2">
-          <div class="field"><label>Company</label><input type="text" id="ec-company-${c.id}" value="${c.company||''}"></div>
-          <div class="field"><label>Contact name</label><input type="text" id="ec-name-${c.id}" value="${c.contactName||''}"></div>
+        <div class="grid2" style="margin-bottom:8px">
+          <div class="field"><label>Company name</label><input type="text" id="ec-company-${c.id}" value="${c.company||''}"></div>
+          <div class="field"><label>Website</label><input type="text" id="ec-website-${c.id}" value="${c.website||''}"></div>
         </div>
-        <div class="grid2">
-          <div class="field"><label>Email</label><input type="email" id="ec-email-${c.id}" value="${c.email||''}"></div>
-          <div class="field"><label>Phone</label><input type="tel" id="ec-phone-${c.id}" value="${c.phone||''}"></div>
-        </div>
+        <div class="field"><label>Industry / notes</label><input type="text" id="ec-notes-${c.id}" value="${c.notes||''}"></div>
       </div>
     </div>
-    <div class="field"><label>Notes</label><input type="text" id="ec-notes-${c.id}" value="${c.notes||''}"></div>
+    <!-- Primary contact -->
+    <div class="sec-title" style="margin-top:4px">Primary contact</div>
+    <div class="grid2">
+      <div class="field"><label>Full name</label><input type="text" id="ec-name-${c.id}" value="${pc.name||''}"></div>
+      <div class="grid2" style="margin-bottom:0">
+        <div class="field"><label>Suffix</label><input type="text" id="ec-suffix-${c.id}" value="${pc.suffix||''}" placeholder="Jr., PhD, AIA"></div>
+        <div class="field"><label>Role / title</label><input type="text" id="ec-role-${c.id}" value="${pc.role||''}"></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Email</label><input type="email" id="ec-email-${c.id}" value="${pc.email||''}"></div>
+      <div class="field"><label>Phone</label><input type="tel" id="ec-phone-${c.id}" value="${pc.phone||''}" oninput="formatPhone(this)"></div>
+    </div>
+    <!-- Additional contacts -->
     <div class="sec-title" style="margin-top:4px">Additional contacts</div>
     <div id="ec-extra-${c.id}">${extraContactsHtml}</div>
     <button class="btn sm" onclick="addExtraContactRow('ec-extra-${c.id}')" style="margin-bottom:10px"><i class="ti ti-plus"></i> Add contact</button>
@@ -1829,13 +1863,19 @@ function renderClientEditForm(c){
 
 function saveClientEdit(id){
   const c=clients.find(x=>x.id===id);if(!c)return;
-  const newPhoto=document.getElementById(`ep-photo-data-${id}`).value;
-  c.photo=newPhoto||c.photo||'';
+  c.photo=document.getElementById(`ep-photo-data-${id}`).value||c.photo||'';
   c.company=document.getElementById(`ec-company-${id}`).value.trim();
-  c.contactName=document.getElementById(`ec-name-${id}`).value.trim();
-  c.email=document.getElementById(`ec-email-${id}`).value.trim();
-  c.phone=document.getElementById(`ec-phone-${id}`).value.trim();
+  c.website=document.getElementById(`ec-website-${id}`)?.value.trim()||'';
   c.notes=document.getElementById(`ec-notes-${id}`).value.trim();
+  c.primaryContact={
+    name:document.getElementById(`ec-name-${id}`).value.trim(),
+    suffix:document.getElementById(`ec-suffix-${id}`)?.value.trim()||'',
+    role:document.getElementById(`ec-role-${id}`)?.value.trim()||'',
+    email:document.getElementById(`ec-email-${id}`).value.trim(),
+    phone:document.getElementById(`ec-phone-${id}`).value.trim(),
+  };
+  // Keep backward compat
+  c.contactName=c.primaryContact.name;
   c.additionalContacts=getExtraContacts(`ec-extra-${id}`);
   save('tracker:clients',clients);
   editing.clients=null;
@@ -2096,45 +2136,57 @@ function refreshTimeAssigneeDropdown(){
 function renderTeamList(){
   const el=document.getElementById('team-list');
   if(!teamMembers.length){el.innerHTML='<div class="empty">No team members yet.</div>';return;}
-  el.innerHTML=teamMembers.map(m=>{
-    const isEditing=editing.team===m.id;
-    const isInternal=m.type==='internal';
-    const totalHours=timeEntries.filter(e=>e.assigneeId===m.id).reduce((s,e)=>s+parseFloat(e.hours||0),0);
-    const linkedClient=m.clientLink?clients.find(c=>c.id===m.clientLink):null;
-    const assignedProjs=projects.filter(p=>(p.teamIds||[]).includes(m.id));
-    const avatar=m.photo?`<img src="${m.photo}" alt="photo">`:`<span>${initials(m.contactName||m.name)}</span>`;
-    return`<div class="card" style="margin-bottom:10px;padding:1rem">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div style="display:flex;gap:12px;align-items:center">
-          <div style="width:42px;height:42px;border-radius:50%;background:${m.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;overflow:hidden;border:2px solid ${m.color||'var(--accent)'}">
-            ${m.photo?`<img src="${m.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:(m.name||'?').charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <div style="font-weight:500;font-size:14px">${m.name}</div>
-            <div style="font-size:12px;color:var(--text2);margin-top:1px">
-              ${m.role||''}${m.company?' . '+m.company:''}${m.email?' . <a href="mailto:'+m.email+'" style="color:var(--accent)">'+m.email+'</a>':''}${m.phone?' . '+m.phone:''}${isInternal&&m.rate?' . '+$f(m.rate)+'/hr':''}
+
+  // Group by company (or "Independent" if none)
+  const groups={};
+  teamMembers.forEach(m=>{
+    const key=m.company||'Independent / No company';
+    if(!groups[key])groups[key]=[];
+    groups[key].push(m);
+  });
+
+  el.innerHTML=Object.entries(groups).map(([company,members])=>`
+    <div style="margin-bottom:1.25rem">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.09em;margin-bottom:8px;padding-bottom:4px;border-bottom:.5px solid var(--border)">${company}</div>
+      ${members.map(m=>{
+        const isEditing=editing.team===m.id;
+        const isInternal=m.type==='internal';
+        const linkedClient=m.clientLink?clients.find(c=>c.id===m.clientLink):null;
+        const assignedProjs=projects.filter(p=>(p.teamIds||[]).includes(m.id));
+        return`<div class="card" style="margin-bottom:8px;padding:1rem">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="display:flex;gap:12px;align-items:center">
+              <div style="width:38px;height:38px;border-radius:50%;background:${m.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px;flex-shrink:0;overflow:hidden;border:2px solid ${m.color||'var(--accent)'}">
+                ${m.photo?`<img src="${m.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:(m.name||'?').charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div style="font-weight:500;font-size:14px;display:flex;align-items:center;gap:6px">
+                  ${m.name}
+                  <span class="type-badge type-${m.type||'external'}">${isInternal?'Internal':'External'}</span>
+                </div>
+                <div style="font-size:12px;color:var(--text2);margin-top:1px">
+                  ${m.role||''}${m.email?` · <a href="mailto:${m.email}" style="color:var(--accent)">${m.email}</a>`:''}${m.phone?` · ${m.phone}`:''}
+                </div>
+                ${linkedClient||assignedProjs.length?`<div style="font-size:11px;color:var(--text3);margin-top:2px">
+                  ${linkedClient?`Client: ${linkedClient.company||linkedClient.primaryContact?.name}`:''} ${assignedProjs.length?`· ${assignedProjs.map(p=>p.name).join(', ')}`:''}</div>`:''}
+              </div>
             </div>
-            <div style="font-size:11px;color:var(--text3);margin-top:2px">
-              ${totalHours.toFixed(1)}h logged${linkedClient?' . Client: '+(linkedClient.company||linkedClient.contactName):''}
-              ${assignedProjs.length?' . '+assignedProjs.map(p=>p.name).join(', '):''}
+            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+              <div class="toggle-wrap">
+                <span style="font-size:11px;color:${isInternal?'var(--accent)':'var(--text3)'}">${isInternal?'Internal':'External'}</span>
+                <label class="toggle" title="Toggle Internal/External">
+                  <input type="checkbox" ${isInternal?'checked':''} onchange="toggleMemberType('${m.id}')">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <button class="icon-action" onclick="toggleEdit('team','${m.id}')"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
             </div>
           </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-          <!-- Internal/External toggle -->
-          <div class="toggle-wrap">
-            <span style="font-size:11px;color:${isInternal?'var(--accent)':'var(--text3)'}">${isInternal?'Internal':'External'}</span>
-            <label class="toggle" title="Toggle Internal/External">
-              <input type="checkbox" ${isInternal?'checked':''} onchange="toggleMemberType('${m.id}')">
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <button class="icon-action" onclick="toggleEdit('team','${m.id}')"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
-        </div>
-      </div>
-      ${isEditing?renderTeamEditForm(m):''}
-    </div>`;
-  }).join('');
+          ${isEditing?renderTeamEditForm(m):''}
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
 }
 
 function renderTeamEditForm(m){
@@ -2237,27 +2289,41 @@ function deleteTeamMember(id){
 //  MINI GANTT (inline on project card)
 // ═══════════════════════════════════════════════
 function renderMiniGantt(p){
-  if(!p.startDate)return'';
-  const phases=(p.phases||[]).filter(ph=>ph.startDate&&ph.endDate);
-  const milestones=(p.milestones||[]).filter(m=>m.date);
+  const phases=(p.phases||[]).filter(ph=>ph.startDate||ph.endDate).sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
+  const milestones=(p.milestones||[]).filter(m=>m.date).sort((a,b)=>a.date.localeCompare(b.date));
   if(!phases.length&&!milestones.length)return'';
 
-  const start=new Date(p.startDate+'T12:00:00');
-  const endDate=p.endDate?new Date(p.endDate+'T12:00:00'):new Date(start.getFullYear(),start.getMonth()+3,start.getDate());
-  const totalMs=Math.max(1,endDate-start);
-  function pctOf(d){return Math.min(100,Math.max(0,(new Date(d+'T12:00:00')-start)/totalMs*100));}
+  const gId=`mg-${p.id}`;
 
-  // Dynamic height: header(28) + 1 project row(18) + each phase row(18) + milestone row(18) + month labels(16)
-  const rowH=18,headerH=28,labelH=16;
-  const rowCount=1+phases.length+(milestones.length>0?1:0);
+  // Build date range from phases and milestones only (not contract dates)
+  let minD=null,maxD=null;
+  phases.forEach(ph=>{
+    if(ph.startDate){const d=new Date(ph.startDate+'T12:00:00');if(!minD||d<minD)minD=d;}
+    if(ph.endDate){const d=new Date(ph.endDate+'T12:00:00');if(!maxD||d>maxD)maxD=d;}
+  });
+  milestones.forEach(ms=>{
+    const d=new Date(ms.date+'T12:00:00');
+    if(!minD||d<minD)minD=d;
+    if(!maxD||d>maxD)maxD=d;
+  });
+  if(!minD){minD=new Date();maxD=new Date(minD);maxD.setMonth(maxD.getMonth()+3);}
+  if(!maxD||maxD<=minD){maxD=new Date(minD);maxD.setMonth(maxD.getMonth()+1);}
+  // Pad by a bit
+  minD=new Date(minD.getFullYear(),minD.getMonth(),1);
+  maxD=new Date(maxD.getFullYear(),maxD.getMonth()+1,0);
+
+  const totalMs=Math.max(1,maxD-minD);
+  const rowH=22,headerH=20,labelH=14;
+  const rowCount=Math.max(1,phases.length);
   const H=headerH+rowCount*rowH+labelH;
-  const W=680;
 
-  // Month labels
+  function pctOf(d){return Math.min(100,Math.max(0,(new Date(d+'T12:00:00')-minD)/totalMs*100));}
+
+  // Month column labels
   let monthLabels=[];
-  let cur=new Date(start.getFullYear(),start.getMonth(),1);
-  while(cur<=endDate){
-    monthLabels.push({label:cur.toLocaleDateString('en-US',{month:'short'}),pct:pctOf(cur.toISOString().split('T')[0])});
+  let cur=new Date(minD.getFullYear(),minD.getMonth(),1);
+  while(cur<=maxD){
+    monthLabels.push({label:cur.toLocaleDateString('en-US',{month:'short'}),pct:Math.max(0,(cur-minD)/totalMs*100)});
     cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
   }
 
@@ -2265,66 +2331,107 @@ function renderMiniGantt(p){
   const todayPct=pctOf(today());
   const todayInRange=todayPct>=0&&todayPct<=100;
 
-  let rows='';
-  let rowIdx=0;
-
-  // Project bar (row 0)
-  const projY=headerH+rowIdx*rowH;
-  rows+=`<text x="0" y="${projY+13}" font-size="10" fill="var(--text2)" font-family="-apple-system,sans-serif">${p.name.slice(0,20)}</text>`;
-  rows+=`<rect x="${pctOf(p.startDate)}%" y="${projY+3}" width="${pctOf(p.endDate||today())-pctOf(p.startDate)}%" height="${rowH-6}" fill="var(--accent)" opacity="0.2" rx="3"/>`;
-  rowIdx++;
-
-  // Phase bars
-  phases.forEach(ph=>{
-    const phY=headerH+rowIdx*rowH;
-    const x1=pctOf(ph.startDate);
-    const x2=pctOf(ph.endDate);
-    const bw=Math.max(0.5,x2-x1);
-    const col=ph.color||'#4a90d9';
-    rows+=`<text x="0" y="${phY+13}" font-size="10" fill="${col}" font-family="-apple-system,sans-serif">${ph.title.slice(0,18)}</text>`;
-    rows+=`<rect x="${x1}%" y="${phY+3}" width="${bw}%" height="${rowH-6}" fill="${col}" rx="3"/>`;
-    if(bw>8)rows+=`<text x="${(x1+bw/2)}%" y="${phY+14}" font-size="9" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle">${ph.title.slice(0,Math.floor(bw*0.12))}</text>`;
-    rowIdx++;
-  });
-
-  // Milestone row
-  if(milestones.length){
-    const msY=headerH+rowIdx*rowH;
-    rows+=`<text x="0" y="${msY+13}" font-size="10" fill="var(--text2)" font-family="-apple-system,sans-serif">Milestones</text>`;
-    milestones.forEach(ms=>{
-      const mp=pctOf(ms.date);
-      if(mp<0||mp>100)return;
-      const mc=ms.completed?'var(--success)':new Date(ms.date+'T12:00:00')<new Date()?'var(--danger)':'var(--accent)';
-      rows+=`<polygon points="${mp}%,${msY+2} calc(${mp}% + 6px),${msY+rowH/2} ${mp}%,${msY+rowH-2} calc(${mp}% - 6px),${msY+rowH/2}" fill="${mc}" opacity="0.9"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></polygon>`;
+  // Assign each milestone to a phase (whichever phase it falls within, or nearest)
+  function msPhaseIdx(ms){
+    const d=ms.date;
+    // Find phase whose range contains this date
+    for(let i=0;i<phases.length;i++){
+      const ph=phases[i];
+      if(ph.startDate&&ph.endDate&&d>=ph.startDate&&d<=ph.endDate)return i;
+    }
+    // Find nearest phase midpoint
+    if(!phases.length)return -1;
+    let best=0,bestDist=Infinity;
+    phases.forEach((ph,i)=>{
+      const mid=ph.startDate&&ph.endDate?((new Date(ph.startDate+'T12:00:00')+new Date(ph.endDate+'T12:00:00'))/2):null;
+      if(mid){const dist=Math.abs(new Date(d+'T12:00:00')-mid);if(dist<bestDist){bestDist=dist;best=i;}}
     });
-    rowIdx++;
+    return best;
   }
 
-  // Today line
-  const todayLine=todayInRange?`<line x1="${todayPct}%" y1="${headerH}" x2="${todayPct}%" y2="${H-labelH}" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="3,2"/>`:'' ;
+  // Group milestones by phase row index
+  const msByRow={};
+  milestones.forEach(ms=>{
+    const ri=phases.length?msPhaseIdx(ms):0;
+    if(!msByRow[ri])msByRow[ri]=[];
+    msByRow[ri].push(ms);
+  });
+  // Milestones without any phase: put between all rows at middle row
+  if(!phases.length&&milestones.length){msByRow[0]=milestones;}
 
-  // Month grid lines + labels
-  const gridAndLabels=monthLabels.map(m=>`
-    <line x1="${m.pct}%" y1="${headerH}" x2="${m.pct}%" y2="${H-labelH}" stroke="var(--border)" stroke-width="0.5"/>
-    <text x="${m.pct}%" y="${H-3}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif">${m.label}</text>
-  `).join('');
+  let svgRows='';
+  phases.forEach((ph,i)=>{
+    const phY=headerH+i*rowH;
+    const col=ph.color||'#4a90d9';
+    const rowBg=i%2===0?'rgba(0,0,0,0.02)':'transparent';
+    svgRows+=`<rect x="0%" y="${phY}" width="100%" height="${rowH}" fill="${rowBg}"/>`;
+    if(ph.startDate){
+      const x1=pctOf(ph.startDate);
+      const x2=ph.endDate?pctOf(ph.endDate):x1+5;
+      const bw=Math.max(1,x2-x1);
+      svgRows+=`<rect x="${x1}%" y="${phY+3}" width="${bw}%" height="${rowH-6}" fill="${col}" rx="3"/>`;
+      // Smart phase label: estimate char width ~6.5px per char at font-size 10
+      // bar pixel width ≈ bw% of container. We use a rough 580px reference width.
+      const approxPx=bw*5.8; // conservative
+      const maxChars=Math.floor(approxPx/6.5);
+      if(maxChars>=3){
+        const label=maxChars>=ph.title.length?ph.title:ph.title.slice(0,maxChars-1)+'…';
+        svgRows+=`<text x="${x1+bw/2}%" y="${phY+rowH/2+4}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle">${esc(label)}</text>`;
+      }
+    }
+    // Milestones on this row
+    (msByRow[i]||[]).forEach(ms=>{
+      const mp=pctOf(ms.date);
+      if(mp<0||mp>100)return;
+      const mc=ms.completed?'var(--success)':new Date(ms.date+'T12:00:00')<new Date()?'var(--danger)':'#9151a0';
+      const r=6;
+      svgRows+=`<polygon points="${mp}%,${phY+2} calc(${mp}% + ${r}px),${phY+rowH/2} ${mp}%,${phY+rowH-2} calc(${mp}% - ${r}px),${phY+rowH/2}" fill="${mc}"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></polygon>`;
+    });
+    // Row divider
+    if(i<phases.length-1)svgRows+=`<line x1="0%" y1="${phY+rowH}" x2="100%" y2="${phY+rowH}" stroke="var(--border)" stroke-width="0.5"/>`;
+  });
+
+  // Grid lines
+  const grid=monthLabels.map(m=>`<line x1="${m.pct}%" y1="${headerH}" x2="${m.pct}%" y2="${H-labelH}" stroke="var(--border)" stroke-width="0.5"/>`).join('');
+  const gridLabels=monthLabels.map(m=>`<text x="${m.pct+0.5}%" y="${H-2}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif">${m.label}</text>`).join('');
+
+  const todayLine=todayInRange?`<line x1="${todayPct}%" y1="${headerH}" x2="${todayPct}%" y2="${H-labelH}" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="3,2"/><text x="${todayPct+0.3}%" y="${headerH+10}" font-size="9" fill="var(--danger)" font-family="-apple-system,sans-serif">Today</text>`:'';
 
   return`<div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border)">
-    <div style="font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Timeline</div>
-    <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;overflow:visible">
-      <!-- BG -->
-      <rect x="0" y="${headerH}" width="100%" height="${H-headerH-labelH}" fill="var(--bg2)" rx="3"/>
-      <!-- Grid + labels -->
-      ${gridAndLabels}
-      <!-- Header: date range -->
-      <text x="0" y="14" font-size="10" fill="var(--text2)" font-family="-apple-system,sans-serif">${fmtDate(p.startDate)}</text>
-      <text x="100%" y="14" font-size="10" fill="var(--text2)" font-family="-apple-system,sans-serif" text-anchor="end">${fmtDate(p.endDate||today())}</text>
-      <!-- Rows -->
-      ${rows}
-      <!-- Today -->
-      ${todayLine}
-    </svg>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Timeline</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn sm" onclick="setMiniGanttView('${gId}','compressed')" id="${gId}-compressed" style="padding:2px 8px;font-size:10px;background:var(--accent);color:#fff;border-color:var(--accent)">3 mo</button>
+        <button class="btn sm" onclick="setMiniGanttView('${gId}','full')" id="${gId}-full" style="padding:2px 8px;font-size:10px">Full</button>
+      </div>
+    </div>
+    <div id="${gId}" data-mindate="${minD.toISOString().split('T')[0]}" data-maxdate="${maxD.toISOString().split('T')[0]}" data-pid="${p.id}" style="overflow-x:auto">
+      <svg width="100%" height="${H}" style="display:block;min-width:300px;overflow:visible">
+        <rect x="0" y="${headerH}" width="100%" height="${H-headerH-labelH}" fill="var(--bg2)" rx="3"/>
+        ${grid}
+        ${svgRows}
+        ${todayLine}
+        ${gridLabels}
+      </svg>
+    </div>
   </div>`;
+}
+
+function setMiniGanttView(gId, mode){
+  const container=document.getElementById(gId);if(!container)return;
+  const pid=container.dataset.pid;
+  const p=projects.find(x=>x.id===pid);if(!p)return;
+  document.getElementById(gId+'-compressed').style.cssText='padding:2px 8px;font-size:10px;'+(mode==='compressed'?'background:var(--accent);color:#fff;border-color:var(--accent)':'');
+  document.getElementById(gId+'-full').style.cssText='padding:2px 8px;font-size:10px;'+(mode==='full'?'background:var(--accent);color:#fff;border-color:var(--accent)':'');
+  // Re-render with overridden date range
+  if(mode==='compressed'){
+    const now=new Date();
+    container.dataset.override=JSON.stringify({start:now.toISOString().split('T')[0],end:new Date(now.getFullYear(),now.getMonth()+3,0).toISOString().split('T')[0]});
+  } else {
+    delete container.dataset.override;
+  }
+  // Trigger re-render of project
+  renderProjectList();
 }
 
 // ═══════════════════════════════════════════════
@@ -2362,6 +2469,13 @@ function addTask(projId){
   renderProjectList();
   // Re-init chips after re-render
   setTimeout(()=>initTaskAssignChips(projId),0);
+}
+
+function saveTaskTitle(projId,taskId,newTitle){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
+  const trimmed=newTitle.trim();
+  if(trimmed&&trimmed!==t.title){t.title=trimmed;save('tracker:projects',projects);}
 }
 
 function updateTaskStatus(projId,taskId,status){
@@ -2565,12 +2679,14 @@ function renderTasksAndMilestones(p){
       <div style="display:flex;align-items:center;gap:6px;padding:5px 0;font-size:13px">
         <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
         ${typeBadge(t)}
-        <span style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;cursor:pointer" onclick="document.getElementById('${expandKey}').style.display=document.getElementById('${expandKey}').style.display==='none'?'block':'none'">${t.title}${!isOpen&&t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'};margin-left:5px">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}</span>
+        <span contenteditable="true" onblur="saveTaskTitle('${p.id}','${t.id}',this.textContent)" style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;outline:none;border-radius:3px;padding:1px 3px;cursor:text" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="if(document.activeElement!==this)this.style.background=''" onfocus="this.style.background='var(--bg2)'">${t.title}</span>
+        ${!isOpen&&t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'};white-space:nowrap">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}
         ${assigneeChips(t.assigneeIds||t.assigneeId)}
+        <button class="icon-action" onclick="document.getElementById('${expandKey}').style.display=document.getElementById('${expandKey}').style.display==='none'?'block':'none'" title="Manage assignees" style="font-size:13px"><i class="ti ti-user-plus"></i></button>
         <select onchange="updateTaskStatus('${p.id}','${t.id}',this.value)" style="width:auto;font-size:11px;padding:2px 4px">${statusOpts(t.status)}</select>
         <button class="icon-action danger" onclick="deleteTask('${p.id}','${t.id}')" style="font-size:12px"><i class="ti ti-x"></i></button>
       </div>
-      <div id="${expandKey}" style="display:none;padding:6px 0 8px 20px;background:var(--bg2);border-radius:4px;margin-bottom:4px">
+      <div id="${expandKey}" style="display:none;padding:6px 8px 8px;background:var(--bg2);border-radius:4px;margin-bottom:4px">
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Assign to:</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px">${assigneeSelector(t.id,t.assigneeIds||t.assigneeId)}</div>
       </div>
