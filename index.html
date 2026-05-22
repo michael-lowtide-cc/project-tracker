@@ -468,34 +468,36 @@ td{padding:8px 0;vertical-align:top}
     <div class="card">
       <div class="sec-title">Add client</div>
       <!-- Company -->
-      <div class="grid2">
-        <div class="field"><label>Company name</label><input type="text" id="c-company" placeholder="Acme Corp"></div>
-        <div class="field"><label>Website (optional)</label><input type="text" id="c-website" placeholder="acmecorp.com"></div>
-      </div>
-      <div class="field"><label>Industry / notes (optional)</label><input type="text" id="c-notes" placeholder="Architecture firm, preferred contact via email, etc."></div>
-      <!-- Primary contact -->
-      <div class="sec-title" style="margin-top:4px">Primary contact</div>
       <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
         <div style="flex-shrink:0;text-align:center">
-          <div id="add-client-photo-preview" class="client-avatar" onclick="document.getElementById('add-client-photo-input').click()" title="Upload photo" style="width:48px;height:48px;font-size:16px;cursor:pointer">
-            <i class="ti ti-camera" style="font-size:18px;color:var(--text3)"></i>
+          <div id="add-client-photo-preview" class="client-avatar" onclick="document.getElementById('add-client-photo-input').click()" title="Upload company logo" style="width:54px;height:54px;font-size:18px;cursor:pointer;border-radius:8px">
+            <i class="ti ti-building" style="font-size:20px;color:var(--text3)"></i>
           </div>
           <input type="file" id="add-client-photo-input" accept="image/*" style="display:none" onchange="previewClientPhoto(this,'add-client-photo-preview','add-client-photo-data')">
           <input type="hidden" id="add-client-photo-data">
-          <div style="font-size:10px;color:var(--text3);margin-top:3px">Photo</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:3px">Logo</div>
         </div>
         <div style="flex:1">
           <div class="grid2" style="margin-bottom:0">
-            <div class="field"><label>Full name</label><input type="text" id="c-name" placeholder="Jane Smith"></div>
-            <div class="grid2" style="margin-bottom:0">
-              <div class="field"><label>Suffix</label><input type="text" id="c-suffix" placeholder="Jr., PhD, AIA" style="width:100%"></div>
-              <div class="field"><label>Role / title</label><input type="text" id="c-role" placeholder="Project Manager"></div>
-            </div>
+            <div class="field"><label>Company name</label><input type="text" id="c-company" placeholder="Acme Corp"></div>
+            <div class="field"><label>Website (optional)</label><input type="text" id="c-website" placeholder="acmecorp.com"></div>
           </div>
+          <div class="field"><label>Industry / notes (optional)</label><input type="text" id="c-notes" placeholder="Architecture firm, preferred contact via email, etc."></div>
+        </div>
+      </div>
+      <!-- Primary contact -->
+      <div class="sec-title" style="margin-top:4px">Primary contact</div>
+      <div style="margin-bottom:12px">
+        <div class="grid2" style="margin-bottom:0">
+          <div class="field"><label>Full name</label><input type="text" id="c-name" placeholder="Jane Smith"></div>
           <div class="grid2" style="margin-bottom:0">
-            <div class="field"><label>Email</label><input type="email" id="c-email" placeholder="jane@acme.com"></div>
-            <div class="field"><label>Phone</label><input type="tel" id="c-phone" placeholder="(555) 000-0000" oninput="formatPhone(this)"></div>
+            <div class="field"><label>Suffix</label><input type="text" id="c-suffix" placeholder="Jr., PhD, AIA" style="width:100%"></div>
+            <div class="field"><label>Role / title</label><input type="text" id="c-role" placeholder="Project Manager"></div>
           </div>
+        </div>
+        <div class="grid2" style="margin-bottom:0">
+          <div class="field"><label>Email</label><input type="email" id="c-email" placeholder="jane@acme.com"></div>
+          <div class="field"><label>Phone</label><input type="tel" id="c-phone" placeholder="(555) 000-0000" oninput="formatPhone(this)"></div>
         </div>
       </div>
       <!-- Additional contacts -->
@@ -1566,8 +1568,6 @@ function renderProjectList(){
             ${p.startDate?`<span><i class="ti ti-calendar" style="font-size:12px"></i> ${fmtDate(p.startDate)}</span>`:''}
             ${endDisp?`<span><i class="ti ti-calendar-off" style="font-size:12px"></i> ${endDisp}</span>`:''}
             ${p.duration?`<span><i class="ti ti-clock" style="font-size:12px"></i> ${p.duration}</span>`:''}
-            ${p.rate?`<span><i class="ti ti-coin" style="font-size:12px"></i> ${$f(p.rate)}/hr</span>`:''}
-            ${budget.display?`<span><i class="ti ti-chart-bar" style="font-size:12px"></i> ${budget.display}</span>`:''}
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
@@ -1576,10 +1576,6 @@ function renderProjectList(){
         </div>
       </div>
       ${isEditing?renderProjectEditForm(p):`
-      ${budgetMax>0?`<div style="margin-top:10px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:3px"><span>${$f(billed)} billed</span><span>${pct.toFixed(0)}%</span></div>
-        <div class="gauge-bar" style="height:7px"><div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div></div>
-      </div>`:''}
       ${p.desc?`<div style="font-size:13px;color:var(--text2);margin-top:8px">${p.desc}</div>`:''}
       ${renderMiniGantt(p,{compressed:_ganttCompressed[p.id]!==false})}
       ${renderTasksAndMilestones(p)}`}
@@ -1926,7 +1922,7 @@ function addClient(){
   ['c-company','c-website','c-name','c-suffix','c-role','c-email','c-phone','c-notes','add-client-photo-data'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
-  document.getElementById('add-client-photo-preview').innerHTML='<i class="ti ti-camera" style="font-size:18px;color:var(--text3)"></i>';
+  document.getElementById('add-client-photo-preview').innerHTML='<i class="ti ti-building" style="font-size:20px;color:var(--text3)"></i>';
   document.getElementById('add-extra-contacts').innerHTML='';
   allDropdownRefresh();
   renderClientList();
@@ -2316,12 +2312,27 @@ function renderMiniGantt(p, opts={}){
   // Apply compressed / full view
   let minD,maxD;
   if(isCompressed){
-    const now=new Date();
-    const center=now>fullMinD&&now<fullMaxD?now:fullMinD;
-    minD=new Date(center.getFullYear(),center.getMonth()-1,1);
-    maxD=new Date(center.getFullYear(),center.getMonth()+2,0);
+    // 3 months starting 1 week before today
+    const oneWeekAgo=new Date();oneWeekAgo.setDate(oneWeekAgo.getDate()-7);
+    minD=new Date(oneWeekAgo.getFullYear(),oneWeekAgo.getMonth(),oneWeekAgo.getDate());
+    maxD=new Date(minD);maxD.setMonth(maxD.getMonth()+3);
   } else {
-    minD=fullMinD;maxD=fullMaxD;
+    // Full: start at contract start date if set, else full phase range
+    if(p.startDate){
+      minD=new Date(p.startDate+'T00:00:00');
+      minD=new Date(minD.getFullYear(),minD.getMonth(),1);
+    } else {
+      minD=fullMinD;
+    }
+    // End at contract end or last phase/milestone date
+    if(p.endDate){
+      maxD=new Date(p.endDate+'T00:00:00');
+      maxD=new Date(maxD.getFullYear(),maxD.getMonth()+1,0);
+      // Also ensure we show phase/milestone data beyond contract end
+      if(fullMaxD>maxD)maxD=new Date(fullMaxD);
+    } else {
+      maxD=fullMaxD;
+    }
   }
 
   const totalMs=Math.max(1,maxD-minD);
@@ -2371,43 +2382,67 @@ function renderMiniGantt(p, opts={}){
   // Milestones without any phase: put between all rows at middle row
   if(!phases.length&&milestones.length){msByRow[0]=milestones;}
 
-  let svgRows='';
+  // We'll use a viewBox approach so all x coords can be absolute (0-1000 scale)
+  const VW=1000; // virtual width
+  function vx(pct){return Math.round(pct/100*VW);}
+
+  // Grid lines (in vw coords)
+  const grid=monthLabels.map(m=>`<line x1="${vx(m.pct)}" y1="${headerH}" x2="${vx(m.pct)}" y2="${H-labelH}" stroke="var(--border)" stroke-width="1"/>`).join('');
+  const gridLabels=monthLabels.map(m=>`<text x="${vx(m.pct)+3}" y="${H-2}" font-size="10" fill="var(--text3)" font-family="-apple-system,sans-serif">${m.label}</text>`).join('');
+
+  // Today pill above the chart
+  const tvx=vx(todayPct);
+  const todayLine=todayInRange?`
+    <line x1="${tvx}" y1="${headerH}" x2="${tvx}" y2="${H-labelH}" stroke="#a32d2d" stroke-width="2" stroke-dasharray="5,4"/>
+    <rect x="${tvx-22}" y="${headerH-18}" width="44" height="15" fill="#a32d2d" rx="4"/>
+    <text x="${tvx}" y="${headerH-7}" font-size="9" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" font-weight="600">TODAY</text>
+  `:'';
+
+  // Rebuild svgRows with absolute vx coords
+  let svgRowsVW='';
   phases.forEach((ph,i)=>{
     const phY=headerH+i*rowH;
     const col=ph.color||'#4a90d9';
     const rowBg=i%2===0?'rgba(0,0,0,0.02)':'transparent';
-    svgRows+=`<rect x="0%" y="${phY}" width="100%" height="${rowH}" fill="${rowBg}"/>`;
+    svgRowsVW+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="${rowBg}"/>`;
     if(ph.startDate){
-      const x1=pctOf(ph.startDate);
-      const x2=ph.endDate?pctOf(ph.endDate):x1+5;
-      const bw=Math.max(1,x2-x1);
-      svgRows+=`<rect x="${x1}%" y="${phY+3}" width="${bw}%" height="${rowH-6}" fill="${col}" rx="3"/>`;
-      // Smart phase label: estimate char width ~6.5px per char at font-size 10
-      // bar pixel width ≈ bw% of container. We use a rough 580px reference width.
-      const approxPx=bw*5.8; // conservative
-      const maxChars=Math.floor(approxPx/6.5);
+      const x1=vx(pctOf(ph.startDate));
+      const x2=ph.endDate?vx(pctOf(ph.endDate)):x1+20;
+      const bw=Math.max(4,x2-x1);
+      svgRowsVW+=`<rect x="${x1}" y="${phY+3}" width="${bw}" height="${rowH-6}" fill="${col}" rx="3"/>`;
+      // Phase label — bw in vw units, ~1000 wide; 10px font ≈ 6 units per char
+      const maxChars=Math.floor((bw-8)/6.5);
       if(maxChars>=3){
         const label=maxChars>=ph.title.length?ph.title:ph.title.slice(0,maxChars-1)+'…';
-        svgRows+=`<text x="${x1+bw/2}%" y="${phY+rowH/2+4}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle">${esc(label)}</text>`;
+        svgRowsVW+=`<text x="${x1+bw/2}" y="${phY+rowH/2+4}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle">${esc(label)}</text>`;
       }
     }
+    if(i<phases.length-1)svgRowsVW+=`<line x1="0" y1="${phY+rowH}" x2="${VW}" y2="${phY+rowH}" stroke="var(--border)" stroke-width="0.5"/>`;
+
     // Milestones on this row
     (msByRow[i]||[]).forEach(ms=>{
       const mp=pctOf(ms.date);
       if(mp<0||mp>100)return;
-      const mc=ms.completed?'var(--success)':new Date(ms.date+'T12:00:00')<new Date()?'var(--danger)':'#9151a0';
-      const r=6;
-      svgRows+=`<polygon points="${mp}%,${phY+2} calc(${mp}% + ${r}px),${phY+rowH/2} ${mp}%,${phY+rowH-2} calc(${mp}% - ${r}px),${phY+rowH/2}" fill="${mc}"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></polygon>`;
+      const mx=vx(mp);
+      const mc=ms.completed?'#1d9e75':new Date(ms.date+'T12:00:00')<new Date()?'#a32d2d':'#9151a0';
+      const cy=phY+rowH/2;
+      const r=7;
+      // Diamond: rotate rect 45°
+      svgRowsVW+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="${mc}" transform="rotate(45,${mx},${cy})" rx="1"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
     });
-    // Row divider
-    if(i<phases.length-1)svgRows+=`<line x1="0%" y1="${phY+rowH}" x2="100%" y2="${phY+rowH}" stroke="var(--border)" stroke-width="0.5"/>`;
   });
 
-  // Grid lines
-  const grid=monthLabels.map(m=>`<line x1="${m.pct}%" y1="${headerH}" x2="${m.pct}%" y2="${H-labelH}" stroke="var(--border)" stroke-width="0.5"/>`).join('');
-  const gridLabels=monthLabels.map(m=>`<text x="${m.pct+0.5}%" y="${H-2}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif">${m.label}</text>`).join('');
-
-  const todayLine=todayInRange?`<line x1="${todayPct}%" y1="${headerH}" x2="${todayPct}%" y2="${H-labelH}" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="3,2"/><text x="${todayPct+0.3}%" y="${headerH+10}" font-size="9" fill="var(--danger)" font-family="-apple-system,sans-serif">Today</text>`:'';
+  // Milestones with no phase
+  if(!phases.length&&milestones.length){
+    const msY=headerH+rowH/2;
+    milestones.forEach(ms=>{
+      const mp=pctOf(ms.date);if(mp<0||mp>100)return;
+      const mx=vx(mp);
+      const mc=ms.completed?'#1d9e75':new Date(ms.date+'T12:00:00')<new Date()?'#a32d2d':'#9151a0';
+      const r=7;
+      svgRowsVW+=`<rect x="${mx-r}" y="${msY-r}" width="${r*2}" height="${r*2}" fill="${mc}" transform="rotate(45,${mx},${msY})" rx="1"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
+    });
+  }
 
   return`<div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
@@ -2417,11 +2452,11 @@ function renderMiniGantt(p, opts={}){
         <button class="btn sm" onclick="setMiniGanttView('${gId}','full')" id="${gId}-full" style="padding:2px 8px;font-size:10px;${!isCompressed?'background:var(--accent);color:#fff;border-color:var(--accent)':''}">Full</button>
       </div>
     </div>
-    <div id="${gId}" data-mindate="${minD.toISOString().split('T')[0]}" data-maxdate="${maxD.toISOString().split('T')[0]}" data-pid="${p.id}" style="overflow-x:auto">
-      <svg width="100%" height="${H}" style="display:block;min-width:300px;overflow:visible">
-        <rect x="0" y="${headerH}" width="100%" height="${H-headerH-labelH}" fill="var(--bg2)" rx="3"/>
+    <div id="${gId}" data-pid="${p.id}" style="overflow-x:auto;padding-top:${todayInRange?'20px':'0'}">
+      <svg viewBox="0 0 ${VW} ${H}" width="100%" height="${H}" style="display:block;min-width:300px;overflow:visible" preserveAspectRatio="none">
+        <rect x="0" y="${headerH}" width="${VW}" height="${H-headerH-labelH}" fill="var(--bg2)" rx="3"/>
         ${grid}
-        ${svgRows}
+        ${svgRowsVW}
         ${todayLine}
         ${gridLabels}
       </svg>
@@ -2688,20 +2723,34 @@ function renderTasksAndMilestones(p){
     const isOpen=t.taskType==='open';
     const overdue=!isOpen&&t.dueDate&&t.dueDate<todayStr&&t.status!=='done';
     const expandKey=`task-expand-${p.id}-${t.id}`;
-    return`<div style="border-bottom:.5px solid var(--border)">
+    const assigneeIds=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
+    const chips=assigneeIds.map(id=>{const m=allMembers.find(x=>x.id===id);return m?`<span style="font-size:10px;background:${m.color||'var(--accent)'};color:#fff;padding:1px 6px;border-radius:10px;white-space:nowrap">${m.name.split(' ')[0]}</span>`:''}).join('');
+    return`<div class="task-row" draggable="true" data-taskid="${t.id}" data-projid="${p.id}"
+      ondragstart="taskDragStart(event,'${p.id}','${t.id}')"
+      ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'"
+      ondragleave="this.style.outline=''"
+      ondrop="taskDropOnTask(event,'${p.id}','${t.id}')"
+      style="border-bottom:.5px solid var(--border);cursor:grab">
       <div style="display:flex;align-items:center;gap:6px;padding:5px 0;font-size:13px">
         <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
         ${typeBadge(t)}
-        <span contenteditable="true" onblur="saveTaskTitle('${p.id}','${t.id}',this.textContent)" style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;outline:none;border-radius:3px;padding:1px 3px;cursor:text" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="if(document.activeElement!==this)this.style.background=''" onfocus="this.style.background='var(--bg2)'">${t.title}</span>
+        <span contenteditable="true" onblur="saveTaskTitle('${p.id}','${t.id}',this.textContent)"
+          style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;outline:none;border-radius:3px;padding:1px 3px;cursor:text"
+          onmouseenter="this.style.background='var(--bg2)'"
+          onmouseleave="if(document.activeElement!==this)this.style.background=''"
+          onfocus="this.style.background='var(--bg2)'">${t.title}</span>
         ${!isOpen&&t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'};white-space:nowrap">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}
-        ${assigneeChips(t.assigneeIds||t.assigneeId)}
+        ${chips}
         <button class="icon-action" onclick="document.getElementById('${expandKey}').style.display=document.getElementById('${expandKey}').style.display==='none'?'block':'none'" title="Manage assignees" style="font-size:13px"><i class="ti ti-user-plus"></i></button>
         <select onchange="updateTaskStatus('${p.id}','${t.id}',this.value)" style="width:auto;font-size:11px;padding:2px 4px">${statusOpts(t.status)}</select>
         <button class="icon-action danger" onclick="deleteTask('${p.id}','${t.id}')" style="font-size:12px"><i class="ti ti-x"></i></button>
       </div>
       <div id="${expandKey}" style="display:none;padding:6px 8px 8px;background:var(--bg2);border-radius:4px;margin-bottom:4px">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Assign to:</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">${assigneeSelector(t.id,t.assigneeIds||t.assigneeId)}</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Assign to (click to toggle):</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${allMembers.map(m=>{
+          const sel=assigneeIds.includes(m.id);
+          return`<span onclick="toggleTaskAssignee('${p.id}','${t.id}','${m.id}')" style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;
+        }).join('')}</div>
       </div>
     </div>`;
   }
@@ -2759,8 +2808,11 @@ function renderTasksAndMilestones(p){
     <!-- Phase groups (sorted by start date) -->
     ${grouped.map(({phase,tasks:pts})=>{
       const isEditingPh=editing.phases===phase.id;
-      return`<div style="margin-bottom:12px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+      return`<div style="margin-bottom:12px;border:.5px dashed transparent;border-radius:var(--radius-sm);padding:4px;transition:border-color .15s"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+        ondragleave="this.style.borderColor='transparent'"
+        ondrop="taskDropOnPhase(event,'${p.id}','${phase.id}');this.style.borderColor='transparent'">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
           <span style="width:12px;height:12px;border-radius:3px;background:${phase.color||'var(--accent)'};flex-shrink:0;display:inline-block"></span>
           <span style="font-size:12px;font-weight:600;color:var(--text)">${phase.title}</span>
           ${phase.startDate||phase.endDate?`<span style="font-size:11px;color:var(--text3)">${phase.startDate?fmtDate(phase.startDate):''}${phase.startDate&&phase.endDate?' → ':''}${phase.endDate?fmtDate(phase.endDate):''}</span>`:''}
@@ -2811,7 +2863,9 @@ function renderTasksAndMilestones(p){
       </div>
       <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
         <span style="font-size:11px;color:var(--text3)">Assign:</span>
-        <div style="display:flex;flex-wrap:wrap;gap:4px" id="task-assign-chips-${p.id}"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px" id="task-assign-chips-${p.id}">
+          ${allMembers.map(m=>`<span onclick="toggleNewTaskAssignee('${p.id}','${m.id}')" id="nta-${p.id}-${m.id}" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid var(--border2);background:transparent;color:var(--text2)">${m.name.split(' ')[0]}</span>`).join('')}
+        </div>
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:8px">
         <button class="btn sm primary" onclick="addTask('${p.id}')"><i class="ti ti-plus"></i> Add task</button>
@@ -3290,8 +3344,72 @@ function timerReset(){
 }
 
 // ═══════════════════════════════════════════════
-//  BOOT
+//  TASK DRAG-TO-PHASE + UNDO
 // ═══════════════════════════════════════════════
+let _dragTaskId=null,_dragProjId=null;
+const _undoStack=[];
+const MAX_UNDO=30;
+
+function pushUndo(description,undoFn){
+  _undoStack.push({description,undoFn});
+  if(_undoStack.length>MAX_UNDO)_undoStack.shift();
+}
+
+function taskDragStart(e,projId,taskId){
+  _dragTaskId=taskId;_dragProjId=projId;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',taskId);
+}
+
+function taskDropOnPhase(e,projId,phaseId){
+  e.preventDefault();e.stopPropagation();
+  e.currentTarget.style.outline='';
+  if(!_dragTaskId||_dragProjId!==projId)return;
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===_dragTaskId);if(!t)return;
+  const prevPhaseId=t.phaseId||'';
+  pushUndo(`Move task "${t.title}" to phase`,()=>{t.phaseId=prevPhaseId;save('tracker:projects',projects);renderProjectList();});
+  t.phaseId=phaseId;
+  save('tracker:projects',projects);
+  renderProjectList();
+  _dragTaskId=null;_dragProjId=null;
+}
+
+function taskDropOnTask(e,projId,targetTaskId){
+  e.preventDefault();e.stopPropagation();
+  e.currentTarget.style.outline='';
+  if(!_dragTaskId||_dragProjId!==projId||_dragTaskId===targetTaskId)return;
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const tasks=p.tasks||[];
+  const srcIdx=tasks.findIndex(x=>x.id===_dragTaskId);
+  const tgtIdx=tasks.findIndex(x=>x.id===targetTaskId);
+  if(srcIdx<0||tgtIdx<0)return;
+  const prevOrder=[...tasks.map(t=>t.id)];
+  const [moved]=tasks.splice(srcIdx,1);
+  // Also copy phase from target
+  moved.phaseId=tasks[tgtIdx<srcIdx?tgtIdx:tgtIdx-1]?.phaseId||moved.phaseId;
+  tasks.splice(tgtIdx<srcIdx?tgtIdx:tgtIdx,0,moved);
+  pushUndo(`Reorder task "${moved.title}"`,()=>{
+    const reordered=prevOrder.map(id=>tasks.find(t=>t.id===id)).filter(Boolean);
+    p.tasks=reordered;save('tracker:projects',projects);renderProjectList();
+  });
+  p.tasks=tasks;
+  save('tracker:projects',projects);
+  renderProjectList();
+  _dragTaskId=null;_dragProjId=null;
+}
+
+// Ctrl+Z undo
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.shiftKey){
+    if(_undoStack.length){
+      const action=_undoStack.pop();
+      action.undoFn();
+      setSyncUI('idle',`Undid: ${action.description}`);
+    }
+    e.preventDefault();
+  }
+});
 window.gapiLoaded=gapiLoaded;
 allDropdownRefresh();
 refreshAll();
