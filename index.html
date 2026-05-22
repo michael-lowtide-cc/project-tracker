@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lowtide.cc Project Tracker</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
-<script src="https://apis.google.com/js/api.js" onload="gapiLoaded()" async defer></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -223,12 +222,12 @@ td{padding:8px 0;vertical-align:top}
   </div>
 
   <!-- SYNC BAR -->
-  <div id="sync-bar" class="sync-bar sync-offline no-print" style="display:none">
+  <div id="sync-bar" class="sync-bar sync-offline no-print" style="display:flex">
     <span class="sync-dot"></span>
-    <span id="sync-msg">Not connected</span>
+    <span id="sync-msg">Loading...</span>
     <div style="display:flex;gap:6px;margin-left:auto">
       <button class="btn sm" id="sync-force-btn" onclick="forcSync()" style="display:none" title="Force sync now"><i class="ti ti-refresh"></i></button>
-      <button class="btn sm" id="sync-action-btn" onclick="handleDriveAuth()">Connect Drive</button>
+      <button class="btn sm" id="sync-action-btn" onclick="handleDriveAuth()" style="display:none">Connect Drive</button>
     </div>
   </div>
 
@@ -633,13 +632,15 @@ let gdToken=null, gdFileId=null, syncTimer=null;
 
 function setSyncUI(state,msg,showBtn=false,btnLabel=''){
   const bar=document.getElementById('sync-bar');
+  if(!bar)return;
   bar.style.display='flex';
   bar.className='sync-bar no-print sync-'+state;
   document.getElementById('sync-msg').textContent=msg;
   const btn=document.getElementById('sync-action-btn');
   btn.style.display=showBtn?'inline-flex':'none';
-  if(showBtn)btn.textContent=btnLabel;
-  document.getElementById('sync-force-btn').style.display=gdToken?'inline-flex':'none';
+  if(showBtn&&btnLabel)btn.textContent=btnLabel;
+  const forceBtn=document.getElementById('sync-force-btn');
+  if(forceBtn)forceBtn.style.display=gdToken?'inline-flex':'none';
 }
 
 async function forcSync(){
@@ -698,9 +699,16 @@ async function initDriveWithToken(){
 
 function gapiLoaded(){
   gapi.load('client',async()=>{
-    document.getElementById('gdrive-btn').style.display='flex';
-    if(checkHashToken()){await initDriveWithToken();}
-    else{setSyncUI('offline','Google Drive not connected',true,'Connect Drive');}
+    // Show the Drive icon button in the header
+    const driveBtn=document.getElementById('gdrive-btn');
+    if(driveBtn)driveBtn.style.display='flex';
+    // Check if we have a hash token from a redirect
+    if(checkHashToken()){
+      await initDriveWithToken();
+      return;
+    }
+    // Update sync bar to show Connect Drive
+    setSyncUI('offline','Google Drive not connected',true,'Connect Drive');
   });
 }
 
@@ -3385,4 +3393,101 @@ function timerReset(){
   timerStart_=0;timerAccum=0;timerPaused=false;
   document.getElementById('timer-display').textContent='0:00:00';
   document.getElementById('timer-task-label').textContent='';
-  document.getElementById('btn-start').style.dis
+  document.getElementById('btn-start').style.display='inline-flex';
+  document.getElementById('btn-pause').style.display='none';
+  document.getElementById('btn-resume').style.display='none';
+  document.getElementById('btn-stop').style.display='none';
+  document.getElementById('btn-discard').style.display='none';
+  document.getElementById('timer-card').classList.remove('timer-running');
+}
+
+// ═══════════════════════════════════════════════
+//  TASK DRAG-TO-PHASE + UNDO
+// ═══════════════════════════════════════════════
+let _dragTaskId=null,_dragProjId=null;
+const _undoStack=[];
+const MAX_UNDO=30;
+
+function pushUndo(description,undoFn){
+  _undoStack.push({description,undoFn});
+  if(_undoStack.length>MAX_UNDO)_undoStack.shift();
+}
+
+function taskDragStart(e,projId,taskId){
+  _dragTaskId=taskId;_dragProjId=projId;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',taskId);
+}
+
+function taskDropOnPhase(e,projId,phaseId){
+  e.preventDefault();e.stopPropagation();
+  e.currentTarget.style.outline='';
+  if(!_dragTaskId||_dragProjId!==projId)return;
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===_dragTaskId);if(!t)return;
+  const prevPhaseId=t.phaseId||'';
+  pushUndo(`Move task "${t.title}" to phase`,()=>{t.phaseId=prevPhaseId;save('tracker:projects',projects);renderProjectList();});
+  t.phaseId=phaseId;
+  save('tracker:projects',projects);
+  renderProjectList();
+  _dragTaskId=null;_dragProjId=null;
+}
+
+function taskDropOnTask(e,projId,targetTaskId){
+  e.preventDefault();e.stopPropagation();
+  e.currentTarget.style.outline='';
+  if(!_dragTaskId||_dragProjId!==projId||_dragTaskId===targetTaskId)return;
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const tasks=p.tasks||[];
+  const srcIdx=tasks.findIndex(x=>x.id===_dragTaskId);
+  const tgtIdx=tasks.findIndex(x=>x.id===targetTaskId);
+  if(srcIdx<0||tgtIdx<0)return;
+  const prevOrder=[...tasks.map(t=>t.id)];
+  const [moved]=tasks.splice(srcIdx,1);
+  // Also copy phase from target
+  moved.phaseId=tasks[tgtIdx<srcIdx?tgtIdx:tgtIdx-1]?.phaseId||moved.phaseId;
+  tasks.splice(tgtIdx<srcIdx?tgtIdx:tgtIdx,0,moved);
+  pushUndo(`Reorder task "${moved.title}"`,()=>{
+    const reordered=prevOrder.map(id=>tasks.find(t=>t.id===id)).filter(Boolean);
+    p.tasks=reordered;save('tracker:projects',projects);renderProjectList();
+  });
+  p.tasks=tasks;
+  save('tracker:projects',projects);
+  renderProjectList();
+  _dragTaskId=null;_dragProjId=null;
+}
+
+// Ctrl+Z undo
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.shiftKey){
+    if(_undoStack.length){
+      const action=_undoStack.pop();
+      action.undoFn();
+      setSyncUI('idle',`Undid: ${action.description}`);
+    }
+    e.preventDefault();
+  }
+});
+window.gapiLoaded=gapiLoaded;
+allDropdownRefresh();
+refreshAll();
+// Show sync bar immediately — gapi script will update state once loaded
+setSyncUI('offline','Google Drive not connected',true,'Connect Drive');
+
+// Report content height to parent so Squarespace iframe resizes to fit
+(function initHeightReporter(){
+  function reportHeight(){
+    const h=document.documentElement.scrollHeight;
+    if(window.parent!==window){
+      window.parent.postMessage({type:'tracker_height',height:h},'*');
+    }
+  }
+  reportHeight();
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setTimeout(reportHeight,50)));
+  new ResizeObserver(reportHeight).observe(document.getElementById('app'));
+})();
+</script>
+<!-- Load gapi AFTER main script so gapiLoaded is defined when it fires -->
+<script src="https://apis.google.com/js/api.js" onload="gapiLoaded()" defer></script>
+</body>
+</html>
