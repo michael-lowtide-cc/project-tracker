@@ -487,11 +487,14 @@ td{padding:8px 0;vertical-align:top}
         <div style="flex:1">
           <div class="grid2" style="margin-bottom:0">
             <div class="field"><label>Full name</label><input type="text" id="c-name" placeholder="Jane Smith"></div>
-            <div class="field"><label>Role / title</label><input type="text" id="c-role" placeholder="Project Manager"></div>
+            <div class="grid2" style="margin-bottom:0">
+              <div class="field"><label>Suffix</label><input type="text" id="c-suffix" placeholder="Jr., PhD, AIA" style="width:100%"></div>
+              <div class="field"><label>Role / title</label><input type="text" id="c-role" placeholder="Project Manager"></div>
+            </div>
           </div>
           <div class="grid2" style="margin-bottom:0">
             <div class="field"><label>Email</label><input type="email" id="c-email" placeholder="jane@acme.com"></div>
-            <div class="field"><label>Phone</label><input type="tel" id="c-phone" placeholder="+1 (555) 000-0000"></div>
+            <div class="field"><label>Phone</label><input type="tel" id="c-phone" placeholder="(555) 000-0000" oninput="formatPhone(this)"></div>
           </div>
         </div>
       </div>
@@ -565,7 +568,7 @@ td{padding:8px 0;vertical-align:top}
           </div>
           <div class="grid2" style="margin-bottom:0">
             <div class="field"><label>Email</label><input type="email" id="tm-email" placeholder="alex@studio.com"></div>
-            <div class="field"><label>Phone</label><input type="tel" id="tm-phone" placeholder="+1 (555) 000-0000"></div>
+            <div class="field"><label>Phone</label><input type="tel" id="tm-phone" placeholder="(555) 000-0000" oninput="formatPhone(this)"></div>
           </div>
         </div>
       </div>
@@ -779,7 +782,7 @@ const TEAM_COLORS=[
 
 const DEF_CATS=['Software','Travel','Equipment','Subcontractor','Meals','Office','Other'];
 let settings, timeEntries, expenses, clients, projects, clientInvs, teamMembers, myProfile, currentTab='dashboard';
-let editing={time:null,expenses:null,projects:null,clients:null,team:null};
+let editing={time:null,expenses:null,projects:null,clients:null,team:null,milestones:null,phases:null};
 
 function reloadState(){
   settings    =Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD',expenseCategories:DEF_CATS},load('tracker:settings',{})||{});
@@ -905,23 +908,24 @@ function tmNameAutofill(val){
   const list=document.getElementById('tm-autofill');if(!list)return;
   if(!val||val.length<2){list.style.display='none';return;}
   const matches=clients.filter(c=>{
-    const n=(c.contactName||'').toLowerCase();
+    const n=(c.primaryContact?.name||c.contactName||'').toLowerCase();
     const co=(c.company||'').toLowerCase();
     return n.includes(val.toLowerCase())||co.includes(val.toLowerCase());
   }).slice(0,5);
   if(!matches.length){list.style.display='none';return;}
-  list.innerHTML=matches.map(c=>`<div class="autofill-item" onclick="tmAutofill('${c.id}')">${c.contactName||c.company}${c.company&&c.contactName?' . <span style="color:var(--text2)">${c.company}</span>':''}</div>`).join('');
+  list.innerHTML=matches.map(c=>`<div class="autofill-item" onclick="tmAutofill('${c.id}')">${c.primaryContact?.name||c.contactName||''}${c.company?` <span style="color:var(--text2)">· ${c.company}</span>`:''}</div>`).join('');
   list.style.display='block';
 }
 
 function tmAutofill(clientId){
   const c=clients.find(x=>x.id===clientId);if(!c)return;
-  document.getElementById('tm-name').value=c.contactName||'';
-  document.getElementById('tm-email').value=c.email||'';
-  document.getElementById('tm-phone').value=c.phone||'';
+  const pc=c.primaryContact||{};
+  document.getElementById('tm-name').value=pc.name||c.contactName||'';
+  document.getElementById('tm-email').value=pc.email||c.email||'';
+  document.getElementById('tm-phone').value=pc.phone||c.phone||'';
+  document.getElementById('tm-role').value=pc.role||'';
   document.getElementById('tm-company').value=c.company||'';
   document.getElementById('tm-autofill').style.display='none';
-  // Store link
   document.getElementById('tm-name').dataset.clientLink=clientId;
 }
 
@@ -1541,14 +1545,14 @@ function renderProjectList(){
           <button class="icon-action" onclick="toggleEdit('projects','${p.id}')" title="${isEditing?'Close':'Edit'}"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
         </div>
       </div>
+      ${isEditing?renderProjectEditForm(p):`
       ${budgetMax>0?`<div style="margin-top:10px">
         <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:3px"><span>${$f(billed)} billed</span><span>${pct.toFixed(0)}%</span></div>
         <div class="gauge-bar" style="height:7px"><div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div></div>
       </div>`:''}
       ${p.desc?`<div style="font-size:13px;color:var(--text2);margin-top:8px">${p.desc}</div>`:''}
       ${renderMiniGantt(p)}
-      ${renderTasksAndMilestones(p)}
-      ${isEditing?renderProjectEditForm(p):''}
+      ${renderTasksAndMilestones(p)}`}
     </div>`;
   }).join('');
 }
@@ -1699,7 +1703,7 @@ function renderClientList(){
           ${c.notes?`<div style="font-size:12px;color:var(--text3);margin-top:2px">${c.notes}</div>`:''}
           <!-- Primary contact -->
           ${pc.name?`<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border)">
-            <div style="font-size:13px;font-weight:500">${pc.name}${pc.role?` <span style="font-size:11px;font-weight:400;color:var(--text2)">. ${pc.role}</span>`:''}</div>
+            <div style="font-size:13px;font-weight:500">${pc.name}${pc.suffix?` ${pc.suffix}`:''}${pc.role?` <span style="font-size:11px;font-weight:400;color:var(--text2)">· ${pc.role}</span>`:''}</div>
             <div class="client-details" style="margin-top:4px">
               ${pc.email?`<span class="client-detail"><i class="ti ti-mail" style="font-size:13px"></i><a href="mailto:${pc.email}">${pc.email}</a></span>`:''}
               ${pc.phone?`<span class="client-detail"><i class="ti ti-phone" style="font-size:13px"></i><a href="tel:${pc.phone}">${pc.phone}</a></span>`:''}
@@ -1849,6 +1853,15 @@ function updateClientPhoto(id,input){
   reader.readAsDataURL(file);
 }
 
+// Phone auto-formatter
+function formatPhone(input){
+  let v=input.value.replace(/\D/g,'').slice(0,10);
+  if(v.length>=7)v=`(${v.slice(0,3)}) ${v.slice(3,6)}-${v.slice(6)}`;
+  else if(v.length>=4)v=`(${v.slice(0,3)}) ${v.slice(3)}`;
+  else if(v.length>0)v=`(${v}`;
+  input.value=v;
+}
+
 function addClient(){
   const company=document.getElementById('c-company').value.trim();
   const contactName=document.getElementById('c-name').value.trim();
@@ -1861,6 +1874,7 @@ function addClient(){
     photo:document.getElementById('add-client-photo-data').value||'',
     primaryContact:{
       name:contactName,
+      suffix:document.getElementById('c-suffix').value.trim(),
       role:document.getElementById('c-role').value.trim(),
       email:document.getElementById('c-email').value.trim(),
       phone:document.getElementById('c-phone').value.trim(),
@@ -1868,7 +1882,7 @@ function addClient(){
     additionalContacts:getExtraContacts('add-extra-contacts')
   });
   save('tracker:clients',clients);
-  ['c-company','c-website','c-name','c-role','c-email','c-phone','c-notes','add-client-photo-data'].forEach(id=>{
+  ['c-company','c-website','c-name','c-suffix','c-role','c-email','c-phone','c-notes','add-client-photo-data'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
   document.getElementById('add-client-photo-preview').innerHTML='<i class="ti ti-camera" style="font-size:18px;color:var(--text3)"></i>';
@@ -2163,28 +2177,31 @@ function renderTeamEditForm(m){
 let _newTmColorVal=TEAM_COLORS[1].hex;
 
 function addTeamMember(){
-  const name=document.getElementById('tm-name').value.trim();if(!name)return;
-  if(_newTmColorVal==='#9151a0'){alert('That color is reserved for your profile. Please choose another.');return;}
   const nameEl=document.getElementById('tm-name');
+  const name=nameEl.value.trim();if(!name)return;
+  if(!_newTmColorVal||_newTmColorVal==='#9151a0'){alert('That color is reserved for your profile. Please choose another.');return;}
   teamMembers.unshift({
     id:uid(),name,
-    type:'external', // default; can toggle on card
+    type:'external',
     role:document.getElementById('tm-role').value.trim(),
     email:document.getElementById('tm-email').value.trim(),
     phone:document.getElementById('tm-phone').value.trim(),
     company:document.getElementById('tm-company').value.trim(),
-    rate:document.getElementById('tm-rate').value||'',
-    notes:document.getElementById('tm-notes').value.trim(),
-    photo:document.getElementById('add-tm-photo-data').value||'',
+    notes:document.getElementById('tm-notes')?.value.trim()||'',
+    photo:document.getElementById('add-tm-photo-data')?.value||'',
     clientLink:nameEl.dataset.clientLink||'',
     color:_newTmColorVal
   });
   save('tracker:team',teamMembers);
-  ['tm-name','tm-role','tm-email','tm-phone','tm-company','tm-rate','tm-notes','add-tm-photo-data'].forEach(id=>{
+  ['tm-name','tm-role','tm-email','tm-phone','tm-company','tm-notes'].forEach(id=>{
     const el=document.getElementById(id);if(el){el.value='';delete el.dataset.clientLink;}
   });
-  document.getElementById('add-tm-photo-preview').innerHTML='<i class="ti ti-camera" style="font-size:20px;color:var(--text3)"></i>';
+  const prev=document.getElementById('add-tm-photo-preview');
+  if(prev)prev.innerHTML='<i class="ti ti-camera" style="font-size:20px;color:var(--text3)"></i>';
+  const dataEl=document.getElementById('add-tm-photo-data');
+  if(dataEl)dataEl.value='';
   _newTmColorVal=TEAM_COLORS[1].hex;
+  renderColorPalette('tm-color-palette',_newTmColorVal,'pickNewTmColor',true);
   allDropdownRefresh();renderTeamList();
 }
 
@@ -2220,61 +2237,92 @@ function deleteTeamMember(id){
 //  MINI GANTT (inline on project card)
 // ═══════════════════════════════════════════════
 function renderMiniGantt(p){
-  if(!p.startDate)return''; // no dates, skip
-  const W=680,H=28,LW=0;
+  if(!p.startDate)return'';
+  const phases=(p.phases||[]).filter(ph=>ph.startDate&&ph.endDate);
+  const milestones=(p.milestones||[]).filter(m=>m.date);
+  if(!phases.length&&!milestones.length)return'';
+
   const start=new Date(p.startDate+'T12:00:00');
   const endDate=p.endDate?new Date(p.endDate+'T12:00:00'):new Date(start.getFullYear(),start.getMonth()+3,start.getDate());
-  const totalDays=Math.max(1,Math.round((endDate-start)/86400000));
-  const todayD=new Date();
-  const todayPct=Math.min(100,Math.max(0,(todayD-start)/86400000/totalDays*100));
-  const tasks=(p.tasks||[]).filter(t=>t.dueDate&&t.dueDate>=p.startDate);
-  const milestones=(p.milestones||[]).filter(m=>m.date&&m.date>=p.startDate);
-  const color=p.status==='completed'?'#888':p.status==='on_hold'?'var(--warning)':'var(--accent)';
-  const phases=p.phases||[];
+  const totalMs=Math.max(1,endDate-start);
+  function pctOf(d){return Math.min(100,Math.max(0,(new Date(d+'T12:00:00')-start)/totalMs*100));}
 
-  // Build month labels
+  // Dynamic height: header(28) + 1 project row(18) + each phase row(18) + milestone row(18) + month labels(16)
+  const rowH=18,headerH=28,labelH=16;
+  const rowCount=1+phases.length+(milestones.length>0?1:0);
+  const H=headerH+rowCount*rowH+labelH;
+  const W=680;
+
+  // Month labels
   let monthLabels=[];
   let cur=new Date(start.getFullYear(),start.getMonth(),1);
   while(cur<=endDate){
-    const pct=(cur-start)/86400000/totalDays*100;
-    if(pct>=0&&pct<=100)monthLabels.push({label:cur.toLocaleDateString('en-US',{month:'short'}),pct});
+    monthLabels.push({label:cur.toLocaleDateString('en-US',{month:'short'}),pct:pctOf(cur.toISOString().split('T')[0])});
     cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
   }
 
+  // Today
+  const todayPct=pctOf(today());
+  const todayInRange=todayPct>=0&&todayPct<=100;
+
+  let rows='';
+  let rowIdx=0;
+
+  // Project bar (row 0)
+  const projY=headerH+rowIdx*rowH;
+  rows+=`<text x="0" y="${projY+13}" font-size="10" fill="var(--text2)" font-family="-apple-system,sans-serif">${p.name.slice(0,20)}</text>`;
+  rows+=`<rect x="${pctOf(p.startDate)}%" y="${projY+3}" width="${pctOf(p.endDate||today())-pctOf(p.startDate)}%" height="${rowH-6}" fill="var(--accent)" opacity="0.2" rx="3"/>`;
+  rowIdx++;
+
   // Phase bars
-  const phaseBars=phases.filter(ph=>ph.startDate&&ph.endDate).map(ph=>{
-    const ps=new Date(ph.startDate+'T12:00:00');
-    const pe=new Date(ph.endDate+'T12:00:00');
-    const x=(ps-start)/86400000/totalDays*100;
-    const w=(pe-ps)/86400000/totalDays*100;
-    return`<rect x="${Math.max(0,x)}%" y="0" width="${Math.min(100-x,w)}%" height="8" fill="${color}" opacity="0.3" rx="2"/>`;
-  }).join('');
+  phases.forEach(ph=>{
+    const phY=headerH+rowIdx*rowH;
+    const x1=pctOf(ph.startDate);
+    const x2=pctOf(ph.endDate);
+    const bw=Math.max(0.5,x2-x1);
+    const col=ph.color||'#4a90d9';
+    rows+=`<text x="0" y="${phY+13}" font-size="10" fill="${col}" font-family="-apple-system,sans-serif">${ph.title.slice(0,18)}</text>`;
+    rows+=`<rect x="${x1}%" y="${phY+3}" width="${bw}%" height="${rowH-6}" fill="${col}" rx="3"/>`;
+    if(bw>8)rows+=`<text x="${(x1+bw/2)}%" y="${phY+14}" font-size="9" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle">${ph.title.slice(0,Math.floor(bw*0.12))}</text>`;
+    rowIdx++;
+  });
+
+  // Milestone row
+  if(milestones.length){
+    const msY=headerH+rowIdx*rowH;
+    rows+=`<text x="0" y="${msY+13}" font-size="10" fill="var(--text2)" font-family="-apple-system,sans-serif">Milestones</text>`;
+    milestones.forEach(ms=>{
+      const mp=pctOf(ms.date);
+      if(mp<0||mp>100)return;
+      const mc=ms.completed?'var(--success)':new Date(ms.date+'T12:00:00')<new Date()?'var(--danger)':'var(--accent)';
+      rows+=`<polygon points="${mp}%,${msY+2} calc(${mp}% + 6px),${msY+rowH/2} ${mp}%,${msY+rowH-2} calc(${mp}% - 6px),${msY+rowH/2}" fill="${mc}" opacity="0.9"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></polygon>`;
+    });
+    rowIdx++;
+  }
+
+  // Today line
+  const todayLine=todayInRange?`<line x1="${todayPct}%" y1="${headerH}" x2="${todayPct}%" y2="${H-labelH}" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="3,2"/>`:'' ;
+
+  // Month grid lines + labels
+  const gridAndLabels=monthLabels.map(m=>`
+    <line x1="${m.pct}%" y1="${headerH}" x2="${m.pct}%" y2="${H-labelH}" stroke="var(--border)" stroke-width="0.5"/>
+    <text x="${m.pct}%" y="${H-3}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif">${m.label}</text>
+  `).join('');
 
   return`<div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border)">
-    <div style="font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Timeline . ${fmtDate(p.startDate)} → ${fmtDate(p.endDate||'')}</div>
-    <svg width="100%" height="${H+18}" viewBox="0 0 ${W} ${H+18}" preserveAspectRatio="none" style="display:block;overflow:visible">
-      <!-- Month labels -->
-      ${monthLabels.map(m=>`<text x="${m.pct}%" y="${H+14}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif">${m.label}</text>`).join('')}
-      <!-- Track -->
-      <rect x="0" y="0" width="100%" height="${H}" fill="var(--bg2)" rx="4"/>
-      <!-- Main bar -->
-      <rect x="0" y="4" width="100%" height="${H-8}" fill="${color}" opacity="0.2" rx="3"/>
-      <!-- Phase bars -->
-      ${phaseBars}
-      <!-- Today marker -->
-      <line x1="${todayPct}%" y1="0" x2="${todayPct}%" y2="${H}" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="3,2"/>
-      <!-- Task dots -->
-      ${tasks.map(t=>{
-        const tp=Math.min(100,Math.max(0,(new Date(t.dueDate+'T12:00:00')-start)/86400000/totalDays*100));
-        const tc=t.status==='done'?'var(--success)':t.taskType==='critical'?'var(--danger)':'var(--text2)';
-        return`<circle cx="${tp}%" cy="${H/2}" r="4" fill="${tc}" opacity="0.85"><title>${t.title}</title></circle>`;
-      }).join('')}
-      <!-- Milestones -->
-      ${milestones.map(ms=>{
-        const mp=Math.min(100,Math.max(0,(new Date(ms.date+'T12:00:00')-start)/86400000/totalDays*100));
-        const mc=ms.completed?'var(--success)':'var(--accent)';
-        return`<polygon points="${mp}%,2 calc(${mp}% + 6px),${H/2} ${mp}%,${H-2} calc(${mp}% - 6px),${H/2}" fill="${mc}" opacity="0.9"><title>${ms.title}</title></polygon>`;
-      }).join('')}
+    <div style="font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.07em">Timeline</div>
+    <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;overflow:visible">
+      <!-- BG -->
+      <rect x="0" y="${headerH}" width="100%" height="${H-headerH-labelH}" fill="var(--bg2)" rx="3"/>
+      <!-- Grid + labels -->
+      ${gridAndLabels}
+      <!-- Header: date range -->
+      <text x="0" y="14" font-size="10" fill="var(--text2)" font-family="-apple-system,sans-serif">${fmtDate(p.startDate)}</text>
+      <text x="100%" y="14" font-size="10" fill="var(--text2)" font-family="-apple-system,sans-serif" text-anchor="end">${fmtDate(p.endDate||today())}</text>
+      <!-- Rows -->
+      ${rows}
+      <!-- Today -->
+      ${todayLine}
     </svg>
   </div>`;
 }
@@ -2289,18 +2337,31 @@ function getProjectMilestones(projId){
 
 function addTask(projId){
   const inp=document.getElementById(`task-inp-${projId}`);
-  const due=document.getElementById(`task-due-${projId}`);
-  const assignee=document.getElementById(`task-assign-${projId}`);
-  const priority=document.getElementById(`task-pri-${projId}`);
-  const phaseEl=document.getElementById(`task-phase-${projId}`);
   const typeEl=document.getElementById(`task-type-${projId}`);
+  const phaseEl=document.getElementById(`task-phase-${projId}`);
   const title=inp.value.trim();if(!title)return;
   const p=projects.find(x=>x.id===projId);if(!p)return;
   if(!p.tasks)p.tasks=[];
-  p.tasks.push({id:uid(),title,dueDate:due.value||'',assigneeId:assignee.value||'',priority:priority.value||'medium',status:'todo',phaseId:phaseEl?phaseEl.value:'',taskType:typeEl?typeEl.value:''});
+  const taskType=typeEl?typeEl.value:'';
+  const isOpen=taskType==='open';
+  const dueEl=document.getElementById(`task-due-${projId}`);
+  const priEl=document.getElementById(`task-pri-${projId}`);
+  const assigneeIds=getNewTaskAssignees(projId);
+  p.tasks.push({
+    id:uid(),title,
+    dueDate:isOpen?'':(dueEl?dueEl.value:''),
+    assigneeIds,
+    assigneeId:assigneeIds[0]||'',
+    priority:priEl?priEl.value:'medium',
+    status:'todo',
+    phaseId:phaseEl?phaseEl.value:'',
+    taskType
+  });
   save('tracker:projects',projects);
-  inp.value='';due.value='';
+  inp.value='';if(dueEl)dueEl.value='';
   renderProjectList();
+  // Re-init chips after re-render
+  setTimeout(()=>initTaskAssignChips(projId),0);
 }
 
 function updateTaskStatus(projId,taskId,status){
@@ -2340,6 +2401,104 @@ function deleteMilestone(projId,msId){
   save('tracker:projects',projects);renderProjectList();
 }
 
+// Phase editing
+let _editingPhases={};
+function toggleEditPhase(projId,phId){
+  const key=projId+'-'+phId;
+  _editingPhases[key]=!_editingPhases[key];
+  if(!editing.phases)editing.phases=null;
+  editing.phases=_editingPhases[key]?phId:null;
+  renderProjectList();
+}
+
+function setPhaseEditColor(phId,color){
+  const inp=document.getElementById(`ph-edit-color-${phId}`);
+  if(inp)inp.value=color;
+  // Update swatch borders
+  document.querySelectorAll(`[id^="pec-${phId}-"]`).forEach(el=>{
+    el.style.borderColor=el.style.background===color?'var(--text)':'transparent';
+  });
+}
+
+function savePhaseEdit(projId,phId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const ph=(p.phases||[]).find(x=>x.id===phId);if(!ph)return;
+  ph.title=document.getElementById(`ph-edit-name-${phId}`).value.trim()||ph.title;
+  ph.color=document.getElementById(`ph-edit-color-${phId}`).value||ph.color;
+  ph.startDate=document.getElementById(`ph-edit-start-${phId}`).value||'';
+  ph.endDate=document.getElementById(`ph-edit-end-${phId}`).value||'';
+  save('tracker:projects',projects);
+  editing.phases=null;
+  renderProjectList();
+}
+
+// Milestone editing
+function toggleEditMilestone(projId,msId){
+  editing.milestones=editing.milestones===msId?null:msId;
+  renderProjectList();
+}
+
+function saveMilestoneEdit(projId,msId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const ms=(p.milestones||[]).find(x=>x.id===msId);if(!ms)return;
+  ms.title=document.getElementById(`ms-edit-title-${msId}`).value.trim()||ms.title;
+  ms.date=document.getElementById(`ms-edit-date-${msId}`).value||ms.date;
+  save('tracker:projects',projects);
+  editing.milestones=null;
+  renderProjectList();
+}
+
+// Task multi-assignee toggle
+function toggleTaskAssignee(projId,taskId,memberId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
+  if(!t.assigneeIds)t.assigneeIds=t.assigneeId?[t.assigneeId]:[];
+  const idx=t.assigneeIds.indexOf(memberId);
+  if(idx>=0)t.assigneeIds.splice(idx,1);
+  else t.assigneeIds.push(memberId);
+  t.assigneeId=t.assigneeIds[0]||'';
+  save('tracker:projects',projects);
+  renderProjectList();
+}
+
+// Init task-assign chips after render
+function initTaskAssignChips(projId){
+  const container=document.getElementById(`task-assign-chips-${projId}`);
+  if(!container)return;
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  let selected=[];
+  container.dataset.selected=JSON.stringify(selected);
+  container.innerHTML=allMembers.map(m=>`
+    <span onclick="toggleNewTaskAssignee('${projId}','${m.id}')" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid var(--border2);background:transparent;color:var(--text2)" id="nta-${projId}-${m.id}">
+      ${m.name.split(' ')[0]}
+    </span>`).join('');
+}
+
+function toggleNewTaskAssignee(projId,memberId){
+  const container=document.getElementById(`task-assign-chips-${projId}`);
+  if(!container)return;
+  let selected=[];
+  try{selected=JSON.parse(container.dataset.selected||'[]');}catch{}
+  const idx=selected.indexOf(memberId);
+  if(idx>=0)selected.splice(idx,1);else selected.push(memberId);
+  container.dataset.selected=JSON.stringify(selected);
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  const el=document.getElementById(`nta-${projId}-${memberId}`);
+  const m=allMembers.find(x=>x.id===memberId);
+  if(el&&m){
+    const isSel=selected.includes(memberId);
+    el.style.border=`.5px solid ${isSel?m.color:'var(--border2)'}`;
+    el.style.background=isSel?m.color+'22':'transparent';
+    el.style.color=isSel?m.color:'var(--text2)';
+  }
+}
+
+function getNewTaskAssignees(projId){
+  const container=document.getElementById(`task-assign-chips-${projId}`);
+  if(!container)return[];
+  try{return JSON.parse(container.dataset.selected||'[]');}catch{return[];}
+}
+
 function addPhase(projId){
   const inp=document.getElementById(`phase-inp-${projId}`);
   const start=document.getElementById(`phase-start-${projId}`);
@@ -2366,98 +2525,90 @@ function deletePhase(projId,phId){
 
 function renderTasksAndMilestones(p){
   const tasks=p.tasks||[];
-  const milestones=p.milestones||[];
-  const phases=p.phases||[];
+  const milestones=[...(p.milestones||[])].sort((a,b)=>a.date.localeCompare(b.date));
+  const phases=[...(p.phases||[])].sort((a,b)=>{
+    if(!a.startDate&&!b.startDate)return 0;
+    if(!a.startDate)return 1;
+    if(!b.startDate)return -1;
+    return a.startDate.localeCompare(b.startDate);
+  });
   const todayStr=today();
   const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
-  const memberOpts=allMembers.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
   const phaseOpts=phases.map(ph=>`<option value="${ph.id}">${ph.title}</option>`).join('');
-  const priBadge=pri=>pri==='high'?'color:var(--danger);font-size:11px':pri==='low'?'color:var(--text3);font-size:11px':'color:var(--warning);font-size:11px';
   const statusOpts=(cur)=>['todo','in_progress','done'].map(s=>`<option value="${s}"${s===cur?' selected':''}>${s==='todo'?'To do':s==='in_progress'?'In progress':'Done'}</option>`).join('');
   const typeBadge=(t)=>t.taskType==='critical'?'<span class="phase-label phase-critical">Critical</span>':t.taskType==='open'?'<span class="phase-label phase-open">Open</span>':'';
   const doneTasks=tasks.filter(t=>t.status==='done').length;
+
+  // Multi-assignee chip rendering
+  function assigneeChips(assigneeIds){
+    const ids=Array.isArray(assigneeIds)?assigneeIds:(assigneeIds?[assigneeIds]:[]);
+    return ids.map(id=>{
+      const m=allMembers.find(x=>x.id===id);
+      return m?`<span style="font-size:10px;background:${m.color||'var(--accent)'};color:#fff;padding:1px 6px;border-radius:10px;white-space:nowrap">${m.name.split(' ')[0]}</span>`:'';
+    }).join('');
+  }
+
+  // Multi-assignee selector chips (toggleable)
+  function assigneeSelector(taskId,assigneeIds){
+    const ids=Array.isArray(assigneeIds)?assigneeIds:(assigneeIds?[assigneeIds]:[]);
+    return allMembers.map(m=>{
+      const sel=ids.includes(m.id);
+      return`<span onclick="toggleTaskAssignee('${p.id}','${taskId}','${m.id}')" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;
+    }).join('');
+  }
+
+  function renderTaskRow(t){
+    const isOpen=t.taskType==='open';
+    const overdue=!isOpen&&t.dueDate&&t.dueDate<todayStr&&t.status!=='done';
+    const expandKey=`task-expand-${p.id}-${t.id}`;
+    return`<div style="border-bottom:.5px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 0;font-size:13px">
+        <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
+        ${typeBadge(t)}
+        <span style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;cursor:pointer" onclick="document.getElementById('${expandKey}').style.display=document.getElementById('${expandKey}').style.display==='none'?'block':'none'">${t.title}${!isOpen&&t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'};margin-left:5px">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}</span>
+        ${assigneeChips(t.assigneeIds||t.assigneeId)}
+        <select onchange="updateTaskStatus('${p.id}','${t.id}',this.value)" style="width:auto;font-size:11px;padding:2px 4px">${statusOpts(t.status)}</select>
+        <button class="icon-action danger" onclick="deleteTask('${p.id}','${t.id}')" style="font-size:12px"><i class="ti ti-x"></i></button>
+      </div>
+      <div id="${expandKey}" style="display:none;padding:6px 0 8px 20px;background:var(--bg2);border-radius:4px;margin-bottom:4px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Assign to:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${assigneeSelector(t.id,t.assigneeIds||t.assigneeId)}</div>
+      </div>
+    </div>`;
+  }
 
   // Group tasks by phase
   const ungrouped=tasks.filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId));
   const grouped=phases.map(ph=>({phase:ph,tasks:tasks.filter(t=>t.phaseId===ph.id)}));
 
-  function renderTaskRow(t){
-    const assignee=t.assigneeId?allMembers.find(m=>m.id===t.assigneeId):null;
-    const overdue=t.dueDate&&t.dueDate<todayStr&&t.status!=='done';
-    return`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:.5px solid var(--border);font-size:13px">
-      <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
-      ${typeBadge(t)}
-      <span style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1">${t.title}${t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'};margin-left:5px">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}</span>
-      ${assignee?`<span style="font-size:10px;background:${assignee.color||'var(--accent)'};color:#fff;padding:1px 6px;border-radius:10px">${assignee.name.split(' ')[0]}</span>`:''}
-      <select onchange="updateTaskStatus('${p.id}','${t.id}',this.value)" style="width:auto;font-size:11px;padding:2px 4px">${statusOpts(t.status)}</select>
-      <button class="icon-action danger" onclick="deleteTask('${p.id}','${t.id}')" style="font-size:12px"><i class="ti ti-x"></i></button>
-    </div>`;
-  }
-
   return`<div style="margin-top:14px;border-top:.5px solid var(--border);padding-top:12px">
-    <!-- PHASES -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <span class="sec-title" style="margin:0">Phases & Tasks <span style="font-weight:400;color:var(--text3)">(${doneTasks}/${tasks.length})</span></span>
-    </div>
-    ${phases.length===0&&tasks.length===0?'<div style="font-size:12px;color:var(--text3);margin-bottom:8px">No tasks yet -- add a phase or task below.</div>':''}
 
-    <!-- Ungrouped tasks -->
-    ${ungrouped.length>0?`<div style="margin-bottom:10px">${ungrouped.map(renderTaskRow).join('')}</div>`:''}
-
-    <!-- Phase groups -->
-    ${grouped.map(({phase,tasks:pts})=>`<div style="margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-        <span style="width:12px;height:12px;border-radius:3px;background:${phase.color||'var(--accent)'};flex-shrink:0;display:inline-block"></span>
-        <span style="font-size:12px;font-weight:600;color:var(--text)">${phase.title}</span>
-        ${phase.startDate||phase.endDate?`<span style="font-size:11px;color:var(--text3)">${phase.startDate?fmtDate(phase.startDate):''}${phase.startDate&&phase.endDate?' → ':''}${phase.endDate?fmtDate(phase.endDate):''}</span>`:''}
-        <button class="icon-action danger" onclick="deletePhase('${p.id}','${phase.id}')" style="font-size:12px;margin-left:auto"><i class="ti ti-x"></i></button>
-      </div>
-      ${pts.length?pts.map(renderTaskRow).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">No tasks in this phase</div>'}
-    </div>`).join('')}
-
-    <!-- Add task row -->
-    <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-top:4px">
-      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">ADD TASK</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
-        <input type="text" id="task-inp-${p.id}" placeholder="Task title..." style="flex:1;min-width:140px;font-size:13px;padding:5px 8px">
-        <select id="task-type-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
-          <option value="">Normal</option><option value="open">Open</option><option value="critical">Critical</option>
-        </select>
-        <select id="task-phase-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
-          <option value="">No phase</option>${phaseOpts}
-        </select>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
-        <input type="date" id="task-due-${p.id}" style="width:140px;font-size:13px;padding:5px 8px">
-        <select id="task-assign-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
-          <option value="">Unassigned</option>${memberOpts}
-        </select>
-        <select id="task-pri-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
-          <option value="low">Low</option><option value="medium" selected>Med</option><option value="high">High</option>
-        </select>
-        <button class="btn sm primary" onclick="addTask('${p.id}')"><i class="ti ti-plus"></i> Add task</button>
-      </div>
-    </div>
-
-    <!-- Add phase row -->
-    <div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end;flex-wrap:wrap">
-      <input type="text" id="phase-inp-${p.id}" placeholder="Phase name (e.g. Discovery)..." style="flex:2;min-width:140px;font-size:13px;padding:5px 8px">
-      <input type="date" id="phase-start-${p.id}" style="width:140px;font-size:13px;padding:5px 8px" title="Phase start date">
-      <input type="date" id="phase-end-${p.id}" style="width:140px;font-size:13px;padding:5px 8px" title="Phase end date">
-      <button class="btn sm" onclick="addPhase('${p.id}')"><i class="ti ti-layers-subtract"></i> Add phase</button>
-    </div>
-
-    <!-- MILESTONES -->
-    <div style="margin-top:14px;padding-top:12px;border-top:.5px solid var(--border)">
+    <!-- MILESTONES (above phases) -->
+    <div style="margin-bottom:14px">
       <span class="sec-title" style="margin-bottom:8px;display:block">Milestones</span>
+      ${milestones.length===0?'<div style="font-size:12px;color:var(--text3)">No milestones yet.</div>':''}
       ${milestones.map(ms=>{
-        const overdue=!ms.completed&&ms.date<todayStr;
-        return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid var(--border);font-size:13px">
-          <input type="checkbox" ${ms.completed?'checked':''} onchange="toggleMilestone('${p.id}','${ms.id}')" style="width:auto;flex-shrink:0">
-          <i class="ti ti-flag-2" style="color:${ms.completed?'var(--success)':overdue?'var(--danger)':'var(--accent)'};font-size:14px"></i>
-          <span style="${ms.completed?'text-decoration:line-through;color:var(--text3);':''}flex:1">${ms.title}</span>
-          <span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'}">${overdue?'⚠ ':''}${fmtDate(ms.date)}</span>
-          <button class="icon-action danger" onclick="deleteMilestone('${p.id}','${ms.id}')" style="font-size:13px"><i class="ti ti-x"></i></button>
+        const overdue=!ms.completed&&ms.date&&ms.date<todayStr;
+        const isEditingMs=editing.milestones===ms.id;
+        return`<div style="border-bottom:.5px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px">
+            <input type="checkbox" ${ms.completed?'checked':''} onchange="toggleMilestone('${p.id}','${ms.id}')" style="width:auto;flex-shrink:0">
+            <i class="ti ti-flag-2" style="color:${ms.completed?'var(--success)':overdue?'var(--danger)':'var(--accent)'};font-size:14px;flex-shrink:0"></i>
+            <span style="${ms.completed?'text-decoration:line-through;color:var(--text3);':''}flex:1">${ms.title}</span>
+            <span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'}">${overdue?'⚠ ':''}${fmtDate(ms.date)}</span>
+            <button class="icon-action" onclick="toggleEditMilestone('${p.id}','${ms.id}')" title="Edit"><i class="ti ${isEditingMs?'ti-x':'ti-pencil'}"></i></button>
+            <button class="icon-action danger" onclick="deleteMilestone('${p.id}','${ms.id}')" style="font-size:13px"><i class="ti ti-x"></i></button>
+          </div>
+          ${isEditingMs?`<div class="edit-form" style="margin-bottom:6px">
+            <div class="grid2">
+              <div><label>Title</label><input type="text" id="ms-edit-title-${ms.id}" value="${ms.title}"></div>
+              <div><label>Date</label><input type="date" id="ms-edit-date-${ms.id}" value="${ms.date||''}"></div>
+            </div>
+            <div class="edit-actions"><div></div><div style="display:flex;gap:6px">
+              <button class="btn danger sm" onclick="deleteMilestone('${p.id}','${ms.id}')"><i class="ti ti-trash"></i> Delete</button>
+              <button class="btn primary sm" onclick="saveMilestoneEdit('${p.id}','${ms.id}')"><i class="ti ti-check"></i> Save</button>
+            </div></div>
+          </div>`:''}
         </div>`;
       }).join('')}
       <div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end">
@@ -2465,6 +2616,85 @@ function renderTasksAndMilestones(p){
         <input type="date" id="ms-date-${p.id}" style="width:150px;font-size:13px;padding:5px 8px">
         <button class="btn sm primary" onclick="addMilestone('${p.id}')"><i class="ti ti-plus"></i> Add</button>
       </div>
+    </div>
+
+    <!-- PHASES & TASKS -->
+    <div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+      <span class="sec-title" style="margin:0">Phases & Tasks <span style="font-weight:400;color:var(--text3)">(${doneTasks}/${tasks.length})</span></span>
+    </div>
+    ${phases.length===0&&tasks.length===0?'<div style="font-size:12px;color:var(--text3);margin-bottom:8px">No tasks yet.</div>':''}
+
+    <!-- Ungrouped tasks -->
+    ${ungrouped.length>0?`<div style="margin-bottom:10px">${ungrouped.map(renderTaskRow).join('')}</div>`:''}
+
+    <!-- Phase groups (sorted by start date) -->
+    ${grouped.map(({phase,tasks:pts})=>{
+      const isEditingPh=editing.phases===phase.id;
+      return`<div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+          <span style="width:12px;height:12px;border-radius:3px;background:${phase.color||'var(--accent)'};flex-shrink:0;display:inline-block"></span>
+          <span style="font-size:12px;font-weight:600;color:var(--text)">${phase.title}</span>
+          ${phase.startDate||phase.endDate?`<span style="font-size:11px;color:var(--text3)">${phase.startDate?fmtDate(phase.startDate):''}${phase.startDate&&phase.endDate?' → ':''}${phase.endDate?fmtDate(phase.endDate):''}</span>`:''}
+          <button class="icon-action" onclick="toggleEditPhase('${p.id}','${phase.id}')" title="Edit phase"><i class="ti ${isEditingPh?'ti-x':'ti-pencil'}"></i></button>
+          <button class="icon-action danger" onclick="deletePhase('${p.id}','${phase.id}')" style="font-size:12px;margin-left:auto"><i class="ti ti-x"></i></button>
+        </div>
+        ${isEditingPh?`<div class="edit-form" style="margin-bottom:8px">
+          <div class="grid2">
+            <div><label>Phase name</label><input type="text" id="ph-edit-name-${phase.id}" value="${phase.title}"></div>
+            <div>
+              <label>Color</label>
+              <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px">
+                ${['#4a90d9','#2d8a6b','#d4756b','#d4a056','#5ba08a','#c27fd4','#6b3fa0','#2d6fa8','#5a5068','#8a7a6b'].map(col=>`<span onclick="setPhaseEditColor('${phase.id}','${col}')" style="width:22px;height:22px;border-radius:50%;background:${col};cursor:pointer;border:2.5px solid ${phase.color===col?'var(--text)':'transparent'}" id="pec-${phase.id}-${col.slice(1)}"></span>`).join('')}
+              </div>
+              <input type="hidden" id="ph-edit-color-${phase.id}" value="${phase.color||'#4a90d9'}">
+            </div>
+          </div>
+          <div class="grid2">
+            <div><label>Start date</label><input type="date" id="ph-edit-start-${phase.id}" value="${phase.startDate||''}"></div>
+            <div><label>End date</label><input type="date" id="ph-edit-end-${phase.id}" value="${phase.endDate||''}"></div>
+          </div>
+          <div class="edit-actions"><div></div><div style="display:flex;gap:6px">
+            <button class="btn danger sm" onclick="deletePhase('${p.id}','${phase.id}')"><i class="ti ti-trash"></i> Delete</button>
+            <button class="btn primary sm" onclick="savePhaseEdit('${p.id}','${phase.id}')"><i class="ti ti-check"></i> Save</button>
+          </div></div>
+        </div>`:''}
+        ${pts.length?pts.map(renderTaskRow).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">No tasks in this phase</div>'}
+      </div>`;
+    }).join('')}
+
+    <!-- Add task -->
+    <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-top:4px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">ADD TASK</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
+        <input type="text" id="task-inp-${p.id}" placeholder="Task title..." style="flex:1;min-width:140px;font-size:13px;padding:5px 8px">
+        <select id="task-type-${p.id}" onchange="document.getElementById('task-due-wrap-${p.id}').style.display=this.value==='open'?'none':'flex'" style="width:auto;font-size:13px;padding:5px 8px">
+          <option value="">Normal</option><option value="open">Open</option><option value="critical">Critical</option>
+        </select>
+        <select id="task-phase-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
+          <option value="">No phase</option>${phaseOpts}
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end" id="task-due-wrap-${p.id}">
+        <input type="date" id="task-due-${p.id}" style="width:140px;font-size:13px;padding:5px 8px">
+        <select id="task-pri-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
+          <option value="low">Low</option><option value="medium" selected>Med</option><option value="high">High</option>
+        </select>
+      </div>
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+        <span style="font-size:11px;color:var(--text3)">Assign:</span>
+        <div style="display:flex;flex-wrap:wrap;gap:4px" id="task-assign-chips-${p.id}"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <button class="btn sm primary" onclick="addTask('${p.id}')"><i class="ti ti-plus"></i> Add task</button>
+      </div>
+    </div>
+
+    <!-- Add phase -->
+    <div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end;flex-wrap:wrap">
+      <input type="text" id="phase-inp-${p.id}" placeholder="Phase name (e.g. Discovery)..." style="flex:2;min-width:140px;font-size:13px;padding:5px 8px">
+      <input type="date" id="phase-start-${p.id}" style="width:140px;font-size:13px;padding:5px 8px" title="Phase start date">
+      <input type="date" id="phase-end-${p.id}" style="width:140px;font-size:13px;padding:5px 8px" title="Phase end date">
+      <button class="btn sm" onclick="addPhase('${p.id}')"><i class="ti ti-layers-subtract"></i> Add phase</button>
     </div>
   </div>`;
 }
