@@ -660,20 +660,67 @@ function handleDriveAuth(){
   url.searchParams.set('include_granted_scopes','true');
   url.searchParams.set('prompt','select_account');
   setSyncUI('pending','Waiting for Google sign-in...');
+
+  // Clear any stale token before opening popup
+  localStorage.removeItem('gd_auth_token');
+
   const popup=window.open(url.toString(),'gdrive-auth','width=500,height=620');
-  window.addEventListener('message',async function h(e){
+
+  function cleanup(){
+    window.removeEventListener('storage',onStorage);
+    window.removeEventListener('message',onMessage);
+    clearInterval(popupChecker);
+  }
+
+  // Primary: localStorage storage event — works even when GitHub Pages COOP
+  // header blocks window.opener in the popup
+  async function onStorage(e){
+    if(e.key!=='gd_auth_token'||!e.newValue)return;
+    cleanup();
+    try{
+      const data=JSON.parse(e.newValue);
+      localStorage.removeItem('gd_auth_token');
+      if(data.token){
+        gdToken=data.token;
+        localStorage.setItem('gd:wasConnected','1');
+        if(popup&&!popup.closed)popup.close();
+        await initDriveWithToken();
+      } else if(data.error){
+        setSyncUI('error','Sign-in failed -- click to retry',true,'Retry');
+      }
+    }catch(err){setSyncUI('error','Auth error',true,'Retry');}
+  }
+
+  // Fallback: postMessage (works if COOP not blocking)
+  async function onMessage(e){
     if(e.data&&e.data.type==='gd_token'){
-      window.removeEventListener('message',h);
+      cleanup();
       gdToken=e.data.token;
       localStorage.setItem('gd:wasConnected','1');
       if(popup&&!popup.closed)popup.close();
       await initDriveWithToken();
     }
     if(e.data&&e.data.type==='gd_error'){
-      window.removeEventListener('message',h);
+      cleanup();
       setSyncUI('error','Sign-in failed -- click to retry',true,'Retry');
     }
-  });
+  }
+
+  window.addEventListener('storage',onStorage);
+  window.addEventListener('message',onMessage);
+
+  // Detect manual popup close before auth completes
+  const popupChecker=setInterval(()=>{
+    if(popup&&popup.closed){
+      setTimeout(()=>{
+        const stored=localStorage.getItem('gd_auth_token');
+        if(!stored&&!gdToken){
+          cleanup();
+          setSyncUI('offline','Sign-in cancelled',true,'Connect Drive');
+        }
+      },600);
+    }
+  },500);
 }
 
 function checkHashToken(){
