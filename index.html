@@ -782,7 +782,8 @@ const TEAM_COLORS=[
 
 const DEF_CATS=['Software','Travel','Equipment','Subcontractor','Meals','Office','Other'];
 let settings, timeEntries, expenses, clients, projects, clientInvs, teamMembers, myProfile, currentTab='dashboard';
-let editing={time:null,expenses:null,projects:null,clients:null,team:null,milestones:null,phases:null};
+let editing={time:null,expenses:null,projects:null,clients:null,team:null,milestones:null,phases:null,tasks:null};
+const _ganttCompressed={};
 
 function reloadState(){
   settings    =Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD',expenseCategories:DEF_CATS},load('tracker:settings',{})||{});
@@ -1386,7 +1387,7 @@ function renderTimeEditForm(e){
       <div><label>Client</label><select id="et-client-${e.id}"><option value="">-- No client --</option>${clientOpts}</select></div>
     </div>
     <div class="grid2">
-      <div><label>Assignee</label><select id="et-assignee-${e.id}"><option value="">-- Me / unassigned --</option>${assigneeOpts}</select></div>
+      <div><label>Assignee</label><select id="et-assignee-${e.id}"><option value="">-- Me --</option>${assigneeOpts}</select></div>
       <div><label>Task / description</label><input type="text" id="et-task-${e.id}" value="${e.task}"></div>
     </div>
     <div class="field"><label>Notes (optional)</label><input type="text" id="et-notes-${e.id}" value="${e.notes||''}"></div>
@@ -1580,7 +1581,7 @@ function renderProjectList(){
         <div class="gauge-bar" style="height:7px"><div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div></div>
       </div>`:''}
       ${p.desc?`<div style="font-size:13px;color:var(--text2);margin-top:8px">${p.desc}</div>`:''}
-      ${renderMiniGantt(p)}
+      ${renderMiniGantt(p,{compressed:_ganttCompressed[p.id]!==false})}
       ${renderTasksAndMilestones(p)}`}
     </div>`;
   }).join('');
@@ -2288,29 +2289,40 @@ function deleteTeamMember(id){
 // ═══════════════════════════════════════════════
 //  MINI GANTT (inline on project card)
 // ═══════════════════════════════════════════════
-function renderMiniGantt(p){
+function renderMiniGantt(p, opts={}){
   const phases=(p.phases||[]).filter(ph=>ph.startDate||ph.endDate).sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
   const milestones=(p.milestones||[]).filter(m=>m.date).sort((a,b)=>a.date.localeCompare(b.date));
   if(!phases.length&&!milestones.length)return'';
 
   const gId=`mg-${p.id}`;
+  const isCompressed=_ganttCompressed[p.id]!==false; // default compressed
 
-  // Build date range from phases and milestones only (not contract dates)
-  let minD=null,maxD=null;
+  // Build full date range from phases and milestones only (not contract dates)
+  let fullMinD=null,fullMaxD=null;
   phases.forEach(ph=>{
-    if(ph.startDate){const d=new Date(ph.startDate+'T12:00:00');if(!minD||d<minD)minD=d;}
-    if(ph.endDate){const d=new Date(ph.endDate+'T12:00:00');if(!maxD||d>maxD)maxD=d;}
+    if(ph.startDate){const d=new Date(ph.startDate+'T12:00:00');if(!fullMinD||d<fullMinD)fullMinD=d;}
+    if(ph.endDate){const d=new Date(ph.endDate+'T12:00:00');if(!fullMaxD||d>fullMaxD)fullMaxD=d;}
   });
   milestones.forEach(ms=>{
     const d=new Date(ms.date+'T12:00:00');
-    if(!minD||d<minD)minD=d;
-    if(!maxD||d>maxD)maxD=d;
+    if(!fullMinD||d<fullMinD)fullMinD=d;
+    if(!fullMaxD||d>fullMaxD)fullMaxD=d;
   });
-  if(!minD){minD=new Date();maxD=new Date(minD);maxD.setMonth(maxD.getMonth()+3);}
-  if(!maxD||maxD<=minD){maxD=new Date(minD);maxD.setMonth(maxD.getMonth()+1);}
-  // Pad by a bit
-  minD=new Date(minD.getFullYear(),minD.getMonth(),1);
-  maxD=new Date(maxD.getFullYear(),maxD.getMonth()+1,0);
+  if(!fullMinD){fullMinD=new Date();fullMaxD=new Date(fullMinD);fullMaxD.setMonth(fullMaxD.getMonth()+3);}
+  if(!fullMaxD||fullMaxD<=fullMinD){fullMaxD=new Date(fullMinD);fullMaxD.setMonth(fullMaxD.getMonth()+1);}
+  fullMinD=new Date(fullMinD.getFullYear(),fullMinD.getMonth(),1);
+  fullMaxD=new Date(fullMaxD.getFullYear(),fullMaxD.getMonth()+1,0);
+
+  // Apply compressed / full view
+  let minD,maxD;
+  if(isCompressed){
+    const now=new Date();
+    const center=now>fullMinD&&now<fullMaxD?now:fullMinD;
+    minD=new Date(center.getFullYear(),center.getMonth()-1,1);
+    maxD=new Date(center.getFullYear(),center.getMonth()+2,0);
+  } else {
+    minD=fullMinD;maxD=fullMaxD;
+  }
 
   const totalMs=Math.max(1,maxD-minD);
   const rowH=22,headerH=20,labelH=14;
@@ -2401,8 +2413,8 @@ function renderMiniGantt(p){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Timeline</span>
       <div style="display:flex;gap:4px">
-        <button class="btn sm" onclick="setMiniGanttView('${gId}','compressed')" id="${gId}-compressed" style="padding:2px 8px;font-size:10px;background:var(--accent);color:#fff;border-color:var(--accent)">3 mo</button>
-        <button class="btn sm" onclick="setMiniGanttView('${gId}','full')" id="${gId}-full" style="padding:2px 8px;font-size:10px">Full</button>
+        <button class="btn sm" onclick="setMiniGanttView('${gId}','compressed')" id="${gId}-compressed" style="padding:2px 8px;font-size:10px;${isCompressed?'background:var(--accent);color:#fff;border-color:var(--accent)':''}">3 mo</button>
+        <button class="btn sm" onclick="setMiniGanttView('${gId}','full')" id="${gId}-full" style="padding:2px 8px;font-size:10px;${!isCompressed?'background:var(--accent);color:#fff;border-color:var(--accent)':''}">Full</button>
       </div>
     </div>
     <div id="${gId}" data-mindate="${minD.toISOString().split('T')[0]}" data-maxdate="${maxD.toISOString().split('T')[0]}" data-pid="${p.id}" style="overflow-x:auto">
@@ -2418,20 +2430,11 @@ function renderMiniGantt(p){
 }
 
 function setMiniGanttView(gId, mode){
-  const container=document.getElementById(gId);if(!container)return;
-  const pid=container.dataset.pid;
-  const p=projects.find(x=>x.id===pid);if(!p)return;
-  document.getElementById(gId+'-compressed').style.cssText='padding:2px 8px;font-size:10px;'+(mode==='compressed'?'background:var(--accent);color:#fff;border-color:var(--accent)':'');
-  document.getElementById(gId+'-full').style.cssText='padding:2px 8px;font-size:10px;'+(mode==='full'?'background:var(--accent);color:#fff;border-color:var(--accent)':'');
-  // Re-render with overridden date range
-  if(mode==='compressed'){
-    const now=new Date();
-    container.dataset.override=JSON.stringify({start:now.toISOString().split('T')[0],end:new Date(now.getFullYear(),now.getMonth()+3,0).toISOString().split('T')[0]});
-  } else {
-    delete container.dataset.override;
-  }
-  // Trigger re-render of project
+  // Extract pid from gId (format: mg-PROJID)
+  const pid=gId.replace('mg-','');
+  _ganttCompressed[pid]=(mode==='compressed');
   renderProjectList();
+  renderDashBudgets();
 }
 
 // ═══════════════════════════════════════════════
@@ -2563,10 +2566,20 @@ function saveMilestoneEdit(projId,msId){
 }
 
 // Task multi-assignee toggle
-function toggleTaskAssignee(projId,taskId,memberId){
+function saveTaskTitle(projId,taskId,newTitle){
   const p=projects.find(x=>x.id===projId);if(!p)return;
-  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
-  if(!t.assigneeIds)t.assigneeIds=t.assigneeId?[t.assigneeId]:[];
+  const t=(p.tasks||[]).find(x=>x.id===taskId);
+  if(t&&newTitle.trim())t.title=newTitle.trim();
+  save('tracker:projects',projects);
+}
+
+function toggleTaskExpandEdit(projId,taskId){
+  const key=`task-expand-${projId}-${taskId}`;
+  const el=document.getElementById(key);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
+
+function toggleTaskAssignee(projId,taskId,memberId){
   const idx=t.assigneeIds.indexOf(memberId);
   if(idx>=0)t.assigneeIds.splice(idx,1);
   else t.assigneeIds.push(memberId);
