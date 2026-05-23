@@ -639,7 +639,7 @@ const GD_SCOPE     = 'https://www.googleapis.com/auth/drive.file';
 const GD_FILENAME  = 'tracker-data.json';
 const GD_KEYS      = ['tracker:settings','tracker:time','tracker:expenses','tracker:clients','tracker:projects','tracker:clientInvs','tracker:team','tracker:myProfile'];
 
-let gdToken=null, gdFileId=null, gdArchiveFolderId=null, syncTimer=null;
+let gdToken=null, gdFileId=null, gdArchiveFolderId=null, gdChangelogFileId=null, gdCodeBackupFolderId=null, syncTimer=null;
 let _lastArchivedDate=null; // track so we only archive once per day
 
 function setSyncUI(state,msg,showBtn=false,btnLabel=''){
@@ -798,124 +798,170 @@ async function findOrCreateFile(){
       });
       gdArchiveFolderId=fc.result.id;
     }
+    // Find or create the Code Backups folder
+    const codeRes=await gapi.client.drive.files.list({
+      q:`name='Lowtide Code Backups' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      spaces:'drive',fields:'files(id,name)'
+    });
+    if(codeRes.result.files&&codeRes.result.files.length>0){
+      gdCodeBackupFolderId=codeRes.result.files[0].id;
+    } else {
+      const cf=await gapi.client.drive.files.create({
+        resource:{name:'Lowtide Code Backups',mimeType:'application/vnd.google-apps.folder'},
+        fields:'id'
+      });
+      gdCodeBackupFolderId=cf.result.id;
+    }
   }catch(e){setSyncUI('error','Drive error: '+(e.result?.error?.message||e.message),true,'Retry');console.error(e);}
 }
 
 async function archiveToday(){
-  // Only archive once per calendar day, and only if we have a valid connection
   if(!gdToken||!gdFileId||!gdArchiveFolderId)return;
   const dateStr=today();
   if(_lastArchivedDate===dateStr)return;
-  const archiveName=`Lowtide Backup ${dateStr}`;
+
   try{
-    // Check if a doc for today already exists
-    const check=await gapi.client.drive.files.list({
-      q:`name='${archiveName}' and '${gdArchiveFolderId}' in parents and trashed=false`,
+    // Read current version counter from Drive
+    let version=14;
+    if(gdChangelogFileId){
+      try{
+        const vr=await fetch(`https://www.googleapis.com/drive/v3/files/${gdChangelogFileId}?alt=media`,{
+          headers:{Authorization:`Bearer ${gdToken}`}
+        });
+        if(vr.ok){const vd=await vr.json();version=vd.version||14;}
+      }catch{}
+    }
+
+    // Check if an archive for today already exists (by date, not version)
+    const dateCheck=await gapi.client.drive.files.list({
+      q:`name contains 'Lowtide Backup ${dateStr}' and '${gdArchiveFolderId}' in parents and trashed=false`,
       spaces:'drive',fields:'files(id)'
     });
-    if(check.result.files&&check.result.files.length>0){_lastArchivedDate=dateStr;return;}
+    if(dateCheck.result.files&&dateCheck.result.files.length>0){_lastArchivedDate=dateStr;return;}
 
-    // Build a human-readable HTML document from the current in-memory data
+    const archiveName=`v${version} — Lowtide Backup ${dateStr}`;
     const h=(s)=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const fd=(d)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+    const fd=(d)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'--';
     const fm=(n)=>new Intl.NumberFormat('en-US',{style:'currency',currency:settings.currency||'USD'}).format(n||0);
 
-    let html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <style>
-      body{font-family:Arial,sans-serif;font-size:11pt;color:#222;max-width:750px;margin:40px auto;padding:0 24px}
-      h1{font-size:18pt;color:#9151a0;margin-bottom:4px}
-      h2{font-size:13pt;color:#9151a0;border-bottom:1px solid #ddd;padding-bottom:4px;margin-top:28px}
-      h3{font-size:11pt;color:#444;margin-top:16px;margin-bottom:4px}
-      table{width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:16px}
-      th{text-align:left;padding:5px 8px;background:#f0eaf7;color:#555;font-weight:600;border-bottom:1px solid #ddd}
-      td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:top}
-      .meta{font-size:10pt;color:#888;margin-bottom:24px}
-      .section-note{font-size:10pt;color:#aaa;font-style:italic}
-    </style></head><body>
-    <h1>Lowtide.cc Project Tracker — Backup</h1>
-    <div class="meta">Archived: ${new Date().toLocaleString('en-US',{dateStyle:'full',timeStyle:'short'})}</div>`;
+    let docHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <style>body{font-family:Arial,sans-serif;font-size:11pt;color:#222;max-width:750px;margin:40px auto;padding:0 24px}
+    h1{font-size:18pt;color:#9151a0;margin-bottom:4px}h2{font-size:13pt;color:#9151a0;border-bottom:1px solid #ddd;padding-bottom:4px;margin-top:28px}
+    h3{font-size:11pt;color:#444;margin-top:16px;margin-bottom:4px}
+    table{width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:16px}
+    th{text-align:left;padding:5px 8px;background:#f0eaf7;color:#555;font-weight:600;border-bottom:1px solid #ddd}
+    td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:top}
+    .meta{font-size:10pt;color:#888;margin-bottom:24px}
+    .ver{font-size:14pt;font-weight:700;color:#9151a0}</style></head><body>
+    <h1>Lowtide.cc Project Tracker</h1>
+    <div><span class="ver">v${version}</span>&nbsp;<span style="font-size:11pt;color:#888">Backup — ${new Date().toLocaleString('en-US',{dateStyle:'full',timeStyle:'short'})}</span></div>
+    <div class="meta">Auto-archived on save. Upload this file to restore.</div>`;
 
-    // PROJECTS
-    html+=`<h2>Projects (${projects.length})</h2>`;
-    if(projects.length){
-      projects.forEach(p=>{
-        const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
-        const tasks=p.tasks||[];const phases=p.phases||[];const milestones=p.milestones||[];
-        html+=`<h3>${h(p.num?p.num+' — ':'')}${h(p.name)} <span style="font-size:10pt;color:#888;font-weight:400">· ${p.status==='on_hold'?'On Hold':p.status==='active'?'Active':'Completed'}</span></h3>`;
-        html+=`<table><tr><th>Client</th><th>Contract Start</th><th>Contract End</th><th>Rate</th><th>Budget</th></tr>
-        <tr><td>${h(client?client.company:'—')}</td><td>${fd(p.startDate)}</td><td>${fd(p.endDate)}</td>
-        <td>${p.rate?fm(p.rate)+'/hr':'—'}</td><td>${p.budget?(p.budgetType==='range'?fm(p.budget)+' – '+fm(p.budgetMax):fm(p.budget)):'—'}</td></tr></table>`;
-        if(p.desc)html+=`<p style="font-size:10pt;color:#555;margin:0 0 8px">${h(p.desc)}</p>`;
-        if(phases.length){
-          html+=`<p style="font-size:10pt;font-weight:600;margin:6px 0 2px">Phases:</p>
-          <table><tr><th>Phase</th><th>Start</th><th>End</th></tr>
-          ${phases.map(ph=>`<tr><td>${h(ph.title)}</td><td>${fd(ph.startDate)}</td><td>${fd(ph.endDate)}</td></tr>`).join('')}</table>`;
-        }
-        if(milestones.length){
-          html+=`<p style="font-size:10pt;font-weight:600;margin:6px 0 2px">Milestones:</p>
-          <table><tr><th>Milestone</th><th>Date</th><th>Status</th></tr>
-          ${milestones.map(m=>`<tr><td>${h(m.title)}</td><td>${fd(m.date)}</td><td>${m.completed?'Complete':'Pending'}</td></tr>`).join('')}</table>`;
-        }
-        if(tasks.length){
-          const done=tasks.filter(t=>t.status==='done').length;
-          html+=`<p style="font-size:10pt;font-weight:600;margin:6px 0 2px">Tasks (${done}/${tasks.length} done):</p>
-          <table><tr><th>Task</th><th>Type</th><th>Phase</th><th>Due</th><th>Status</th></tr>
-          ${tasks.map(t=>{
-            const ph=t.phaseId?phases.find(x=>x.id===t.phaseId):null;
-            return`<tr><td>${h(t.title)}</td><td>${h(t.taskType||'normal')}</td><td>${h(ph?ph.title:'—')}</td><td>${fd(t.dueDate)}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In Progress':'To Do'}</td></tr>`;
-          }).join('')}</table>`;
-        }
-      });
-    } else html+=`<p class="section-note">No projects.</p>`;
+    // Projects
+    docHtml+=`<h2>Projects (${projects.length})</h2>`;
+    projects.forEach(p=>{
+      const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
+      const tasks=p.tasks||[],phases=p.phases||[],milestones=p.milestones||[];
+      docHtml+=`<h3>${h(p.num?p.num+' — ':'')}${h(p.name)} <span style="font-size:10pt;color:#888;font-weight:400">· ${p.status==='on_hold'?'On Hold':p.status==='active'?'Active':'Completed'}</span></h3>
+      <table><tr><th>Client</th><th>Start</th><th>End</th><th>Location</th><th>Rate</th><th>Budget</th></tr>
+      <tr><td>${h(client?client.company:'--')}</td><td>${fd(p.startDate)}</td><td>${fd(p.endDate)}</td>
+      <td>${h(p.location||'--')}</td><td>${p.rate?fm(p.rate)+'/hr':'--'}</td>
+      <td>${p.budget?(p.budgetType==='range'?fm(p.budget)+' - '+fm(p.budgetMax):p.budgetType==='sub'?'Sub-project':'Fixed: '+fm(p.budget)):'--'}</td></tr></table>`;
+      if(phases.length)docHtml+=`<p style="font-size:10pt;font-weight:600;margin:4px 0 2px">Phases</p>
+        <table><tr><th>Phase</th><th>Start</th><th>End</th></tr>
+        ${phases.map(ph=>`<tr><td>${h(ph.title)}</td><td>${fd(ph.startDate)}</td><td>${fd(ph.endDate)}</td></tr>`).join('')}</table>`;
+      if(milestones.length)docHtml+=`<p style="font-size:10pt;font-weight:600;margin:4px 0 2px">Milestones</p>
+        <table><tr><th>Milestone</th><th>Date</th><th>Status</th></tr>
+        ${milestones.map(m=>`<tr><td>${h(m.title)}</td><td>${fd(m.date)}</td><td>${m.completed?'Complete':'Pending'}</td></tr>`).join('')}</table>`;
+      if(tasks.length){const done=tasks.filter(t=>t.status==='done').length;
+        docHtml+=`<p style="font-size:10pt;font-weight:600;margin:4px 0 2px">Tasks (${done}/${tasks.length} done)</p>
+        <table><tr><th>Task</th><th>Type</th><th>Phase</th><th>Due</th><th>Status</th></tr>
+        ${tasks.map(t=>{const ph=t.phaseId?phases.find(x=>x.id===t.phaseId):null;
+          return`<tr><td>${h(t.title)}</td><td>${h(t.taskType||'normal')}</td><td>${h(ph?ph.title:'--')}</td><td>${fd(t.dueDate)}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In Progress':'To Do'}</td></tr>`;
+        }).join('')}</table>`;}
+    });
+    if(!projects.length)docHtml+=`<p style="color:#aaa;font-style:italic">No projects.</p>`;
 
-    // CLIENTS
-    html+=`<h2>Clients (${clients.length})</h2>`;
-    if(clients.length){
-      html+=`<table><tr><th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Website</th></tr>
+    // Clients
+    docHtml+=`<h2>Clients (${clients.length})</h2>`;
+    if(clients.length)docHtml+=`<table><tr><th>Company</th><th>Contact</th><th>Email</th><th>Phone</th></tr>
       ${clients.map(c=>{const pc=c.primaryContact||{};
         return`<tr><td>${h(c.company)}</td><td>${h(pc.name||'')}${pc.suffix?' '+h(pc.suffix):''}${pc.role?`<br><span style="color:#888;font-size:9pt">${h(pc.role)}</span>`:''}</td>
-        <td>${h(pc.email)}</td><td>${h(pc.phone)}</td><td>${h(c.website)}</td></tr>`;
-      }).join('')}</table>`;
-    } else html+=`<p class="section-note">No clients.</p>`;
+        <td>${h(pc.email)}</td><td>${h(pc.phone)}</td></tr>`;}).join('')}</table>`;
+    else docHtml+=`<p style="color:#aaa;font-style:italic">No clients.</p>`;
 
-    // TEAM
-    html+=`<h2>Team (${teamMembers.length})</h2>`;
-    if(teamMembers.length){
-      html+=`<table><tr><th>Name</th><th>Type</th><th>Role</th><th>Company</th><th>Email</th></tr>
+    // Team
+    docHtml+=`<h2>Team (${teamMembers.length})</h2>`;
+    if(teamMembers.length)docHtml+=`<table><tr><th>Name</th><th>Type</th><th>Role</th><th>Company</th><th>Email</th></tr>
       ${teamMembers.map(m=>`<tr><td>${h(m.name)}</td><td>${m.type==='internal'?'Internal':'External'}</td>
       <td>${h(m.role)}</td><td>${h(m.company)}</td><td>${h(m.email)}</td></tr>`).join('')}</table>`;
-    } else html+=`<p class="section-note">No team members.</p>`;
+    else docHtml+=`<p style="color:#aaa;font-style:italic">No team members.</p>`;
 
-    // TIME ENTRIES
+    // Time (most recent 50)
     const recentTime=[...timeEntries].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,50);
-    html+=`<h2>Time Entries (${timeEntries.length} total — showing most recent ${Math.min(50,timeEntries.length)})</h2>`;
-    if(recentTime.length){
-      html+=`<table><tr><th>Date</th><th>Task</th><th>Project</th><th>Hours</th><th>Billable</th></tr>
+    docHtml+=`<h2>Time Entries (${timeEntries.length} total, ${Math.min(50,timeEntries.length)} shown)</h2>`;
+    if(recentTime.length)docHtml+=`<table><tr><th>Date</th><th>Task</th><th>Project</th><th>Hours</th><th>Billable</th></tr>
       ${recentTime.map(e=>{const proj=e.projectId?projects.find(p=>p.id===e.projectId):null;
-        return`<tr><td>${fd(e.date)}</td><td>${h(e.task)}</td><td>${h(proj?proj.name:'—')}</td>
-        <td>${e.hours}h</td><td>${e.billable?'Yes':'No'}</td></tr>`;
+        return`<tr><td>${fd(e.date)}</td><td>${h(e.task)}</td><td>${h(proj?proj.name:'--')}</td><td>${e.hours}h</td><td>${e.billable?'Yes':'No'}</td></tr>`;
       }).join('')}</table>`;
-    } else html+=`<p class="section-note">No time entries.</p>`;
+    else docHtml+=`<p style="color:#aaa;font-style:italic">No time entries.</p>`;
 
-    // EXPENSES
-    html+=`<h2>Expenses (${expenses.length})</h2>`;
-    if(expenses.length){
-      html+=`<table><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Billable</th></tr>
-      ${expenses.map(e=>`<tr><td>${fd(e.date)}</td><td>${h(e.description)}</td><td>${h(e.category)}</td>
-      <td>${fm(e.amount)}</td><td>${e.billable?'Yes':'No'}</td></tr>`).join('')}</table>`;
-    } else html+=`<p class="section-note">No expenses.</p>`;
+    // Expenses
+    docHtml+=`<h2>Expenses (${expenses.length})</h2>`;
+    if(expenses.length)docHtml+=`<table><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Billable</th></tr>
+      ${expenses.map(e=>`<tr><td>${fd(e.date)}</td><td>${h(e.description)}</td><td>${h(e.category)}</td><td>${fm(e.amount)}</td><td>${e.billable?'Yes':'No'}</td></tr>`).join('')}</table>`;
+    else docHtml+=`<p style="color:#aaa;font-style:italic">No expenses.</p>`;
 
-    html+=`</body></html>`;
+    docHtml+=`</body></html>`;
 
-    // Upload as a Google Doc (mimeType: application/vnd.google-apps.document)
-    const boundary='LOWTIDE_ARCHIVE_BOUNDARY';
-    const meta=JSON.stringify({
-      name:archiveName,
-      mimeType:'application/vnd.google-apps.document',
-      parents:[gdArchiveFolderId]
+    // Upload as Google Doc
+    const boundary='LOWTIDE_ARCHIVE';
+    const meta=JSON.stringify({name:archiveName,mimeType:'application/vnd.google-apps.document',parents:[gdArchiveFolderId]});
+    const multipart=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${docHtml}\r\n--${boundary}--`;
+    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${gdToken}`,'Content-Type':`multipart/related; boundary=${boundary}`},
+      body:multipart
     });
-    const multipart=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${html}\r\n--${boundary}--`;
 
+    // Increment version counter in Drive
+    if(gdChangelogFileId){
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${gdChangelogFileId}?uploadType=media`,{
+        method:'PATCH',
+        headers:{'Authorization':`Bearer ${gdToken}`,'Content-Type':'application/json'},
+        body:JSON.stringify({version:version+1,lastDate:dateStr})
+      });
+    }
+
+    _lastArchivedDate=dateStr;
+    console.log(`Archived v${version} to Drive: ${archiveName}`);
+    // Also back up the HTML source code
+    backupHTMLToDrive(version, dateStr);
+  }catch(e){
+    console.warn('Archive failed (non-critical):',e.message);
+  }
+}
+
+async function backupHTMLToDrive(version, dateStr){
+  if(!gdToken||!gdCodeBackupFolderId)return;
+  try{
+    const fileName=`v${version} -- project-tracker-${dateStr}.html`;
+    // Check if this version already backed up
+    const check=await gapi.client.drive.files.list({
+      q:`name='${fileName}' and '${gdCodeBackupFolderId}' in parents and trashed=false`,
+      spaces:'drive',fields:'files(id)'
+    });
+    if(check.result.files&&check.result.files.length>0)return;
+
+    // Fetch the app's own HTML source
+    const res=await fetch(window.location.href);
+    if(!res.ok)return;
+    const htmlSource=await res.text();
+
+    // Upload as raw HTML file
+    const boundary='LOWTIDE_CODE';
+    const meta=JSON.stringify({name:fileName,mimeType:'text/html',parents:[gdCodeBackupFolderId]});
+    const multipart=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${htmlSource}\r\n--${boundary}--`;
     await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
       method:'POST',
       headers:{
@@ -924,10 +970,9 @@ async function archiveToday(){
       },
       body:multipart
     });
-    _lastArchivedDate=dateStr;
-    console.log(`Archived Google Doc to Drive: ${archiveName}`);
+    console.log(`Code backup saved to Drive: ${fileName}`);
   }catch(e){
-    console.warn('Archive failed (non-critical):',e.message);
+    console.warn('Code backup failed (non-critical):',e.message);
   }
 }
 
