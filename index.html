@@ -282,10 +282,18 @@ td{padding:8px 0;vertical-align:top}
   <!-- DASHBOARD -->
   <div id="dashboard-section">
     <div class="page-header"><h2 class="page-title">Dashboard</h2>
-      <div style="display:flex;gap:4px" id="period-filters">
-        <button class="period-btn active" onclick="setPeriod('month')" id="pb-month">Month</button>
-        <button class="period-btn" onclick="setPeriod('year')" id="pb-year">Year</button>
-        <button class="period-btn" onclick="setPeriod('all')" id="pb-all">All time</button>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <!-- Month navigation arrows (only visible when Month is active) -->
+        <div id="month-nav" style="display:none;align-items:center;gap:4px">
+          <button class="icon-btn" onclick="shiftMonth(-1)" style="padding:4px 7px"><i class="ti ti-chevron-left"></i></button>
+          <span id="month-nav-label" style="font-size:13px;color:var(--text2);min-width:110px;text-align:center"></span>
+          <button class="icon-btn" onclick="shiftMonth(1)" style="padding:4px 7px"><i class="ti ti-chevron-right"></i></button>
+        </div>
+        <div style="display:flex;gap:4px" id="period-filters">
+          <button class="period-btn" onclick="setPeriod('month')" id="pb-month">Month</button>
+          <button class="period-btn" onclick="setPeriod('year')" id="pb-year">Year</button>
+          <button class="period-btn active" onclick="setPeriod('all')" id="pb-all">All time</button>
+        </div>
       </div>
     </div>
     <div id="dash-project-budgets"></div>
@@ -324,10 +332,7 @@ td{padding:8px 0;vertical-align:top}
         <div><label>Project</label><select id="t-project" onchange="autoFillClientFromProject()"><option value="">— No project —</option></select></div>
         <div><label>Client</label><select id="t-client" onchange="refreshTimeProjectDropdown()"><option value="">— No client —</option></select></div>
       </div>
-      <div class="grid2">
-        <div><label>Assignee</label><select id="t-assignee"><option value="">— Me / unassigned —</option></select></div>
-        <div><label>Task / description</label><input type="text" id="t-task" placeholder="Homepage design review" onkeydown="if(event.key==='Enter')addTime()"></div>
-      </div>
+      <div class="field"><label>Task / description</label><input type="text" id="t-task" placeholder="Homepage design review" onkeydown="if(event.key==='Enter')addTime()"></div>
       <div class="field"><label>Notes (optional)</label><input type="text" id="t-notes" placeholder="Additional context" onkeydown="if(event.key==='Enter')addTime()"></div>
       <div class="row-action">
         <label class="check-label"><input type="checkbox" id="t-billable" checked> Billable</label>
@@ -422,18 +427,21 @@ td{padding:8px 0;vertical-align:top}
       <div class="grid2">
         <div>
           <label>Budget</label>
-          <div style="display:flex;gap:6px;align-items:center">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <select id="p-budget-type" onchange="toggleBudgetType()" style="width:auto;flex-shrink:0;font-size:13px">
               <option value="fixed">Fixed</option>
               <option value="range">Range</option>
+              <option value="sub">Sub-project</option>
             </select>
             <input type="number" id="p-budget" min="0" step="100" placeholder="10000" style="flex:1">
             <span id="p-budget-range-sep" style="display:none;color:var(--text2);font-size:13px">–</span>
             <input type="number" id="p-budget-max" min="0" step="100" placeholder="12000" style="flex:1;display:none">
+            <select id="p-budget-parent" style="display:none;flex:1;font-size:13px"><option value="">— Parent project —</option></select>
           </div>
         </div>
         <div><label>Hourly rate ($/hr)</label><input type="number" id="p-rate" min="0" step="5" placeholder="Use default"></div>
       </div>
+      <div class="field"><label>Location (optional)</label><input type="text" id="p-location" placeholder="City, State or Remote"></div>
       <div style="margin-bottom:12px">
         <label class="check-label" style="margin-bottom:8px"><input type="checkbox" id="p-retainer-on" onchange="toggleRetainerFields()"> Has retainer</label>
         <div id="retainer-fields" class="retainer-fields" style="display:none">
@@ -449,8 +457,11 @@ td{padding:8px 0;vertical-align:top}
       <div class="field"><label>Description (optional)</label><input type="text" id="p-desc" placeholder="Brief project overview" onkeydown="if(event.key==='Enter')addProject()"></div>
       <div class="field">
         <label>Team members</label>
+        <div style="position:relative">
+          <input type="text" id="p-team-search" placeholder="Type a name to add..." autocomplete="off" oninput="projTeamSearch(this.value)" style="margin-bottom:6px">
+          <div id="p-team-search-list" class="autofill-list" style="display:none;position:absolute;z-index:10;width:100%"></div>
+        </div>
         <div id="p-team-assign" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">Click team members to assign them to this project</div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px">
         <button class="btn" onclick="toggleAddProject()">Cancel</button>
@@ -515,9 +526,9 @@ td{padding:8px 0;vertical-align:top}
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem" class="no-print">
       <label style="font-size:14px;color:var(--text2);margin:0">Period</label>
       <input type="month" id="inv-month" style="width:180px" oninput="renderInvoice()">
-      <label style="font-size:14px;color:var(--text2);margin:0">Project</label>
-      <select id="inv-project-filter" style="width:200px" onchange="renderInvoice()">
-        <option value="">All projects</option>
+      <label style="font-size:14px;color:var(--text2);margin:0">Client</label>
+      <select id="inv-client-filter" style="width:200px" onchange="renderInvoice()">
+        <option value="">All clients</option>
       </select>
     </div>
     <div class="card" id="invoice-card">
@@ -1000,6 +1011,7 @@ const DEF_CATS=['Software','Travel','Equipment','Subcontractor','Meals','Office'
 let settings, timeEntries, expenses, clients, projects, clientInvs, teamMembers, myProfile, currentTab='dashboard';
 let editing={time:null,expenses:null,projects:null,clients:null,team:null,milestones:null,phases:null,tasks:null};
 const _ganttCompressed={};
+let _projTeamSelected=[];
 
 function reloadState(){
   settings    =Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD',expenseCategories:DEF_CATS},load('tracker:settings',{})||{});
@@ -1124,14 +1136,50 @@ function toggleMemberType(id){
 function tmNameAutofill(val){
   const list=document.getElementById('tm-autofill');if(!list)return;
   if(!val||val.length<2){list.style.display='none';return;}
-  const matches=clients.filter(c=>{
-    const n=(c.primaryContact?.name||c.contactName||'').toLowerCase();
-    const co=(c.company||'').toLowerCase();
-    return n.includes(val.toLowerCase())||co.includes(val.toLowerCase());
-  }).slice(0,5);
+  const v=val.toLowerCase();
+  // Search primary contacts AND additional contacts
+  const matches=[];
+  clients.forEach(c=>{
+    const pc=c.primaryContact||{};
+    if((pc.name||'').toLowerCase().includes(v)||(c.company||'').toLowerCase().includes(v)){
+      matches.push({clientId:c.id,name:pc.name||'',company:c.company||'',role:pc.role||'',email:pc.email||'',phone:pc.phone||''});
+    }
+    (c.additionalContacts||[]).forEach(ac=>{
+      if((ac.name||'').toLowerCase().includes(v)){
+        matches.push({clientId:c.id,name:ac.name||'',company:c.company||'',role:ac.role||'',email:ac.email||'',phone:ac.phone||''});
+      }
+    });
+  });
   if(!matches.length){list.style.display='none';return;}
-  list.innerHTML=matches.map(c=>`<div class="autofill-item" onclick="tmAutofill('${c.id}')">${c.primaryContact?.name||c.contactName||''}${c.company?` <span style="color:var(--text2)">· ${c.company}</span>`:''}</div>`).join('');
+  list.innerHTML=matches.slice(0,6).map((m,i)=>`<div class="autofill-item" onclick="tmAutofillData(${i})">${m.name||m.company}${m.company&&m.name?` <span style="color:var(--text2)">· ${m.company}</span>`:''}</div>`).join('');
+  list._matches=matches;
   list.style.display='block';
+}
+
+function tmAutofillData(idx){
+  const list=document.getElementById('tm-autofill');
+  const m=list._matches&&list._matches[idx];
+  if(!m)return;
+  document.getElementById('tm-name').value=m.name||'';
+  document.getElementById('tm-email').value=m.email||'';
+  document.getElementById('tm-phone').value=m.phone||'';
+  document.getElementById('tm-role').value=m.role||'';
+  document.getElementById('tm-company').value=m.company||'';
+  list.style.display='none';
+  document.getElementById('tm-name').dataset.clientLink=m.clientId;
+  // Auto-select color: use same as existing member from same company, skip if taken
+  if(m.company){
+    const sameCompany=teamMembers.filter(x=>x.company===m.company&&x.color);
+    if(sameCompany.length){
+      const takenColors=new Set(teamMembers.map(x=>x.color));
+      const existing=sameCompany[0].color;
+      // Find next available color from same hue family or just pick next unused
+      const unused=TEAM_COLORS.find(c=>!c.mine&&!takenColors.has(c.hex));
+      const pick=unused?unused.hex:TEAM_COLORS[1].hex;
+      _newTmColorVal=pick;
+      renderColorPalette('tm-color-palette',pick,'pickNewTmColor',true);
+    }
+  }
 }
 
 function tmAutofill(clientId){
@@ -1276,10 +1324,75 @@ function toggleEndDateType(){
 }
 
 function toggleBudgetType(){
-  const r=document.getElementById('p-budget-type').value==='range';
-  document.getElementById('p-budget-range-sep').style.display=r?'inline':'none';
-  document.getElementById('p-budget-max').style.display=r?'block':'none';
-  document.getElementById('p-budget').placeholder=r?'Min (e.g. 8000)':'Amount';
+  const v=document.getElementById('p-budget-type').value;
+  const isSub=v==='sub';
+  const isRange=v==='range';
+  document.getElementById('p-budget').style.display=isSub?'none':'block';
+  document.getElementById('p-budget-range-sep').style.display=isRange?'inline':'none';
+  document.getElementById('p-budget-max').style.display=isRange?'block':'none';
+  document.getElementById('p-budget-parent').style.display=isSub?'block':'none';
+  if(isSub){
+    // Populate parent project dropdown
+    const sel=document.getElementById('p-budget-parent');
+    const prev=sel.value;
+    sel.innerHTML='<option value="">— Parent project —</option>';
+    projects.forEach(p=>sel.appendChild(new Option(p.name,p.id)));
+    if(prev)sel.value=prev;
+  }
+}
+
+// Type-to-search for project team member assignment
+function projTeamSearch(val){
+  const list=document.getElementById('p-team-search-list');
+  if(!val||val.length<1){list.style.display='none';return;}
+  const v=val.toLowerCase();
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  const matches=allMembers.filter(m=>m.name.toLowerCase().includes(v)&&!_projTeamSelected.includes(m.id));
+  if(!matches.length){
+    // Offer to add as new team member
+    list.innerHTML=`<div class="autofill-item" onclick="promptNewTeamMember('${val.replace(/'/g,'\\\'')}')" style="color:var(--accent)"><i class="ti ti-plus"></i> Add "${val}" as new team member</div>`;
+    list.style.display='block';
+    return;
+  }
+  list.innerHTML=matches.map(m=>`<div class="autofill-item" onclick="addProjTeamMember('${m.id}')">
+    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${m.color||'#888'};margin-right:6px;vertical-align:middle"></span>${m.name}${m.type==='external'?` <span style="font-size:11px;color:var(--text3)">(${m.company||'External'})</span>`:''}
+  </div>`).join('');
+  list.style.display='block';
+}
+
+function addProjTeamMember(id){
+  if(!_projTeamSelected.includes(id))_projTeamSelected.push(id);
+  document.getElementById('p-team-search').value='';
+  document.getElementById('p-team-search-list').style.display='none';
+  renderProjTeamChips();
+}
+
+function removeProjTeamMember(id){
+  _projTeamSelected=_projTeamSelected.filter(x=>x!==id);
+  renderProjTeamChips();
+}
+
+function renderProjTeamChips(){
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  const el=document.getElementById('p-team-assign');
+  el.innerHTML=_projTeamSelected.map(id=>{
+    const m=allMembers.find(x=>x.id===id);
+    if(!m)return'';
+    return`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:12px;background:${m.color}22;border:.5px solid ${m.color};color:${m.color}">
+      ${m.name}
+      <button onclick="removeProjTeamMember('${id}')" style="background:none;border:none;cursor:pointer;color:${m.color};font-size:13px;padding:0;line-height:1">×</button>
+    </span>`;
+  }).join('');
+}
+
+function promptNewTeamMember(name){
+  document.getElementById('p-team-search-list').style.display='none';
+  document.getElementById('p-team-search').value='';
+  // Switch to team tab with name pre-filled
+  document.getElementById('tm-name').value=name;
+  switchTab('team');
+  document.getElementById('tm-name').focus();
+  setSyncUI('idle','Fill in details and click Add member, then return to add this project.');
 }
 
 function toggleRetainerFields(){
@@ -1363,23 +1476,35 @@ function refreshExpenseCategoryDropdown(){
 // ═══════════════════════════════════════════════
 //  PERIOD FILTER
 // ═══════════════════════════════════════════════
-let currentPeriod='month';
+let currentPeriod='all';
+let currentMonth=today().substring(0,7); // YYYY-MM for month navigation
+
 function setPeriod(p){
   currentPeriod=p;
   ['month','year','all'].forEach(x=>document.getElementById('pb-'+x).classList.toggle('active',x===p));
+  document.getElementById('month-nav').style.display=p==='month'?'flex':'none';
   refreshAll();
 }
 function periodLabel(){
-  const now=new Date();
-  if(currentPeriod==='month')return now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
-  if(currentPeriod==='year')return String(now.getFullYear());
+  if(currentPeriod==='month'){
+    const[y,m]=currentMonth.split('-');
+    return new Date(+y,+m-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  }
+  if(currentPeriod==='year')return String(new Date().getFullYear());
   return 'All time';
+}
+function shiftMonth(delta){
+  const[y,m]=currentMonth.split('-').map(Number);
+  const d=new Date(y,m-1+delta,1);
+  currentMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  document.getElementById('month-nav-label').textContent=periodLabel();
+  refreshAll();
 }
 function filterByPeriod(entries){
   if(currentPeriod==='all')return entries;
   const now=new Date();
-  const prefix=currentPeriod==='month'?today().substring(0,7):String(now.getFullYear());
-  return entries.filter(e=>e.date&&e.date.startsWith(prefix));
+  if(currentPeriod==='month')return entries.filter(e=>e.date&&e.date.startsWith(currentMonth));
+  return entries.filter(e=>e.date&&e.date.startsWith(String(now.getFullYear())));
 }
 
 // ═══════════════════════════════════════════════
@@ -1387,6 +1512,9 @@ function filterByPeriod(entries){
 // ═══════════════════════════════════════════════
 function refreshAll(){
   document.getElementById('proj-meta-display').textContent=periodLabel();
+  // Update month nav label if visible
+  const mnl=document.getElementById('month-nav-label');
+  if(mnl)mnl.textContent=periodLabel();
 
   const filteredTime=filterByPeriod(timeEntries);
   const filteredExp=filterByPeriod(expenses);
@@ -1397,7 +1525,8 @@ function refreshAll(){
     return s+parseFloat(e.hours||0)*getProjRate(proj);
   },0);
   const expAmt=filteredExp.filter(e=>e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
-  document.getElementById('m-hours').textContent=totalHours.toFixed(1)+'h';
+  // No rounding on hours displayed
+  document.getElementById('m-hours').textContent=totalHours%1===0?totalHours+'h':totalHours.toFixed(2)+'h';
   document.getElementById('m-time-amt').textContent=$f(billTimeAmt);
   document.getElementById('m-exp-amt').textContent=$f(expAmt);
   document.getElementById('m-total').textContent=$f(billTimeAmt+expAmt);
@@ -1413,7 +1542,7 @@ function refreshAll(){
 
   renderTimeList();
   renderExpenseList();
-  refreshInvoiceProjectFilter();
+  refreshInvoiceClientFilter();
   if(currentTab==='invoice')renderInvoice();
   if(currentTab==='projects')renderProjectList();
 }
@@ -1437,9 +1566,45 @@ function renderDashBudgets(){
     const bTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*rate,0);
     const bExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
     const billed=bTime+bExp;
+    const budgetMin=budget.min||0;
     const budgetMax=budget.max||0;
-    const pct=budgetMax>0?Math.min(100,(billed/budgetMax)*100):0;
-    const barColor=pct>=100?'var(--danger)':pct>=80?'var(--warning)':'var(--success)';
+    const retainerOn=p.retainerOn&&parseFloat(p.retainerAmt||0)>0;
+    const retainerAmt=retainerOn?parseFloat(p.retainerAmt):0;
+
+    // Budget bar color logic:
+    // yellow = 0 → retainer, green = retainer → budgetMin, red = budgetMin → budgetMax
+    // If no retainer: green until budgetMin, red budgetMin→budgetMax
+    let barSegments='';
+    if(budgetMax>0){
+      const billedPct=Math.min(100,billed/budgetMax*100);
+      const retPct=retainerAmt>0?Math.min(100,retainerAmt/budgetMax*100):0;
+      const minPct=budgetMin>0?Math.min(100,budgetMin/budgetMax*100):100;
+
+      if(retainerAmt>0&&billed<=retainerAmt){
+        // All yellow
+        barSegments=`<div style="position:absolute;left:0;top:0;height:100%;width:${billedPct.toFixed(1)}%;background:#f0b429;border-radius:5px"></div>`;
+      } else if(billed<=budgetMin||budgetMin===0){
+        // Yellow up to retainer, then green
+        const yellowPct=retPct;
+        const greenPct=billedPct-yellowPct;
+        barSegments=`${yellowPct>0?`<div style="position:absolute;left:0;top:0;height:100%;width:${yellowPct.toFixed(1)}%;background:#f0b429;border-radius:5px 0 0 5px"></div>`:''}
+          <div style="position:absolute;left:${yellowPct.toFixed(1)}%;top:0;height:100%;width:${Math.max(0,greenPct).toFixed(1)}%;background:var(--success);border-radius:${yellowPct>0?'0 5px 5px 0':'5px'}"></div>`;
+      } else {
+        // Yellow, green, red
+        const yellowPct=retPct;
+        const greenPct=minPct-yellowPct;
+        const redPct=billedPct-minPct;
+        barSegments=`${yellowPct>0?`<div style="position:absolute;left:0;top:0;height:100%;width:${yellowPct.toFixed(1)}%;background:#f0b429;border-radius:5px 0 0 5px"></div>`:''}
+          ${greenPct>0?`<div style="position:absolute;left:${yellowPct.toFixed(1)}%;top:0;height:100%;width:${greenPct.toFixed(1)}%;background:var(--success);border-radius:0"></div>`:''}
+          <div style="position:absolute;left:${minPct.toFixed(1)}%;top:0;height:100%;width:${Math.max(0,redPct).toFixed(1)}%;background:var(--danger);border-radius:0 5px 5px 0"></div>`;
+      }
+      // Retainer break notch
+      if(retPct>0&&retPct<100){
+        barSegments+=`<div style="position:absolute;left:${retPct.toFixed(1)}%;top:0;height:100%;width:2px;background:var(--bg);z-index:2"></div>`;
+      }
+    }
+    const billedPct=budgetMax>0?Math.min(100,billed/budgetMax*100):0;
+    const overBudget=budgetMax>0&&billed>budgetMax;
 
     // Upcoming milestones within 1 month
     const upcoming=(p.milestones||[]).filter(m=>!m.completed&&m.date&&m.date>=today()&&m.date<=oneMonthStr).sort((a,b)=>a.date.localeCompare(b.date));
@@ -1456,19 +1621,23 @@ function renderDashBudgets(){
           <div style="font-size:15px;font-weight:600">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} — </span>`:''}${p.name}</div>
           ${clientName?`<div style="font-size:12px;color:var(--text2);margin-top:2px">${clientName}</div>`:''}
         </div>
-        <div style="text-align:right;font-size:12px;color:var(--text2)">
-          ${p.startDate?`<div>Start: <strong>${fmtDate(p.startDate)}</strong></div>`:''}
-          ${p.endDate?`<div>End: <strong>${fmtDate(p.endDate)}</strong></div>`:''}
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <div style="text-align:right;font-size:12px;color:var(--text2)">
+            ${p.startDate?`<div>Start: <strong>${fmtDate(p.startDate)}</strong></div>`:''}
+            ${p.endDate?`<div>End: <strong>${fmtDate(p.endDate)}</strong></div>`:''}
+          </div>
+          <button class="icon-action" onclick="switchTab('projects');setTimeout(()=>toggleEdit('projects','${p.id}'),100)" title="Edit project" style="flex-shrink:0"><i class="ti ti-pencil"></i></button>
         </div>
       </div>
       <!-- Budget row -->
       <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--text2);margin-bottom:6px">
         ${p.rate?`<span><i class="ti ti-coin" style="font-size:12px"></i> ${$f(parseFloat(p.rate))}/hr</span>`:''}
         ${budget.display?`<span><i class="ti ti-chart-bar" style="font-size:12px"></i> Budget: ${budget.display}</span>`:''}
-        <span><i class="ti ti-receipt" style="font-size:12px"></i> Billed: <strong style="color:var(--text)">${$f(billed)}</strong>${budgetMax>0?` / ${$f(budgetMax)}`:''}</span>
-        ${budgetMax>0?`<span style="color:${barColor}">${pct.toFixed(0)}% used</span>`:''}
+        ${retainerOn?`<span><i class="ti ti-refresh" style="font-size:12px"></i> Retainer: ${$f(retainerAmt)}${p.retainerPaid?' ✓':''}</span>`:''}
+        <span><i class="ti ti-receipt" style="font-size:12px"></i> Billed: <strong style="color:${overBudget?'var(--danger)':'var(--text)'}">${$f(billed)}</strong>${budgetMax>0?` / ${$f(budgetMax)}`:''}</span>
+        ${budgetMax>0?`<span style="color:${overBudget?'var(--danger)':'var(--text2)'}">${billedPct.toFixed(1)}% used</span>`:''}
       </div>
-      ${budgetMax>0?`<div class="gauge-bar" style="height:5px;margin-bottom:8px"><div class="gauge-fill" style="width:${pct.toFixed(1)}%;background:${barColor}"></div></div>`:''}
+      ${budgetMax>0?`<div class="gauge-bar" style="height:8px;margin-bottom:8px;position:relative">${barSegments}</div>`:''}
       ${timeline}
       ${upcoming.length?`<div style="margin-top:10px;padding-top:8px;border-top:.5px solid var(--border)">
         <div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Upcoming milestones</div>
@@ -1561,6 +1730,13 @@ function autoFillClientFromProject(){
 function renderTimeList(){
   const el=document.getElementById('time-list');
   if(!timeEntries.length){el.innerHTML='<div class="empty">No entries yet.</div>';return;}
+  // Auto-fill clientId from project for entries that are missing it
+  timeEntries.forEach(e=>{
+    if(!e.clientId&&e.projectId){
+      const proj=projects.find(p=>p.id===e.projectId);
+      if(proj&&proj.clientId)e.clientId=proj.clientId;
+    }
+  });
   // Group by date
   const groups={};
   timeEntries.forEach(e=>{
@@ -1569,6 +1745,8 @@ function renderTimeList(){
     groups[d].push(e);
   });
   const sortedDates=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
+  // Helper: display hours exactly without rounding
+  function fmtHrs(h){const n=parseFloat(h||0);return n%1===0?n+'h':n+'h';}
   el.innerHTML=sortedDates.map(date=>{
     const entries=groups[date];
     const dayHours=entries.reduce((s,e)=>s+parseFloat(e.hours||0),0);
@@ -1579,7 +1757,7 @@ function renderTimeList(){
     return`<div style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid var(--border2);margin-bottom:2px">
         <span style="font-size:12px;font-weight:600;color:var(--accent)">${fmtDate(date)}</span>
-        <span style="font-size:12px;color:var(--text2)">${dayHours.toFixed(1)}h${dayAmt>0?' . '+$f(dayAmt):''}</span>
+        <span style="font-size:12px;color:var(--text2)">${fmtHrs(dayHours)}${dayAmt>0?' · '+$f(dayAmt):''}</span>
       </div>
       ${entries.map(e=>{
         const client=e.clientId?clients.find(c=>c.id===e.clientId):null;
@@ -1590,11 +1768,11 @@ function renderTimeList(){
           <div class="entry-row" style="padding:8px 0">
             <div style="flex:1">
               <div class="entry-title">${e.task}</div>
-              <div class="entry-meta">${client?''+( client.company||client.contactName):''}${proj?( client?' . ':'')+proj.name:''}${e.notes?' . '+e.notes:''}${e.billable?'':' . non-billable'}</div>
+              <div class="entry-meta">${client?(client.company||''):''}${proj?(client?' · ':'')+proj.name:''}${e.notes?' · '+e.notes:''}${e.billable?'':' · non-billable'}</div>
             </div>
             <div class="entry-right">
-              <span class="amt">${e.hours}h</span>
-              ${e.billable?`<span style="font-size:12px;color:var(--text2)">${$f(e.hours*rate)}</span>`:''}
+              <span class="amt">${fmtHrs(e.hours)}</span>
+              ${e.billable?`<span style="font-size:12px;color:var(--text2)">${$f(parseFloat(e.hours||0)*rate)}</span>`:''}
               <button class="icon-action" onclick="toggleEdit('time','${e.id}')" title="${isEditing?'Close':'Edit'}"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
             </div>
           </div>
@@ -1849,13 +2027,16 @@ function renderProjectEditForm(p){
       </div>
       <div></div>
     </div>
+    <div class="field"><label>Location (optional)</label><input type="text" id="ep-location-${p.id}" value="${p.location||''}" placeholder="City, State or Remote"></div>
     <div class="grid2" style="margin-bottom:8px">
-      <label class="check-label"><input type="checkbox" id="ep-ret-on-${p.id}" ${p.retainerOn?'checked':''} onchange="document.getElementById('ep-ret-fields-${p.id}').style.display=this.checked?'grid':'none'"> Has retainer</label>
-      <label class="check-label"><input type="checkbox" id="ep-ret-paid-${p.id}" ${p.retainerPaid?'checked':''}> Retainer paid</label>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <label class="check-label"><input type="checkbox" id="ep-ret-on-${p.id}" ${p.retainerOn?'checked':''} onchange="document.getElementById('ep-ret-amt-wrap-${p.id}').style.display=this.checked?'flex':'none'"> Has retainer</label>
+        <label class="check-label"><input type="checkbox" id="ep-ret-paid-${p.id}" ${p.retainerPaid?'checked':''}> Retainer paid</label>
+        <label class="check-label"><input type="checkbox" id="ep-ret-inbud-${p.id}" ${p.retainerInBudget?'checked':''}> Applied to budget</label>
+      </div>
     </div>
-    <div id="ep-ret-fields-${p.id}" style="display:${p.retainerOn?'grid':'none'};grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px">
-      <div><label>Retainer amount ($)</label><input type="number" id="ep-ret-amt-${p.id}" value="${p.retainerAmt||''}" min="0" step="100"></div>
-      <div style="display:flex;align-items:flex-end;padding-bottom:2px"><label class="check-label"><input type="checkbox" id="ep-ret-inbud-${p.id}" ${p.retainerInBudget?'checked':''}> In total budget</label></div>
+    <div id="ep-ret-amt-wrap-${p.id}" style="display:${p.retainerOn?'flex':'none'};gap:12px;margin-bottom:8px;align-items:flex-end">
+      <div style="flex:1"><label>Retainer amount ($)</label><input type="number" id="ep-ret-amt-${p.id}" value="${p.retainerAmt||''}" min="0" step="100"></div>
     </div>
     <div class="field"><label>Description</label><input type="text" id="ep-desc-${p.id}" value="${p.desc||''}"></div>
     <div class="field"><label>Team members</label><div class="color-palette" id="ep-team-${p.id}" style="flex-wrap:wrap;gap:6px"></div></div>
@@ -1885,9 +2066,10 @@ function saveProjectEdit(id){
   p.budgetMax=btype==='range'?document.getElementById(`ep-budgetmax-${id}`)?.value||'':'';
   p.retainerOn=document.getElementById(`ep-ret-on-${id}`).checked;
   p.retainerPaid=document.getElementById(`ep-ret-paid-${id}`).checked;
-  p.retainerAmt=document.getElementById(`ep-ret-amt-${id}`).value;
-  p.retainerInBudget=document.getElementById(`ep-ret-inbud-${id}`).checked;
+  p.retainerAmt=document.getElementById(`ep-ret-amt-${id}`)?.value||'';
+  p.retainerInBudget=document.getElementById(`ep-ret-inbud-${id}`)?.checked||false;
   p.desc=document.getElementById(`ep-desc-${id}`).value.trim();
+  p.location=document.getElementById(`ep-location-${id}`)?.value.trim()||'';
   p.teamIds=getTeamAssignSelected(`ep-team-${id}`);
   save('tracker:projects',projects);
   editing.projects=null;
@@ -1903,10 +2085,35 @@ function addProject(){
   const endType=document.getElementById('p-end-type').value;
   const budType=document.getElementById('p-budget-type').value;
   const bmax=document.getElementById('p-budget-max').value;
-  const teamIds=getTeamAssignSelected('p-team-assign');
-  projects.unshift({id:uid(),num:document.getElementById('p-num').value.trim(),name,clientId:document.getElementById('p-client').value||'',status:document.getElementById('p-status').value,startDate:document.getElementById('p-start').value,endDateType:endType,endDate:endType==='specific'?document.getElementById('p-end-date').value:'',endDateMonth:endType==='monthyear'?document.getElementById('p-end-month').value:'',duration:document.getElementById('p-duration').value.trim(),budget:document.getElementById('p-budget').value||'',budgetMax:budType==='range'?bmax:'',budgetType:budType,rate:document.getElementById('p-rate').value||'',retainerOn,retainerAmt:retainerOn?document.getElementById('p-retainer-amt').value:'',retainerInBudget:retainerOn&&document.getElementById('p-retainer-in-budget').checked,retainerPaid:retainerOn&&document.getElementById('p-retainer-paid').checked,desc:document.getElementById('p-desc').value.trim(),teamIds,tasks:[],milestones:[],phases:[]});
+  const parentProjId=budType==='sub'?document.getElementById('p-budget-parent').value:'';
+  projects.unshift({
+    id:uid(),num:document.getElementById('p-num').value.trim(),name,
+    clientId:document.getElementById('p-client').value||'',
+    status:document.getElementById('p-status').value,
+    startDate:document.getElementById('p-start').value,
+    endDateType:endType,
+    endDate:endType==='specific'?document.getElementById('p-end-date').value:'',
+    endDateMonth:endType==='monthyear'?document.getElementById('p-end-month').value:'',
+    duration:document.getElementById('p-duration').value.trim(),
+    location:document.getElementById('p-location').value.trim(),
+    budget:budType!=='sub'?document.getElementById('p-budget').value||'':'',
+    budgetMax:budType==='range'?bmax:'',budgetType:budType,
+    parentProjectId:parentProjId,
+    rate:document.getElementById('p-rate').value||'',
+    retainerOn,
+    retainerAmt:retainerOn?document.getElementById('p-retainer-amt').value:'',
+    retainerInBudget:retainerOn&&document.getElementById('p-retainer-in-budget').checked,
+    retainerPaid:retainerOn&&document.getElementById('p-retainer-paid').checked,
+    desc:document.getElementById('p-desc').value.trim(),
+    teamIds:[..._projTeamSelected],
+    tasks:[],milestones:[],phases:[]
+  });
   save('tracker:projects',projects);
-  ['p-num','p-name','p-budget','p-budget-max','p-rate','p-retainer-amt','p-desc','p-end-date','p-end-month','p-duration'].forEach(id=>{document.getElementById(id).value='';});
+  ['p-num','p-name','p-budget','p-budget-max','p-rate','p-retainer-amt','p-desc','p-end-date','p-end-month','p-duration','p-location'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  _projTeamSelected=[];renderProjTeamChips();
+  document.getElementById('p-team-search').value='';
   document.getElementById('p-retainer-on').checked=false;document.getElementById('retainer-fields').style.display='none';
   document.getElementById('p-end-type').value='none';toggleEndDateType();
   document.getElementById('p-budget-type').value='fixed';toggleBudgetType();
@@ -2234,46 +2441,48 @@ function toggleRetainerPaid(projId){
 // ═══════════════════════════════════════════════
 //  INVOICE (print view)
 // ═══════════════════════════════════════════════
-function refreshInvoiceProjectFilter(){
-  const sel=document.getElementById('inv-project-filter');if(!sel)return;
+function refreshInvoiceClientFilter(){
+  const sel=document.getElementById('inv-client-filter');if(!sel)return;
   const prev=sel.value;
-  sel.innerHTML='<option value="">All projects</option>';
-  projects.forEach(p=>sel.appendChild(new Option(p.name,p.id)));
+  sel.innerHTML='<option value="">All clients</option>';
+  clients.forEach(c=>sel.appendChild(new Option(c.company||clientLabel(c),c.id)));
   if(prev)sel.value=prev;
 }
 
 function renderInvoice(){
   const m=document.getElementById('inv-month').value||thisMonth();
-  const pid=document.getElementById('inv-project-filter').value||'';
+  const cid=document.getElementById('inv-client-filter')?.value||'';
   const prefix=settings.invoicePrefix||'INV';
   const defRate=parseFloat(settings.hourlyRate||0);
-  const proj=pid?projects.find(p=>p.id===pid):null;
-  const projRate=proj?getProjRate(proj):defRate;
-  const client=proj&&proj.clientId?clients.find(c=>c.id===proj.clientId):null;
+  const client=cid?clients.find(c=>c.id===cid):null;
 
-  document.getElementById('inv-number').textContent=prefix+'-'+m.replace('-','')+(pid?'-'+pid.slice(0,4):'');
-  document.getElementById('inv-proj-name').textContent=proj?proj.name:'All Projects';
-  document.getElementById('inv-client-name').textContent=client?'For: '+(client.company||client.contactName):'';
+  document.getElementById('inv-number').textContent=prefix+'-'+m.replace('-','')+(cid?'-'+cid.slice(0,4):'');
+  document.getElementById('inv-proj-name').textContent=client?(client.company||clientLabel(client)):'All Clients';
+  document.getElementById('inv-client-name').textContent='';
   document.getElementById('inv-period').textContent='Period: '+fmtMonth(m);
 
-  const invT=timeEntries.filter(e=>e.date.startsWith(m)&&e.billable&&(!pid||e.projectId===pid)).sort((a,b)=>a.date.localeCompare(b.date));
-  const invE=expenses.filter(e=>e.date.startsWith(m)&&e.billable&&(!pid||e.projectId===pid)).sort((a,b)=>a.date.localeCompare(b.date));
+  // Get projects for this client
+  const clientProjects=cid?projects.filter(p=>p.clientId===cid):projects;
+  const clientProjIds=new Set(clientProjects.map(p=>p.id));
 
-  const invTimeAmt=invT.reduce((s,e)=>{const p=e.projectId?projects.find(x=>x.id===e.projectId):null;const r=p?getProjRate(p):defRate;return s+e.hours*r;},0);
-  const invExpAmt=invE.reduce((s,e)=>s+e.amount,0);
+  const invT=timeEntries.filter(e=>e.date.startsWith(m)&&e.billable&&(!cid||clientProjIds.has(e.projectId))).sort((a,b)=>a.date.localeCompare(b.date));
+  const invE=expenses.filter(e=>e.date.startsWith(m)&&e.billable&&(!cid||clientProjIds.has(e.projectId)||e.clientId===cid)).sort((a,b)=>a.date.localeCompare(b.date));
+
+  const invTimeAmt=invT.reduce((s,e)=>{const p=e.projectId?projects.find(x=>x.id===e.projectId):null;const r=p?getProjRate(p):defRate;return s+parseFloat(e.hours||0)*r;},0);
+  const invExpAmt=invE.reduce((s,e)=>s+parseFloat(e.amount||0),0);
   const invTotal=invTimeAmt+invExpAmt;
-  const invHours=invT.reduce((s,e)=>s+e.hours,0);
+  const invHours=invT.reduce((s,e)=>s+parseFloat(e.hours||0),0);
 
-  // Retainer logic
-  const retainerOn=proj&&proj.retainerOn&&proj.retainerPaid&&proj.retainerInBudget;
-  const retainerAmt=retainerOn?parseFloat(proj.retainerAmt||0):0;
-  const retainerApplied=retainerOn?Math.min(retainerAmt,invTotal):0;
+  // Retainer logic — apply if exactly one client's project has retainer paid
+  const retainerProj=clientProjects.find(p=>p.retainerOn&&p.retainerPaid&&p.retainerInBudget);
+  const retainerAmt=retainerProj?parseFloat(retainerProj.retainerAmt||0):0;
+  const retainerApplied=retainerProj?Math.min(retainerAmt,invTotal):0;
   const balance=invTotal-retainerApplied;
 
   const rSec=document.getElementById('inv-retainer-section');
-  rSec.innerHTML=retainerOn?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:1rem;font-size:13px">
+  rSec.innerHTML=retainerProj?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:1rem;font-size:13px">
     <strong>Retainer on account:</strong> ${$f(retainerAmt)} paid
-    <span style="color:var(--success);margin-left:8px">. ${$f(retainerApplied)} applied this invoice</span>
+    <span style="color:var(--success);margin-left:8px">· ${$f(retainerApplied)} applied this invoice</span>
   </div>`:'';
 
   const tsec=document.getElementById('inv-time-section');
@@ -2284,7 +2493,7 @@ function renderInvoice(){
   if(!invT.length&&!invE.length){
     tsec.innerHTML='';esec.innerHTML='';totals.innerHTML='';
     empty.style.display='block';
-    empty.textContent='No billable entries for '+fmtMonth(m)+(pid?' in this project':'')+ '.';
+    empty.textContent='No billable entries for '+fmtMonth(m)+(cid?' for this client':'')+ '.';
     return;
   }
   empty.style.display='none';
@@ -2307,13 +2516,13 @@ function renderInvoice(){
         });
         return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date)).map(d=>`<tr class="tr-sep">
           <td style="color:var(--text2);font-size:12px">${fmtDate(d.date)}</td>
-          <td>${d.tasks.join('<br>')}${d.proj&&!pid?`<span style="font-size:11px;color:var(--text2)"> -- ${d.proj.name}</span>`:''}</td>
+          <td>${d.tasks.join('<br>')}${d.proj&&clientProjects.length>1?`<span style="font-size:11px;color:var(--text2)"> — ${d.proj.name}</span>`:''}</td>
           <td style="text-align:right">${d.hours.toFixed(2)}</td>
           <td style="text-align:right;color:var(--text2)">${$f(d.rate)}</td>
           <td style="text-align:right">${$f(d.hours*d.rate)}</td>
         </tr>`).join('');
       })()}
-      <tr class="tr-strong"><td colspan="2">${invHours.toFixed(1)}h total</td><td colspan="3" style="text-align:right">${$f(invTimeAmt)}</td></tr>
+      <tr class="tr-strong"><td colspan="2">${invHours.toFixed(2)}h total</td><td colspan="3" style="text-align:right">${$f(invTimeAmt)}</td></tr>
     </tbody>
   </table>`:'';
 
@@ -2371,7 +2580,7 @@ function allDropdownRefresh(){
   refreshTimeProjectDropdown();
   refreshExpenseProjectDropdown();
   refreshExpenseCategoryDropdown();
-  refreshInvoiceProjectFilter();
+  refreshInvoiceClientFilter();
   refreshTimeAssigneeDropdown();
 }
 
@@ -2390,25 +2599,37 @@ function renderTeamList(){
   const el=document.getElementById('team-list');
   if(!teamMembers.length){el.innerHTML='<div class="empty">No team members yet.</div>';return;}
 
-  // Group by company (or "Independent" if none)
+  // Group by company (or "Independent" if none), sorted alphabetically
   const groups={};
   teamMembers.forEach(m=>{
     const key=m.company||'Independent / No company';
     if(!groups[key])groups[key]=[];
     groups[key].push(m);
   });
+  const sortedCompanies=Object.keys(groups).sort((a,b)=>{
+    // Put "Independent" last
+    if(a.startsWith('Independent'))return 1;
+    if(b.startsWith('Independent'))return -1;
+    return a.localeCompare(b);
+  });
 
-  el.innerHTML=Object.entries(groups).map(([company,members])=>`
-    <div style="margin-bottom:1.25rem">
+  el.innerHTML=sortedCompanies.map(company=>{
+    const members=groups[company];
+    return`<div style="margin-bottom:1.25rem">
       <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.09em;margin-bottom:8px;padding-bottom:4px;border-bottom:.5px solid var(--border)">${company}</div>
       ${members.map(m=>{
         const isEditing=editing.team===m.id;
         const isInternal=m.type==='internal';
         const linkedClient=m.clientLink?clients.find(c=>c.id===m.clientLink):null;
         const assignedProjs=projects.filter(p=>(p.teamIds||[]).includes(m.id));
-        return`<div class="card" style="margin-bottom:8px;padding:1rem">
+        return`<div class="card" style="margin-bottom:8px;padding:1rem" draggable="true"
+          ondragstart="teamDragStart(event,'${m.id}')"
+          ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'"
+          ondragleave="this.style.outline=''"
+          ondrop="teamDrop(event,'${m.id}');this.style.outline=''">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div style="display:flex;gap:12px;align-items:center">
+              <i class="ti ti-grip-vertical" style="font-size:16px;color:var(--text3);cursor:grab;flex-shrink:0" title="Drag to reorder"></i>
               <div style="width:38px;height:38px;border-radius:50%;background:${m.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px;flex-shrink:0;overflow:hidden;border:2px solid ${m.color||'var(--accent)'}">
                 ${m.photo?`<img src="${m.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:(m.name||'?').charAt(0).toUpperCase()}
               </div>
@@ -2424,22 +2645,28 @@ function renderTeamList(){
                   ${linkedClient?`Client: ${linkedClient.company||linkedClient.primaryContact?.name}`:''} ${assignedProjs.length?`· ${assignedProjs.map(p=>p.name).join(', ')}`:''}</div>`:''}
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-              <div class="toggle-wrap">
-                <span style="font-size:11px;color:${isInternal?'var(--accent)':'var(--text3)'}">${isInternal?'Internal':'External'}</span>
-                <label class="toggle" title="Toggle Internal/External">
-                  <input type="checkbox" ${isInternal?'checked':''} onchange="toggleMemberType('${m.id}')">
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-              <button class="icon-action" onclick="toggleEdit('team','${m.id}')"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
-            </div>
+            <button class="icon-action" onclick="toggleEdit('team','${m.id}')"><i class="ti ${isEditing?'ti-x':'ti-pencil'}"></i></button>
           </div>
           ${isEditing?renderTeamEditForm(m):''}
         </div>`;
       }).join('')}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+}
+
+// Team drag reorder
+let _teamDragId=null;
+function teamDragStart(e,id){_teamDragId=id;}
+function teamDrop(e,targetId){
+  if(!_teamDragId||_teamDragId===targetId)return;
+  const srcIdx=teamMembers.findIndex(m=>m.id===_teamDragId);
+  const tgtIdx=teamMembers.findIndex(m=>m.id===targetId);
+  if(srcIdx<0||tgtIdx<0)return;
+  const [moved]=teamMembers.splice(srcIdx,1);
+  teamMembers.splice(tgtIdx,0,moved);
+  save('tracker:team',teamMembers);
+  _teamDragId=null;
+  renderTeamList();
 }
 
 function renderTeamEditForm(m){
