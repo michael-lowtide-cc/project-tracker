@@ -439,21 +439,21 @@ td{padding:8px 0;vertical-align:top}
             <select id="p-budget-parent" style="display:none;flex:1;font-size:13px"><option value="">— Parent project —</option></select>
           </div>
         </div>
-        <div><label>Hourly rate ($/hr)</label><input type="number" id="p-rate" min="0" step="5" placeholder="Use default"></div>
+        <div id="p-rate-wrap"><label>Hourly rate ($/hr)</label><input type="number" id="p-rate" min="0" step="5" placeholder="Use default"></div>
       </div>
-      <div class="field"><label>Location (optional)</label><input type="text" id="p-location" placeholder="City, State or Remote"></div>
-      <div style="margin-bottom:12px">
+      <div id="p-retainer-wrap" style="margin-bottom:12px">
         <label class="check-label" style="margin-bottom:8px"><input type="checkbox" id="p-retainer-on" onchange="toggleRetainerFields()"> Has retainer</label>
         <div id="retainer-fields" class="retainer-fields" style="display:none">
           <div class="grid2" style="margin-bottom:0">
             <div><label>Retainer amount ($)</label><input type="number" id="p-retainer-amt" min="0" step="100" placeholder="2000"></div>
             <div style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;padding-bottom:2px">
-              <label class="check-label"><input type="checkbox" id="p-retainer-in-budget"> Include in total budget</label>
+              <label class="check-label"><input type="checkbox" id="p-retainer-in-budget"> Applied to budget</label>
               <label class="check-label"><input type="checkbox" id="p-retainer-paid"> Mark as paid</label>
             </div>
           </div>
         </div>
       </div>
+      <div class="field"><label>Location (optional)</label><input type="text" id="p-location" placeholder="City, State or Remote"></div>
       <div class="field"><label>Description (optional)</label><input type="text" id="p-desc" placeholder="Brief project overview" onkeydown="if(event.key==='Enter')addProject()"></div>
       <div class="field">
         <label>Team members</label>
@@ -461,7 +461,7 @@ td{padding:8px 0;vertical-align:top}
           <input type="text" id="p-team-search" placeholder="Type a name to add..." autocomplete="off" oninput="projTeamSearch(this.value)" style="margin-bottom:6px">
           <div id="p-team-search-list" class="autofill-list" style="display:none;position:absolute;z-index:10;width:100%"></div>
         </div>
-        <div id="p-team-assign" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+        <div id="p-team-assign" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;min-height:0"></div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px">
         <button class="btn" onclick="toggleAddProject()">Cancel</button>
@@ -1055,7 +1055,15 @@ const TEAM_COLORS=[
 const DEF_CATS=['Software','Travel','Equipment','Subcontractor','Meals','Office','Other'];
 let settings, timeEntries, expenses, clients, projects, clientInvs, teamMembers, myProfile, currentTab='dashboard';
 let editing={time:null,expenses:null,projects:null,clients:null,team:null,milestones:null,phases:null,tasks:null};
-const _ganttCompressed={};
+const _ganttCompressed={}; // '3mo' (default), '1mo', 'full'
+
+function cycleGanttView(gId){
+  const pid=gId.replace('mg-','');
+  const cur=_ganttCompressed[pid]||'3mo';
+  _ganttCompressed[pid]=cur==='3mo'?'1mo':cur==='1mo'?'full':'3mo';
+  renderProjectList();
+  renderDashBudgets();
+}
 let _projTeamSelected=[];
 
 function reloadState(){
@@ -1376,8 +1384,12 @@ function toggleBudgetType(){
   document.getElementById('p-budget-range-sep').style.display=isRange?'inline':'none';
   document.getElementById('p-budget-max').style.display=isRange?'block':'none';
   document.getElementById('p-budget-parent').style.display=isSub?'block':'none';
+  // Hide rate and retainer for sub-projects
+  const rateWrap=document.getElementById('p-rate-wrap');
+  const retWrap=document.getElementById('p-retainer-wrap');
+  if(rateWrap)rateWrap.style.display=isSub?'none':'block';
+  if(retWrap)retWrap.style.display=isSub?'none':'block';
   if(isSub){
-    // Populate parent project dropdown
     const sel=document.getElementById('p-budget-parent');
     const prev=sel.value;
     sel.innerHTML='<option value="">— Parent project —</option>';
@@ -1594,73 +1606,67 @@ function refreshAll(){
 
 function renderDashBudgets(){
   const el=document.getElementById('dash-project-budgets');
-  const active=projects.filter(p=>p.status==='active');
-  if(!active.length){
-    el.innerHTML='<div class="card" style="font-size:13px;color:var(--text2)">No active projects yet.</div>';
-    return;
-  }
   const oneMonthOut=new Date();oneMonthOut.setMonth(oneMonthOut.getMonth()+1);
   const oneMonthStr=oneMonthOut.toISOString().split('T')[0];
   const myId='__me__';
 
-  el.innerHTML=active.map(p=>{
-    const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
-    const clientName=client?client.company:'';
+  // Sort active top-level projects by project number
+  const active=projects.filter(p=>p.status==='active'&&!p.parentProjectId);
+  active.sort((a,b)=>{
+    if(!a.num&&!b.num)return 0;
+    if(!a.num)return 1;if(!b.num)return -1;
+    const na=parseFloat(a.num),nb=parseFloat(b.num);
+    if(!isNaN(na)&&!isNaN(nb))return na-nb;
+    return a.num.localeCompare(b.num);
+  });
+
+  if(!active.length){
+    el.innerHTML='<div class="card" style="font-size:13px;color:var(--text2)">No active projects yet. Add a project to see budget tracking here.</div>';return;
+  }
+
+  function buildBudgetBar(p){
     const rate=getProjRate(p);
     const budget=getProjBudget(p);
     const bTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*rate,0);
     const bExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
     const billed=bTime+bExp;
-    const budgetMin=budget.min||0;
-    const budgetMax=budget.max||0;
+    const budgetMin=budget.min||0;const budgetMax=budget.max||0;
     const retainerOn=p.retainerOn&&parseFloat(p.retainerAmt||0)>0;
     const retainerAmt=retainerOn?parseFloat(p.retainerAmt):0;
-
-    // Budget bar color logic:
-    // yellow = 0 → retainer, green = retainer → budgetMin, red = budgetMin → budgetMax
-    // If no retainer: green until budgetMin, red budgetMin→budgetMax
     let barSegments='';
     if(budgetMax>0){
       const billedPct=Math.min(100,billed/budgetMax*100);
       const retPct=retainerAmt>0?Math.min(100,retainerAmt/budgetMax*100):0;
       const minPct=budgetMin>0?Math.min(100,budgetMin/budgetMax*100):100;
-
       if(retainerAmt>0&&billed<=retainerAmt){
-        // All yellow
         barSegments=`<div style="position:absolute;left:0;top:0;height:100%;width:${billedPct.toFixed(1)}%;background:#f0b429;border-radius:5px"></div>`;
       } else if(billed<=budgetMin||budgetMin===0){
-        // Yellow up to retainer, then green
-        const yellowPct=retPct;
-        const greenPct=billedPct-yellowPct;
+        const yellowPct=retPct;const greenPct=billedPct-yellowPct;
         barSegments=`${yellowPct>0?`<div style="position:absolute;left:0;top:0;height:100%;width:${yellowPct.toFixed(1)}%;background:#f0b429;border-radius:5px 0 0 5px"></div>`:''}
           <div style="position:absolute;left:${yellowPct.toFixed(1)}%;top:0;height:100%;width:${Math.max(0,greenPct).toFixed(1)}%;background:var(--success);border-radius:${yellowPct>0?'0 5px 5px 0':'5px'}"></div>`;
       } else {
-        // Yellow, green, red
-        const yellowPct=retPct;
-        const greenPct=minPct-yellowPct;
-        const redPct=billedPct-minPct;
+        const yellowPct=retPct;const greenPct=minPct-yellowPct;const redPct=billedPct-minPct;
         barSegments=`${yellowPct>0?`<div style="position:absolute;left:0;top:0;height:100%;width:${yellowPct.toFixed(1)}%;background:#f0b429;border-radius:5px 0 0 5px"></div>`:''}
           ${greenPct>0?`<div style="position:absolute;left:${yellowPct.toFixed(1)}%;top:0;height:100%;width:${greenPct.toFixed(1)}%;background:var(--success);border-radius:0"></div>`:''}
           <div style="position:absolute;left:${minPct.toFixed(1)}%;top:0;height:100%;width:${Math.max(0,redPct).toFixed(1)}%;background:var(--danger);border-radius:0 5px 5px 0"></div>`;
       }
-      // Retainer break notch
-      if(retPct>0&&retPct<100){
-        barSegments+=`<div style="position:absolute;left:${retPct.toFixed(1)}%;top:0;height:100%;width:2px;background:var(--bg);z-index:2"></div>`;
-      }
+      if(retPct>0&&retPct<100)barSegments+=`<div style="position:absolute;left:${retPct.toFixed(1)}%;top:0;height:100%;width:2px;background:var(--bg);z-index:2"></div>`;
     }
-    const billedPct=budgetMax>0?Math.min(100,billed/budgetMax*100):0;
-    const overBudget=budgetMax>0&&billed>budgetMax;
+    return{billed,budgetMax,budget,retainerOn,retainerAmt,barSegments,billedPct:budgetMax>0?Math.min(100,billed/budgetMax*100):0,overBudget:budgetMax>0&&billed>budgetMax};
+  }
 
-    // Upcoming milestones within 1 month
+  el.innerHTML=active.map(p=>{
+    const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
+    const clientName=client?client.company:'';
+    const {billed,budgetMax,budget,retainerOn,retainerAmt,barSegments,billedPct,overBudget}=buildBudgetBar(p);
     const upcoming=(p.milestones||[]).filter(m=>!m.completed&&m.date&&m.date>=today()&&m.date<=oneMonthStr).sort((a,b)=>a.date.localeCompare(b.date));
-
-    // Tasks assigned to me
     const myTasks=(p.tasks||[]).filter(t=>t.status!=='done'&&(t.assigneeId===myId||(t.assigneeIds||[]).includes(myId)));
-
-    // Timeline
     const timeline=renderMiniGantt(p,{compressed:_ganttCompressed[p.id]!==false});
 
-    return`<div class="card" style="margin-bottom:1rem">
+    // Sub-projects for this parent
+    const subs=projects.filter(s=>s.parentProjectId===p.id&&s.status==='active');
+
+    return`<div class="card" id="dash-proj-${p.id}" style="margin-bottom:1rem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div>
           <div style="font-size:15px;font-weight:600">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} — </span>`:''}${p.name}</div>
@@ -1674,7 +1680,6 @@ function renderDashBudgets(){
           <button class="icon-action" onclick="switchTab('projects');setTimeout(()=>toggleEdit('projects','${p.id}'),100)" title="Edit project" style="flex-shrink:0"><i class="ti ti-pencil"></i></button>
         </div>
       </div>
-      <!-- Budget row -->
       <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--text2);margin-bottom:6px">
         ${p.rate?`<span><i class="ti ti-coin" style="font-size:12px"></i> ${$f(parseFloat(p.rate))}/hr</span>`:''}
         ${budget.display?`<span><i class="ti ti-chart-bar" style="font-size:12px"></i> Budget: ${budget.display}</span>`:''}
@@ -1684,6 +1689,23 @@ function renderDashBudgets(){
       </div>
       ${budgetMax>0?`<div class="gauge-bar" style="height:8px;margin-bottom:8px;position:relative">${barSegments}</div>`:''}
       ${timeline}
+      ${subs.length?`<div style="margin-top:10px;padding-top:8px;border-top:.5px solid var(--border)">
+        <div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Sub-projects</div>
+        ${subs.map(s=>{
+          const parentProj=projects.find(x=>x.id===s.parentProjectId);
+          return`<div style="margin-left:16px;padding:8px 10px;background:var(--bg2);border-radius:var(--radius-sm);margin-bottom:6px;border-left:2px solid var(--accent)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="flex:1;font-size:13px;font-weight:500">${s.num?`<span style="font-size:11px;color:var(--text2)">${s.num} — </span>`:''}${s.name}</div>
+              <button class="btn sm" onclick="document.getElementById('dash-proj-${p.id}').scrollIntoView({behavior:'smooth',block:'center'})" style="font-size:11px;padding:2px 8px"><i class="ti ti-arrow-up"></i> ${p.name}</button>
+            </div>
+            ${(s.tasks||[]).filter(t=>t.status!=='done'&&(t.assigneeId===myId||(t.assigneeIds||[]).includes(myId))).slice(0,3).map(t=>`
+              <div style="display:flex;align-items:center;gap:5px;font-size:12px;margin-top:4px;color:var(--text2)">
+                <input type="checkbox" onchange="updateTaskStatus('${s.id}','${t.id}',this.checked?'done':'todo')" style="width:auto">
+                <span>${t.title}</span>
+              </div>`).join('')}
+          </div>`;
+        }).join('')}
+      </div>`:''}
       ${upcoming.length?`<div style="margin-top:10px;padding-top:8px;border-top:.5px solid var(--border)">
         <div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Upcoming milestones</div>
         ${upcoming.map(m=>`<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0">
@@ -1706,6 +1728,9 @@ function renderDashBudgets(){
   }).join('');
 }
 
+
+// ═══════════════════════════════════════════════
+//  TIME
 // ═══════════════════════════════════════════════
 //  TIME
 // ═══════════════════════════════════════════════
@@ -1831,7 +1856,6 @@ function renderTimeList(){
 function renderTimeEditForm(e){
   const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${clientLabel(c)}</option>`).join('');
   const projOpts=projects.map(p=>`<option value="${p.id}"${p.id===e.projectId?' selected':''}>${p.name}</option>`).join('');
-  const assigneeOpts=[{id:'__me__',name:myProfile.name||'Me'},...teamMembers].map(m=>`<option value="${m.id}"${m.id===e.assigneeId?' selected':''}>${m.name}</option>`).join('');
   return`<div class="edit-form">
     <div class="grid2">
       <div><label>Date</label><input type="date" id="et-date-${e.id}" value="${e.date}"></div>
@@ -1841,10 +1865,7 @@ function renderTimeEditForm(e){
       <div><label>Project</label><select id="et-project-${e.id}" onchange="etAutoFillClient('${e.id}')"><option value="">-- No project --</option>${projOpts}</select></div>
       <div><label>Client</label><select id="et-client-${e.id}"><option value="">-- No client --</option>${clientOpts}</select></div>
     </div>
-    <div class="grid2">
-      <div><label>Assignee</label><select id="et-assignee-${e.id}"><option value="">-- Me --</option>${assigneeOpts}</select></div>
-      <div><label>Task / description</label><input type="text" id="et-task-${e.id}" value="${e.task}"></div>
-    </div>
+    <div class="field"><label>Task / description</label><input type="text" id="et-task-${e.id}" value="${e.task}"></div>
     <div class="field"><label>Notes (optional)</label><input type="text" id="et-notes-${e.id}" value="${e.notes||''}"></div>
     <div class="edit-actions">
       <label class="check-label"><input type="checkbox" id="et-bill-${e.id}" ${e.billable?'checked':''}> Billable</label>
@@ -1871,7 +1892,8 @@ function saveTimeEdit(id){
   e.hours=parseFloat(document.getElementById(`et-hours-${id}`).value)||0;
   e.projectId=document.getElementById(`et-project-${id}`).value||'';
   e.clientId=document.getElementById(`et-client-${id}`).value||'';
-  e.assigneeId=document.getElementById(`et-assignee-${id}`)?.value||'';
+  // auto-fill client from project if not set
+  if(!e.clientId&&e.projectId){const proj=projects.find(p=>p.id===e.projectId);if(proj&&proj.clientId)e.clientId=proj.clientId;}
   e.task=document.getElementById(`et-task-${id}`).value.trim();
   e.notes=document.getElementById(`et-notes-${id}`).value.trim();
   e.billable=document.getElementById(`et-bill-${id}`).checked;
@@ -2072,17 +2094,15 @@ function renderProjectEditForm(p){
       </div>
       <div></div>
     </div>
-    <div class="field"><label>Location (optional)</label><input type="text" id="ep-location-${p.id}" value="${p.location||''}" placeholder="City, State or Remote"></div>
-    <div class="grid2" style="margin-bottom:8px">
-      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-        <label class="check-label"><input type="checkbox" id="ep-ret-on-${p.id}" ${p.retainerOn?'checked':''} onchange="document.getElementById('ep-ret-amt-wrap-${p.id}').style.display=this.checked?'flex':'none'"> Has retainer</label>
-        <label class="check-label"><input type="checkbox" id="ep-ret-paid-${p.id}" ${p.retainerPaid?'checked':''}> Retainer paid</label>
-        <label class="check-label"><input type="checkbox" id="ep-ret-inbud-${p.id}" ${p.retainerInBudget?'checked':''}> Applied to budget</label>
-      </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+      <label class="check-label"><input type="checkbox" id="ep-ret-on-${p.id}" ${p.retainerOn?'checked':''} onchange="document.getElementById('ep-ret-amt-wrap-${p.id}').style.display=this.checked?'flex':'none'"> Has retainer</label>
+      <label class="check-label"><input type="checkbox" id="ep-ret-paid-${p.id}" ${p.retainerPaid?'checked':''}> Retainer paid</label>
+      <label class="check-label"><input type="checkbox" id="ep-ret-inbud-${p.id}" ${p.retainerInBudget?'checked':''}> Applied to budget</label>
     </div>
     <div id="ep-ret-amt-wrap-${p.id}" style="display:${p.retainerOn?'flex':'none'};gap:12px;margin-bottom:8px;align-items:flex-end">
       <div style="flex:1"><label>Retainer amount ($)</label><input type="number" id="ep-ret-amt-${p.id}" value="${p.retainerAmt||''}" min="0" step="100"></div>
     </div>
+    <div class="field"><label>Location (optional)</label><input type="text" id="ep-location-${p.id}" value="${p.location||''}" placeholder="City, State or Remote"></div>
     <div class="field"><label>Description</label><input type="text" id="ep-desc-${p.id}" value="${p.desc||''}"></div>
     <div class="field"><label>Team members</label><div class="color-palette" id="ep-team-${p.id}" style="flex-wrap:wrap;gap:6px"></div></div>
     <div class="edit-actions">
@@ -2163,6 +2183,11 @@ function addProject(){
   document.getElementById('p-end-type').value='none';toggleEndDateType();
   document.getElementById('p-budget-type').value='fixed';toggleBudgetType();
   document.getElementById('p-start').value=today();
+  // Close the add project card
+  const form=document.getElementById('add-project-form');
+  const btn=document.getElementById('add-project-btn');
+  if(form)form.style.display='none';
+  if(btn)btn.innerHTML='<i class="ti ti-plus"></i> Add project';
   allDropdownRefresh();refreshAll();
 }
 
@@ -2819,7 +2844,8 @@ function renderMiniGantt(p, opts={}){
   if(!phases.length&&!milestones.length)return'';
 
   const gId=`mg-${p.id}`;
-  const isCompressed=_ganttCompressed[p.id]!==false; // default compressed
+  const viewMode=_ganttCompressed[p.id]||'3mo'; // '1mo', '3mo', 'full'
+  const isCompressed=viewMode; // passed to button label
 
   // Build full date range from phases and milestones only (not contract dates)
   let fullMinD=null,fullMaxD=null;
@@ -2837,12 +2863,17 @@ function renderMiniGantt(p, opts={}){
   fullMinD=new Date(fullMinD.getFullYear(),fullMinD.getMonth(),1);
   fullMaxD=new Date(fullMaxD.getFullYear(),fullMaxD.getMonth()+1,0);
 
-  // Apply compressed / full view
+  // Apply view mode
   let minD,maxD;
-  if(isCompressed){
+  if(viewMode==='1mo'){
+    // 1 month starting 1 week before today
+    const oneWeekAgo=new Date();oneWeekAgo.setDate(oneWeekAgo.getDate()-7);
+    minD=new Date(oneWeekAgo);
+    maxD=new Date(minD);maxD.setMonth(maxD.getMonth()+1);
+  } else if(viewMode==='3mo'){
     // 3 months starting 1 week before today
     const oneWeekAgo=new Date();oneWeekAgo.setDate(oneWeekAgo.getDate()-7);
-    minD=new Date(oneWeekAgo.getFullYear(),oneWeekAgo.getMonth(),oneWeekAgo.getDate());
+    minD=new Date(oneWeekAgo);
     maxD=new Date(minD);maxD.setMonth(maxD.getMonth()+3);
   } else {
     // Full: start at contract start date if set, else full phase range
@@ -2852,11 +2883,9 @@ function renderMiniGantt(p, opts={}){
     } else {
       minD=fullMinD;
     }
-    // End at contract end or last phase/milestone date
     if(p.endDate){
       maxD=new Date(p.endDate+'T00:00:00');
       maxD=new Date(maxD.getFullYear(),maxD.getMonth()+1,0);
-      // Also ensure we show phase/milestone data beyond contract end
       if(fullMaxD>maxD)maxD=new Date(fullMaxD);
     } else {
       maxD=fullMaxD;
@@ -2932,22 +2961,21 @@ function renderMiniGantt(p, opts={}){
   phases.forEach((ph,i)=>{
     const phY=headerH+i*rowH;
     const col=ph.color||'#4a90d9';
-    const rowBg=i%2===0?'rgba(0,0,0,0.02)':'transparent';
-    svgRowsVW+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="${rowBg}"/>`;
+    // No row dividers — solid single-color background
+    // Phase row - solid bg, rounder corners, wider letter-spacing
+    svgRowsVW+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="var(--bg2)"/>`;
     if(ph.startDate){
       const x1=vx(pctOf(ph.startDate));
       const x2=ph.endDate?vx(pctOf(ph.endDate)):x1+20;
       const bw=Math.max(4,x2-x1);
-      svgRowsVW+=`<rect x="${x1}" y="${phY+3}" width="${bw}" height="${rowH-6}" fill="${col}" rx="3"/>`;
-      // Phase label — bw in vw units, ~1000 wide; 10px font ≈ 6 units per char
-      const maxChars=Math.floor((bw-8)/6.5);
+      svgRowsVW+=`<rect x="${x1}" y="${phY+3}" width="${bw}" height="${rowH-6}" fill="${col}" rx="6"/>`;
+      // Phase label with wider letter-spacing
+      const maxChars=Math.floor((bw-8)/7.5);
       if(maxChars>=3){
         const label=maxChars>=ph.title.length?ph.title:ph.title.slice(0,maxChars-1)+'...';
-        svgRowsVW+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle">${esc(label)}</text>`;
+        svgRowsVW+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle" letter-spacing="0.08em">${esc(label)}</text>`;
       }
     }
-    if(i<phases.length-1)svgRowsVW+=`<line x1="0" y1="${phY+rowH}" x2="${VW}" y2="${phY+rowH}" stroke="var(--border)" stroke-width="0.5"/>`;
-
     // Milestone diamonds: small (r=4), grey (#888)
     (msByRow[i]||[]).forEach(ms=>{
       const mp=pctOf(ms.date);
@@ -2973,10 +3001,7 @@ function renderMiniGantt(p, opts={}){
   return`<div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Timeline</span>
-      <div style="display:flex;gap:4px">
-        <button class="btn sm" onclick="setMiniGanttView('${gId}','compressed')" id="${gId}-compressed" style="padding:2px 8px;font-size:10px;${isCompressed?'background:var(--accent);color:#fff;border-color:var(--accent)':''}">3 mo</button>
-        <button class="btn sm" onclick="setMiniGanttView('${gId}','full')" id="${gId}-full" style="padding:2px 8px;font-size:10px;${!isCompressed?'background:var(--accent);color:#fff;border-color:var(--accent)':''}">Full</button>
-      </div>
+      <button class="btn sm" onclick="cycleGanttView('${gId}')" style="padding:2px 10px;font-size:10px">${isCompressed==='1mo'?'1 mo':isCompressed==='3mo'?'3 mo':'Full'} ↻</button>
     </div>
     <div id="${gId}" data-pid="${p.id}" style="overflow-x:auto;padding-top:${todayInRange?'20px':'0'}">
       <svg viewBox="0 0 ${VW} ${H}" width="100%" height="${H}" style="display:block;min-width:300px;overflow:visible" preserveAspectRatio="none">
@@ -2991,9 +3016,8 @@ function renderMiniGantt(p, opts={}){
 }
 
 function setMiniGanttView(gId, mode){
-  // Extract pid from gId (format: mg-PROJID)
   const pid=gId.replace('mg-','');
-  _ganttCompressed[pid]=(mode==='compressed');
+  _ganttCompressed[pid]=mode;
   renderProjectList();
   renderDashBudgets();
 }
@@ -3056,13 +3080,13 @@ function deleteTask(projId,taskId){
 
 function addMilestone(projId){
   const inp=document.getElementById(`ms-inp-${projId}`);
-  const date=document.getElementById(`ms-date-${projId}`);
-  const title=inp.value.trim();if(!title||!date.value)return;
+  const dateEl=document.getElementById(`ms-date-${projId}`);
+  const title=inp?inp.value.trim():'';if(!title)return;
   const p=projects.find(x=>x.id===projId);if(!p)return;
   if(!p.milestones)p.milestones=[];
-  p.milestones.push({id:uid(),title,date:date.value,completed:false});
+  p.milestones.push({id:uid(),title,date:dateEl?dateEl.value:'',completed:false});
   save('tracker:projects',projects);
-  inp.value='';date.value='';
+  editing.milestones=null;
   renderProjectList();
 }
 
@@ -3079,8 +3103,22 @@ function deleteMilestone(projId,msId){
   save('tracker:projects',projects);renderProjectList();
 }
 
-// Phase editing
-let _editingPhases={};
+// Toggle inline add panels
+function toggleAddMilestone(projId){
+  const key=`add-${projId}`;
+  editing.milestones=editing.milestones===key?null:key;
+  renderProjectList();
+}
+function toggleAddTask(projId){
+  const key=`add-task-${projId}`;
+  editing.tasks=editing.tasks===key?null:key;
+  renderProjectList();
+}
+function toggleAddPhase(projId){
+  const key=`add-phase-${projId}`;
+  editing.phases=editing.phases===key?null:key;
+  renderProjectList();
+}
 function toggleEditPhase(projId,phId){
   const key=projId+'-'+phId;
   _editingPhases[key]=!_editingPhases[key];
@@ -3191,15 +3229,15 @@ function addPhase(projId){
   const inp=document.getElementById(`phase-inp-${projId}`);
   const start=document.getElementById(`phase-start-${projId}`);
   const end=document.getElementById(`phase-end-${projId}`);
-  const title=inp.value.trim();if(!title)return;
+  const colorEl=document.getElementById(`phase-color-${projId}`);
+  const title=inp?inp.value.trim():'';if(!title)return;
   const p=projects.find(x=>x.id===projId);if(!p)return;
   if(!p.phases)p.phases=[];
-  // Assign a color from the palette cycling through non-accent colors
-  const phColors=['#4a90d9','#2d8a6b','#d4756b','#d4a056','#5ba08a','#c27fd4','#6b3fa0','#2d6fa8','#5a5068','#8a7a6b'];
-  const color=phColors[p.phases.length % phColors.length];
+  const color=colorEl?colorEl.value:'#4a90d9';
   p.phases.push({id:uid(),title,startDate:start?start.value:'',endDate:end?end.value:'',color});
   save('tracker:projects',projects);
-  inp.value='';if(start)start.value='';if(end)end.value='';
+  // Close the add phase panel
+  editing.phases=null;
   renderProjectList();
 }
 
@@ -3213,84 +3251,72 @@ function deletePhase(projId,phId){
 
 function renderTasksAndMilestones(p){
   const tasks=p.tasks||[];
-  const milestones=[...(p.milestones||[])].sort((a,b)=>a.date.localeCompare(b.date));
+  const milestones=[...(p.milestones||[])].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   const phases=[...(p.phases||[])].sort((a,b)=>{
     if(!a.startDate&&!b.startDate)return 0;
-    if(!a.startDate)return 1;
-    if(!b.startDate)return -1;
+    if(!a.startDate)return 1;if(!b.startDate)return -1;
     return a.startDate.localeCompare(b.startDate);
   });
   const todayStr=today();
+
+  // Only show project-assigned members for task chips
+  const projMemberIds=new Set(p.teamIds||[]);
+  projMemberIds.add('__me__');
   const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  const projMembers=allMembers.filter(m=>projMemberIds.has(m.id));
+
   const phaseOpts=phases.map(ph=>`<option value="${ph.id}">${ph.title}</option>`).join('');
   const statusOpts=(cur)=>['todo','in_progress','done'].map(s=>`<option value="${s}"${s===cur?' selected':''}>${s==='todo'?'To do':s==='in_progress'?'In progress':'Done'}</option>`).join('');
   const typeBadge=(t)=>t.taskType==='critical'?'<span class="phase-label phase-critical">Critical</span>':t.taskType==='open'?'<span class="phase-label phase-open">Open</span>':'';
   const doneTasks=tasks.filter(t=>t.status==='done').length;
-
-  // Multi-assignee chip rendering
-  function assigneeChips(assigneeIds){
-    const ids=Array.isArray(assigneeIds)?assigneeIds:(assigneeIds?[assigneeIds]:[]);
-    return ids.map(id=>{
-      const m=allMembers.find(x=>x.id===id);
-      return m?`<span style="font-size:10px;background:${m.color||'var(--accent)'};color:#fff;padding:1px 6px;border-radius:10px;white-space:nowrap">${m.name.split(' ')[0]}</span>`:'';
-    }).join('');
-  }
-
-  // Multi-assignee selector chips (toggleable)
-  function assigneeSelector(taskId,assigneeIds){
-    const ids=Array.isArray(assigneeIds)?assigneeIds:(assigneeIds?[assigneeIds]:[]);
-    return allMembers.map(m=>{
-      const sel=ids.includes(m.id);
-      return`<span onclick="toggleTaskAssignee('${p.id}','${taskId}','${m.id}')" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;
-    }).join('');
-  }
+  const showAddMs=editing.milestones===`add-${p.id}`;
+  const showAddTask=editing.tasks===`add-task-${p.id}`;
+  const showAddPhase=editing.phases===`add-phase-${p.id}`;
 
   function renderTaskRow(t){
     const isOpen=t.taskType==='open';
     const overdue=!isOpen&&t.dueDate&&t.dueDate<todayStr&&t.status!=='done';
     const expandKey=`task-expand-${p.id}-${t.id}`;
-    const assigneeIds=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
-    const chips=assigneeIds.map(id=>{const m=allMembers.find(x=>x.id===id);return m?`<span style="font-size:10px;background:${m.color||'var(--accent)'};color:#fff;padding:1px 6px;border-radius:10px;white-space:nowrap">${m.name.split(' ')[0]}</span>`:''}).join('');
-    return`<div class="task-row" draggable="true" data-taskid="${t.id}" data-projid="${p.id}"
-      ondragstart="taskDragStart(event,'${p.id}','${t.id}')"
-      ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'"
-      ondragleave="this.style.outline=''"
-      ondrop="taskDropOnTask(event,'${p.id}','${t.id}')"
-      style="border-bottom:.5px solid var(--border);cursor:grab">
+    const aIds=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
+    const chips=aIds.map(id=>{const m=allMembers.find(x=>x.id===id);return m?`<span style="font-size:10px;background:${m.color||'var(--accent)'};color:#fff;padding:1px 6px;border-radius:10px">${m.name.split(' ')[0]}</span>`:''}).join('');
+    return`<div draggable="true" ondragstart="taskDragStart(event,'${p.id}','${t.id}')" ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'" ondragleave="this.style.outline=''" ondrop="taskDropOnTask(event,'${p.id}','${t.id}')" style="border-bottom:.5px solid var(--border)">
       <div style="display:flex;align-items:center;gap:6px;padding:5px 0;font-size:13px">
         <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
         ${typeBadge(t)}
-        <span contenteditable="true" onblur="saveTaskTitle('${p.id}','${t.id}',this.textContent)"
-          style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;outline:none;border-radius:3px;padding:1px 3px;cursor:text"
-          onmouseenter="this.style.background='var(--bg2)'"
-          onmouseleave="if(document.activeElement!==this)this.style.background=''"
-          onfocus="this.style.background='var(--bg2)'">${t.title}</span>
-        ${!isOpen&&t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'};white-space:nowrap">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}
+        <span contenteditable="true" onblur="saveTaskTitle('${p.id}','${t.id}',this.textContent)" style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;outline:none;border-radius:3px;padding:1px 3px;cursor:text" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="if(document.activeElement!==this)this.style.background=''" onfocus="this.style.background='var(--bg2)'">${t.title}</span>
+        ${!isOpen&&t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'}">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}
         ${chips}
-        <button class="icon-action" onclick="document.getElementById('${expandKey}').style.display=document.getElementById('${expandKey}').style.display==='none'?'block':'none'" title="Manage assignees" style="font-size:13px"><i class="ti ti-user-plus"></i></button>
+        <button class="icon-action" onclick="document.getElementById('${expandKey}').style.display=document.getElementById('${expandKey}').style.display==='none'?'block':'none'" style="font-size:13px"><i class="ti ti-user-plus"></i></button>
         <select onchange="updateTaskStatus('${p.id}','${t.id}',this.value)" style="width:auto;font-size:11px;padding:2px 4px">${statusOpts(t.status)}</select>
         <button class="icon-action danger" onclick="deleteTask('${p.id}','${t.id}')" style="font-size:12px"><i class="ti ti-x"></i></button>
       </div>
       <div id="${expandKey}" style="display:none;padding:6px 8px 8px;background:var(--bg2);border-radius:4px;margin-bottom:4px">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Assign to (click to toggle):</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">${allMembers.map(m=>{
-          const sel=assigneeIds.includes(m.id);
-          return`<span onclick="toggleTaskAssignee('${p.id}','${t.id}','${m.id}')" style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;
-        }).join('')}</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Assign (project members):</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${projMembers.map(m=>{const sel=aIds.includes(m.id);return`<span onclick="toggleTaskAssignee('${p.id}','${t.id}','${m.id}')" style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;}).join('')}</div>
       </div>
     </div>`;
   }
 
-  // Group tasks by phase
   const ungrouped=tasks.filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId));
   const grouped=phases.map(ph=>({phase:ph,tasks:tasks.filter(t=>t.phaseId===ph.id)}));
 
   return`<div style="margin-top:14px;border-top:.5px solid var(--border);padding-top:12px">
-
-    <!-- MILESTONES (above phases) -->
     <div style="margin-bottom:14px">
-      <span class="sec-title" style="margin-bottom:8px;display:block">Milestones</span>
-      ${milestones.length===0?'<div style="font-size:12px;color:var(--text3)">No milestones yet.</div>':''}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span class="sec-title" style="margin:0">Milestones</span>
+        <button class="icon-action" onclick="toggleAddMilestone('${p.id}')" style="font-size:14px"><i class="ti ${showAddMs?'ti-x':'ti-plus'}"></i></button>
+      </div>
+      ${showAddMs?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+        <div class="grid2" style="margin-bottom:8px">
+          <div><label>Title</label><input type="text" id="ms-inp-${p.id}" placeholder="Milestone name..."></div>
+          <div><label>Date</label><input type="date" id="ms-date-${p.id}"></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:6px">
+          <button class="btn sm" onclick="toggleAddMilestone('${p.id}')">Cancel</button>
+          <button class="btn sm primary" onclick="addMilestone('${p.id}')"><i class="ti ti-check"></i> Add</button>
+        </div>
+      </div>`:''}
+      ${milestones.length===0&&!showAddMs?'<div style="font-size:12px;color:var(--text3)">No milestones yet.</div>':''}
       ${milestones.map(ms=>{
         const overdue=!ms.completed&&ms.date&&ms.date<todayStr;
         const isEditingMs=editing.milestones===ms.id;
@@ -3300,8 +3326,7 @@ function renderTasksAndMilestones(p){
             <i class="ti ti-flag-2" style="color:${ms.completed?'var(--success)':overdue?'var(--danger)':'var(--accent)'};font-size:14px;flex-shrink:0"></i>
             <span style="${ms.completed?'text-decoration:line-through;color:var(--text3);':''}flex:1">${ms.title}</span>
             <span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'}">${overdue?'⚠ ':''}${fmtDate(ms.date)}</span>
-            <button class="icon-action" onclick="toggleEditMilestone('${p.id}','${ms.id}')" title="Edit"><i class="ti ${isEditingMs?'ti-x':'ti-pencil'}"></i></button>
-            <button class="icon-action danger" onclick="deleteMilestone('${p.id}','${ms.id}')" style="font-size:13px"><i class="ti ti-x"></i></button>
+            <button class="icon-action" onclick="toggleEditMilestone('${p.id}','${ms.id}')"><i class="ti ${isEditingMs?'ti-x':'ti-pencil'}"></i></button>
           </div>
           ${isEditingMs?`<div class="edit-form" style="margin-bottom:6px">
             <div class="grid2">
@@ -3315,41 +3340,75 @@ function renderTasksAndMilestones(p){
           </div>`:''}
         </div>`;
       }).join('')}
-      <div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end">
-        <input type="text" id="ms-inp-${p.id}" placeholder="Milestone name..." style="flex:1;font-size:13px;padding:5px 8px">
-        <input type="date" id="ms-date-${p.id}" style="width:150px;font-size:13px;padding:5px 8px">
-        <button class="btn sm primary" onclick="addMilestone('${p.id}')"><i class="ti ti-plus"></i> Add</button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:4px">
+      <span class="sec-title" style="margin:0">Phases & Tasks <span style="font-weight:400;color:var(--text3)">(${doneTasks}/${tasks.length})</span></span>
+      <div style="display:flex;gap:4px">
+        <button class="btn sm" onclick="toggleAddPhase('${p.id}')" style="font-size:11px;padding:2px 8px"><i class="ti ti-plus"></i> Phase</button>
+        <button class="btn sm" onclick="toggleAddTask('${p.id}')" style="font-size:11px;padding:2px 8px"><i class="ti ti-plus"></i> Task</button>
       </div>
     </div>
-
-    <!-- PHASES & TASKS -->
-    <div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
-      <span class="sec-title" style="margin:0">Phases & Tasks <span style="font-weight:400;color:var(--text3)">(${doneTasks}/${tasks.length})</span></span>
-    </div>
-    ${phases.length===0&&tasks.length===0?'<div style="font-size:12px;color:var(--text3);margin-bottom:8px">No tasks yet.</div>':''}
-
-    <!-- Ungrouped tasks -->
+    ${showAddPhase?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+      <div class="grid2" style="margin-bottom:8px">
+        <div><label>Phase name</label><input type="text" id="phase-inp-${p.id}" placeholder="e.g. Discovery..."></div>
+        <div><label>Color</label>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px">
+            ${['#4a90d9','#2d8a6b','#d4756b','#d4a056','#5ba08a','#c27fd4','#6b3fa0','#2d6fa8','#5a5068','#8a7a6b'].map((col,ci)=>`<span onclick="document.getElementById('phase-color-${p.id}').value='${col}';document.querySelectorAll('.pcol-${p.id}').forEach(s=>s.style.borderColor='transparent');this.style.borderColor='var(--text)'" class="pcol-${p.id}" style="width:20px;height:20px;border-radius:50%;background:${col};cursor:pointer;border:2.5px solid ${ci===0?'var(--text)':'transparent'}"></span>`).join('')}
+          </div>
+          <input type="hidden" id="phase-color-${p.id}" value="#4a90d9">
+        </div>
+      </div>
+      <div class="grid2" style="margin-bottom:8px">
+        <div><label>Start date</label><input type="date" id="phase-start-${p.id}"></div>
+        <div><label>End date</label><input type="date" id="phase-end-${p.id}"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:6px">
+        <button class="btn sm" onclick="toggleAddPhase('${p.id}')">Cancel</button>
+        <button class="btn sm primary" onclick="addPhase('${p.id}')"><i class="ti ti-check"></i> Add phase</button>
+      </div>
+    </div>`:''}
+    ${showAddTask?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
+        <input type="text" id="task-inp-${p.id}" placeholder="Task title..." style="flex:1;min-width:140px;font-size:13px;padding:5px 8px">
+        <select id="task-type-${p.id}" onchange="document.getElementById('task-due-wrap-${p.id}').style.display=this.value==='open'?'none':'flex'" style="width:auto;font-size:13px;padding:5px 8px">
+          <option value="">Normal</option><option value="open">Open</option><option value="critical">Critical</option>
+        </select>
+        <select id="task-phase-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
+          <option value="">No phase</option>${phaseOpts}
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="task-due-wrap-${p.id}">
+        <input type="date" id="task-due-${p.id}" style="width:140px;font-size:13px;padding:5px 8px">
+        <select id="task-pri-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
+          <option value="low">Low</option><option value="medium" selected>Med</option><option value="high">High</option>
+        </select>
+      </div>
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+        <span style="font-size:11px;color:var(--text3)">Assign:</span>
+        <div id="task-assign-chips-${p.id}" style="display:flex;flex-wrap:wrap;gap:4px">
+          ${projMembers.map(m=>`<span onclick="toggleNewTaskAssignee('${p.id}','${m.id}')" id="nta-${p.id}-${m.id}" style="display:inline-flex;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid var(--border2);color:var(--text2)">${m.name.split(' ')[0]}</span>`).join('')}
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px">
+        <button class="btn sm" onclick="toggleAddTask('${p.id}')">Cancel</button>
+        <button class="btn sm primary" onclick="addTask('${p.id}')"><i class="ti ti-check"></i> Add task</button>
+      </div>
+    </div>`:''}
+    ${phases.length===0&&tasks.length===0&&!showAddPhase&&!showAddTask?'<div style="font-size:12px;color:var(--text3);margin-bottom:8px">No tasks yet.</div>':''}
     ${ungrouped.length>0?`<div style="margin-bottom:10px">${ungrouped.map(renderTaskRow).join('')}</div>`:''}
-
-    <!-- Phase groups (sorted by start date) -->
     ${grouped.map(({phase,tasks:pts})=>{
       const isEditingPh=editing.phases===phase.id;
-      return`<div style="margin-bottom:12px;border:.5px dashed transparent;border-radius:var(--radius-sm);padding:4px;transition:border-color .15s"
-        ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
-        ondragleave="this.style.borderColor='transparent'"
-        ondrop="taskDropOnPhase(event,'${p.id}','${phase.id}');this.style.borderColor='transparent'">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+      return`<div style="margin-bottom:12px;border:.5px dashed transparent;border-radius:var(--radius-sm);padding:4px" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='transparent'" ondrop="taskDropOnPhase(event,'${p.id}','${phase.id}');this.style.borderColor='transparent'">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
           <span style="width:12px;height:12px;border-radius:3px;background:${phase.color||'var(--accent)'};flex-shrink:0;display:inline-block"></span>
           <span style="font-size:12px;font-weight:600;color:var(--text)">${phase.title}</span>
           ${phase.startDate||phase.endDate?`<span style="font-size:11px;color:var(--text3)">${phase.startDate?fmtDate(phase.startDate):''}${phase.startDate&&phase.endDate?' → ':''}${phase.endDate?fmtDate(phase.endDate):''}</span>`:''}
-          <button class="icon-action" onclick="toggleEditPhase('${p.id}','${phase.id}')" title="Edit phase"><i class="ti ${isEditingPh?'ti-x':'ti-pencil'}"></i></button>
-          <button class="icon-action danger" onclick="deletePhase('${p.id}','${phase.id}')" style="font-size:12px;margin-left:auto"><i class="ti ti-x"></i></button>
+          <button class="icon-action" onclick="toggleEditPhase('${p.id}','${phase.id}')" style="margin-left:auto"><i class="ti ${isEditingPh?'ti-x':'ti-pencil'}"></i></button>
         </div>
         ${isEditingPh?`<div class="edit-form" style="margin-bottom:8px">
           <div class="grid2">
             <div><label>Phase name</label><input type="text" id="ph-edit-name-${phase.id}" value="${phase.title}"></div>
-            <div>
-              <label>Color</label>
+            <div><label>Color</label>
               <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px">
                 ${['#4a90d9','#2d8a6b','#d4756b','#d4a056','#5ba08a','#c27fd4','#6b3fa0','#2d6fa8','#5a5068','#8a7a6b'].map(col=>`<span onclick="setPhaseEditColor('${phase.id}','${col}')" style="width:22px;height:22px;border-radius:50%;background:${col};cursor:pointer;border:2.5px solid ${phase.color===col?'var(--text)':'transparent'}" id="pec-${phase.id}-${col.slice(1)}"></span>`).join('')}
               </div>
@@ -3368,49 +3427,143 @@ function renderTasksAndMilestones(p){
         ${pts.length?pts.map(renderTaskRow).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">No tasks in this phase</div>'}
       </div>`;
     }).join('')}
-
-    <!-- Add task -->
-    <div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-top:4px">
-      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">ADD TASK</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
-        <input type="text" id="task-inp-${p.id}" placeholder="Task title..." style="flex:1;min-width:140px;font-size:13px;padding:5px 8px">
-        <select id="task-type-${p.id}" onchange="document.getElementById('task-due-wrap-${p.id}').style.display=this.value==='open'?'none':'flex'" style="width:auto;font-size:13px;padding:5px 8px">
-          <option value="">Normal</option><option value="open">Open</option><option value="critical">Critical</option>
-        </select>
-        <select id="task-phase-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
-          <option value="">No phase</option>${phaseOpts}
-        </select>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end" id="task-due-wrap-${p.id}">
-        <input type="date" id="task-due-${p.id}" style="width:140px;font-size:13px;padding:5px 8px">
-        <select id="task-pri-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
-          <option value="low">Low</option><option value="medium" selected>Med</option><option value="high">High</option>
-        </select>
-      </div>
-      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
-        <span style="font-size:11px;color:var(--text3)">Assign:</span>
-        <div style="display:flex;flex-wrap:wrap;gap:4px" id="task-assign-chips-${p.id}">
-          ${allMembers.map(m=>`<span onclick="toggleNewTaskAssignee('${p.id}','${m.id}')" id="nta-${p.id}-${m.id}" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid var(--border2);background:transparent;color:var(--text2)">${m.name.split(' ')[0]}</span>`).join('')}
-        </div>
-      </div>
-      <div style="display:flex;justify-content:flex-end;margin-top:8px">
-        <button class="btn sm primary" onclick="addTask('${p.id}')"><i class="ti ti-plus"></i> Add task</button>
-      </div>
-    </div>
-
-    <!-- Add phase -->
-    <div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end;flex-wrap:wrap">
-      <input type="text" id="phase-inp-${p.id}" placeholder="Phase name (e.g. Discovery)..." style="flex:2;min-width:140px;font-size:13px;padding:5px 8px">
-      <input type="date" id="phase-start-${p.id}" style="width:140px;font-size:13px;padding:5px 8px" title="Phase start date">
-      <input type="date" id="phase-end-${p.id}" style="width:140px;font-size:13px;padding:5px 8px" title="Phase end date">
-      <button class="btn sm" onclick="addPhase('${p.id}')"><i class="ti ti-layers-subtract"></i> Add phase</button>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px;padding-top:8px;border-top:.5px solid var(--border)">
+      <button class="icon-action" onclick="exportProjectPDF('${p.id}')" title="Project Overview PDF" style="font-size:18px;color:var(--text2)"><i class="ti ti-file-type-pdf"></i></button>
     </div>
   </div>`;
 }
 
 // ═══════════════════════════════════════════════
-//  GANTT CHART
+//  PROJECT OVERVIEW PDF
 // ═══════════════════════════════════════════════
+function exportProjectPDF(projId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
+  const phases=[...(p.phases||[])].sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
+  const milestones=[...(p.milestones||[])].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  const projTeam=allMembers.filter(m=>(p.teamIds||[]).includes(m.id)||m.id==='__me__');
+  const fd=(d)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+  const fm=(n)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n||0);
+  const h=(s)=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // Mini Gantt SVG
+  function buildGanttSVG(){
+    if(!phases.length&&!milestones.length)return'';
+    let allDates=[...phases.flatMap(ph=>[ph.startDate,ph.endDate]),...milestones.map(m=>m.date)].filter(Boolean).sort();
+    if(!allDates.length)return'';
+    const rangeStart=new Date(allDates[0]+'T00:00:00');
+    const rangeEnd=new Date(allDates[allDates.length-1]+'T00:00:00');
+    rangeStart.setDate(1);
+    rangeEnd.setMonth(rangeEnd.getMonth()+1);rangeEnd.setDate(0);
+    const totalMs=Math.max(1,rangeEnd-rangeStart);
+    const VW=600,rowH=22,headerH=20,labelH=14;
+    const H=headerH+Math.max(1,phases.length)*rowH+labelH;
+    function vx(d){return Math.round(Math.min(100,Math.max(0,(new Date(d+'T12:00:00')-rangeStart)/totalMs*100))/100*VW);}
+    let rows='';
+    phases.forEach((ph,i)=>{
+      const phY=headerH+i*rowH;
+      const col=ph.color||'#4a90d9';
+      rows+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="#f5f5f2"/>`;
+      if(ph.startDate&&ph.endDate){
+        const x1=vx(ph.startDate),x2=vx(ph.endDate),bw=Math.max(4,x2-x1);
+        rows+=`<rect x="${x1}" y="${phY+3}" width="${bw}" height="${rowH-6}" fill="${col}" rx="4"/>`;
+        if(bw>40)rows+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="9" fill="#fff" font-family="Arial,sans-serif" text-anchor="middle" dominant-baseline="middle" letter-spacing="0.06em">${h(ph.title.slice(0,Math.floor(bw/7)))}</text>`;
+      }
+      milestones.filter(ms=>ms.date&&ph.startDate<=ms.date&&ph.endDate>=ms.date).forEach(ms=>{
+        const mx=vx(ms.date);const cy=phY+rowH/2;const r=4;
+        rows+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="#888" transform="rotate(45,${mx},${cy})"/>`;
+      });
+    });
+    // Month labels
+    let cur=new Date(rangeStart.getFullYear(),rangeStart.getMonth(),1);
+    let grid='';
+    while(cur<=rangeEnd){
+      const x=Math.round((cur-rangeStart)/totalMs*VW);
+      const lbl=cur.toLocaleDateString('en-US',{month:'short'});
+      grid+=`<line x1="${x}" y1="${headerH}" x2="${x}" y2="${H-labelH}" stroke="#ddd" stroke-width="0.5"/>`;
+      grid+=`<text x="${x+2}" y="${H-3}" font-size="8" fill="#999" font-family="Arial,sans-serif">${lbl}</text>`;
+      cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+    }
+    return`<svg width="${VW}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="${VW}" height="${H}" fill="#eaeae5" rx="3"/>
+      <text x="0" y="14" font-size="9" fill="#9a979a" font-family="Arial,sans-serif">${h(allDates[0])}</text>
+      <text x="${VW}" y="14" font-size="9" fill="#9a979a" font-family="Arial,sans-serif" text-anchor="end">${h(allDates[allDates.length-1])}</text>
+      ${grid}${rows}
+    </svg>`;
+  }
+
+  const ganttSVG=buildGanttSVG();
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    @media print{body{margin:0}}
+    body{font-family:Arial,sans-serif;font-size:10pt;color:#2A2829;max-width:720px;margin:24px auto;padding:0 20px}
+    h1{font-size:16pt;color:#9151a0;margin-bottom:2px}
+    h2{font-size:11pt;color:#9151a0;border-bottom:1px solid #ddd;padding-bottom:3px;margin-top:18px;margin-bottom:8px}
+    .meta{font-size:9pt;color:#888;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:10px}
+    th{text-align:left;padding:4px 6px;background:#f0eaf7;font-weight:600;border-bottom:1px solid #ddd}
+    td{padding:4px 6px;border-bottom:1px solid #eee;vertical-align:top}
+    .chip{display:inline-block;padding:1px 6px;border-radius:10px;font-size:8pt;color:#fff;margin:1px}
+    .badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:8pt;font-weight:600;background:#e8f5ee;color:#0f6e56}
+    .badge.critical{background:#fdecea;color:#a32d2d}
+    .badge.open{background:#f5f5f2;color:#6b686a}
+  </style></head><body>
+  <h1>${h(p.num?p.num+' — ':'')}${h(p.name)}</h1>
+  <div class="meta">
+    ${client?`<strong>${h(client.company)}</strong> · `:''}
+    Status: ${p.status==='active'?'Active':p.status==='on_hold'?'On Hold':'Completed'}
+    ${p.startDate?` · Start: ${fd(p.startDate)}`:''}
+    ${p.endDate?` · End: ${fd(p.endDate)}`:''}
+    ${p.location?` · ${h(p.location)}`:''}
+  </div>
+  ${p.desc?`<p style="font-size:10pt;color:#555;margin-bottom:14px">${h(p.desc)}</p>`:''}
+
+  <h2>Project Details</h2>
+  <table><tr>
+    <th>Rate</th><th>Budget</th><th>Duration</th>
+  </tr><tr>
+    <td>${p.rate?fm(p.rate)+'/hr':'—'}</td>
+    <td>${p.budget?(p.budgetType==='range'?fm(p.budget)+' – '+fm(p.budgetMax):fm(p.budget)):'—'}</td>
+    <td>${h(p.duration||'—')}</td>
+  </tr></table>
+
+  ${projTeam.length?`<h2>Team</h2><div>${projTeam.map(m=>`<span class="chip" style="background:${m.color||'#888'}">${h(m.name)}</span>`).join('')}</div>`:''}
+
+  ${phases.length?`<h2>Phases</h2><table><tr><th>Phase</th><th>Start</th><th>End</th></tr>
+    ${phases.map(ph=>`<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${ph.color||'#4a90d9'};margin-right:5px;vertical-align:middle"></span>${h(ph.title)}</td><td>${fd(ph.startDate)}</td><td>${fd(ph.endDate)}</td></tr>`).join('')}
+  </table>`:''}
+
+  ${milestones.length?`<h2>Milestones</h2><table><tr><th>Milestone</th><th>Date</th><th>Status</th></tr>
+    ${milestones.map(ms=>`<tr><td>${h(ms.title)}</td><td>${fd(ms.date)}</td><td>${ms.completed?'✓ Complete':'Pending'}</td></tr>`).join('')}
+  </table>`:''}
+
+  ${ganttSVG?`<h2>Timeline</h2><div>${ganttSVG}</div>`:''}
+
+  ${phases.length?phases.map(ph=>{
+    const pts=(p.tasks||[]).filter(t=>t.phaseId===ph.id);
+    if(!pts.length)return'';
+    return`<h2>${h(ph.title)}</h2><table><tr><th>Task</th><th>Type</th><th>Due</th><th>Status</th><th>Assignees</th></tr>
+      ${pts.map(t=>{
+        const ids=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
+        const names=ids.map(id=>allMembers.find(m=>m.id===id)?.name||'').filter(Boolean).join(', ');
+        return`<tr><td>${h(t.title)}</td><td>${t.taskType?`<span class="badge ${t.taskType}">${h(t.taskType)}</span>`:''}</td><td>${fd(t.dueDate)}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In Progress':'To Do'}</td><td>${h(names)}</td></tr>`;
+      }).join('')}
+    </table>`;
+  }).join(''):''}
+
+  ${((p.tasks||[]).filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId))).length?`<h2>Other Tasks</h2><table><tr><th>Task</th><th>Type</th><th>Due</th><th>Status</th></tr>
+    ${(p.tasks||[]).filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId)).map(t=>`<tr><td>${h(t.title)}</td><td>${t.taskType?`<span class="badge ${t.taskType}">${h(t.taskType)}</span>`:''}</td><td>${fd(t.dueDate)}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In Progress':'To Do'}</td></tr>`).join('')}
+  </table>`:''}
+
+  <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+}
 function refreshGanttProjectFilter(){
   const sel=document.getElementById('gantt-project-filter');if(!sel)return;
   const prev=sel.value;
