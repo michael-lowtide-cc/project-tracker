@@ -18,7 +18,7 @@
   :root{--bg:#2A2829;--bg2:#3a3638;--bg3:#221f22;--text:#E0E0DB;--text2:#a09aa0;--text3:#706870;--border:rgba(224,224,219,0.1);--border2:rgba(224,224,219,0.2);}
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:15px;line-height:1.5}
-#app{max-width:780px;margin:0 auto;padding:2rem 1rem 4rem}
+#app{max-width:1100px;margin:0 auto;padding:2rem 1rem 4rem}
 h1{font-size:22px;font-weight:500}
 .sub{font-size:13px;color:var(--text2);margin-top:3px}
 .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem}
@@ -273,7 +273,7 @@ td{padding:8px 0;vertical-align:top}
     <button class="tab" id="tab-time" data-tab="time" title="Time"><i class="ti ti-clock"></i></button>
     <button class="tab" id="tab-projects" data-tab="projects" title="Projects"><i class="ti ti-folder"></i></button>
     <button class="tab" id="tab-board" data-tab="board" title="Board"><i class="ti ti-layout-kanban"></i></button>
-    <button class="tab" id="tab-workload" data-tab="workload" title="Workload"><i class="ti ti-chart-bar-popular"></i></button>
+    <button class="tab" id="tab-workload" data-tab="workload" title="Workload"><i class="ti ti-users"></i></button>
     <button class="tab" id="tab-team" data-tab="team" title="Team"><i class="ti ti-users-group"></i></button>
     <button class="tab" id="tab-clients" data-tab="clients" title="Clients"><i class="ti ti-users"></i></button>
     <button class="tab" id="tab-expenses" data-tab="expenses" title="Expenses"><i class="ti ti-receipt"></i></button>
@@ -586,7 +586,13 @@ td{padding:8px 0;vertical-align:top}
           </div>
         </div>
       </div>
-      <div id="tm-company-wrap" class="field"><label>Company</label><input type="text" id="tm-company" placeholder="Their studio or agency"></div>
+      <div id="tm-company-wrap" class="field">
+        <label>Company</label>
+        <div class="autofill-wrap">
+          <input type="text" id="tm-company" placeholder="Their studio or agency" autocomplete="off" oninput="tmCompanyAutofill(this.value)">
+          <div class="autofill-list" id="tm-company-autofill" style="display:none"></div>
+        </div>
+      </div>
       <div class="field"><label>Notes (optional)</label><input type="text" id="tm-notes" placeholder="Timezone, specialty, etc."></div>
       <div class="field">
         <label>Color</label>
@@ -1256,6 +1262,19 @@ function tmAutofillData(idx){
       renderColorPalette('tm-color-palette',pick,'pickNewTmColor',true);
     }
   }
+}
+
+function tmCompanyAutofill(val){
+  const list=document.getElementById('tm-company-autofill');if(!list)return;
+  if(!val||val.length<1){list.style.display='none';return;}
+  const v=val.toLowerCase();
+  // Collect unique companies from existing team members
+  const companies=[...new Set(teamMembers.map(m=>m.company).filter(c=>c&&c.toLowerCase().includes(v)))];
+  // Also check clients
+  clients.forEach(c=>{if(c.company&&c.company.toLowerCase().includes(v)&&!companies.includes(c.company))companies.push(c.company);});
+  if(!companies.length){list.style.display='none';return;}
+  list.innerHTML=companies.slice(0,6).map(co=>`<div class="autofill-item" onclick="document.getElementById('tm-company').value='${co.replace(/'/g,'\\\'') }';document.getElementById('tm-company-autofill').style.display='none'">${co}</div>`).join('');
+  list.style.display='block';
 }
 
 function tmAutofill(clientId){
@@ -2049,7 +2068,14 @@ function addExpense(){
 function renderProjectList(){
   const el=document.getElementById('project-list');
   if(!projects.length){el.innerHTML='<div class="empty">No projects yet.</div>';return;}
-  el.innerHTML=projects.map(p=>{
+  // Sort alphanumerically by project number (blanks last)
+  const sorted=[...projects].sort((a,b)=>{
+    if(!a.num&&!b.num)return 0;if(!a.num)return 1;if(!b.num)return -1;
+    const na=parseFloat(a.num),nb=parseFloat(b.num);
+    if(!isNaN(na)&&!isNaN(nb))return na-nb;
+    return a.num.localeCompare(b.num);
+  });
+  el.innerHTML=sorted.map(p=>{
     const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
     const clientLabel=client?(client.company||client.contactName):'';
     const rate=getProjRate(p);
@@ -2080,7 +2106,6 @@ function renderProjectList(){
         </div>
       </div>
       ${isEditing?renderProjectEditForm(p):`
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;margin-bottom:4px">
         ${renderHealthBadge(p)}
         <button onclick="generateClientShare('${p.id}')" style="background:none;border:.5px solid var(--border2);border-radius:20px;padding:2px 8px;font-size:11px;color:var(--text3);cursor:pointer"><i class="ti ti-share" style="font-size:11px"></i> Share with client</button>
       </div>
@@ -2092,83 +2117,154 @@ function renderProjectList(){
 }
 
 function renderProjectEditForm(p){
+  const pfx=`ep-${p.id}`;
   const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===p.clientId?' selected':''}>${clientLabel(c)}</option>`).join('');
   const statusOpts=['active','on_hold','completed'].map(s=>`<option value="${s}"${s===p.status?' selected':''}>${s==='on_hold'?'On Hold':s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('');
-  const isRange=p.budgetType==='range'&&p.budgetMax;
+  const isSub=p.budgetType==='sub';
+  const isRange=p.budgetType==='range';
   return`<div class="edit-form" style="margin-top:12px">
     <div class="grid3">
-      <div><label>Project #</label><input type="text" id="ep-num-${p.id}" value="${p.num||''}"></div>
-      <div style="grid-column:span 2"><label>Name</label><input type="text" id="ep-name-${p.id}" value="${p.name}"></div>
+      <div><label>Project #</label><input type="text" id="${pfx}-num" value="${p.num||''}"></div>
+      <div style="grid-column:span 2"><label>Name</label><input type="text" id="${pfx}-name" value="${p.name}"></div>
     </div>
     <div class="grid2">
-      <div><label>Client</label><select id="ep-client-${p.id}"><option value="">-- No client --</option>${clientOpts}</select></div>
-      <div><label>Status</label><select id="ep-status-${p.id}">${statusOpts}</select></div>
+      <div><label>Client</label><select id="${pfx}-client"><option value="">-- No client --</option>${clientOpts}</select></div>
+      <div><label>Status</label><select id="${pfx}-status">${statusOpts}</select></div>
     </div>
     <div class="grid2">
-      <div><label>Contract start date</label><input type="date" id="ep-start-${p.id}" value="${p.startDate||''}"></div>
-      <div><label>Contract end date</label><input type="date" id="ep-end-${p.id}" value="${p.endDate||''}"></div>
+      <div><label>Start date</label><input type="date" id="${pfx}-start" value="${p.startDate||''}"></div>
+      <div><label>End date</label><input type="date" id="${pfx}-end" value="${p.endDate||''}"></div>
     </div>
     <div class="grid2">
-      <div><label>Duration (optional)</label><input type="text" id="ep-dur-${p.id}" value="${p.duration||''}" placeholder="e.g. 3 months"></div>
-      <div><label>Hourly rate ($/hr)</label><input type="number" id="ep-rate-${p.id}" value="${p.rate||''}" min="0" step="5" placeholder="Use default"></div>
+      <div><label>Duration (optional)</label><input type="text" id="${pfx}-dur" value="${p.duration||''}" placeholder="e.g. 3 months"></div>
+      <div id="${pfx}-rate-wrap" style="${isSub?'display:none':''}"><label>Hourly rate ($/hr)</label><input type="number" id="${pfx}-rate" value="${p.rate||''}" min="0" step="5" placeholder="Use default"></div>
     </div>
     <div class="grid2">
       <div>
         <label>Budget</label>
-        <div style="display:flex;gap:6px;align-items:center">
-          <select id="ep-budget-type-${p.id}" onchange="(function(){const r=document.getElementById('ep-budget-type-${p.id}').value==='range';document.getElementById('ep-budgetmax-${p.id}').style.display=r?'block':'none';document.getElementById('ep-budgetsep-${p.id}').style.display=r?'inline':'none';})()" style="width:auto;font-size:13px">
-            <option value="fixed"${!isRange?' selected':''}>Fixed</option>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <select id="${pfx}-budget-type" onchange="epToggleBudgetType('${p.id}')" style="width:auto;font-size:13px">
+            <option value="fixed"${!isRange&&!isSub?' selected':''}>Fixed</option>
             <option value="range"${isRange?' selected':''}>Range</option>
+            <option value="sub"${isSub?' selected':''}>Sub-project</option>
           </select>
-          <input type="number" id="ep-budget-${p.id}" value="${p.budget||''}" min="0" step="100" placeholder="${isRange?'Min':'Amount'}" style="flex:1">
-          <span id="ep-budgetsep-${p.id}" style="display:${isRange?'inline':'none'};color:var(--text2)">–</span>
-          <input type="number" id="ep-budgetmax-${p.id}" value="${p.budgetMax||''}" min="0" step="100" placeholder="Max" style="flex:1;display:${isRange?'block':'none'}">
+          <input type="number" id="${pfx}-budget" value="${p.budget||''}" min="0" step="100" placeholder="${isRange?'Min':'Amount'}" style="flex:1;display:${isSub?'none':'block'}">
+          <span id="${pfx}-budgetsep" style="display:${isRange?'inline':'none'};color:var(--text2)">–</span>
+          <input type="number" id="${pfx}-budgetmax" value="${p.budgetMax||''}" min="0" step="100" placeholder="Max" style="flex:1;display:${isRange?'block':'none'}">
+          <select id="${pfx}-budget-parent" style="flex:1;display:${isSub?'block':'none'};font-size:13px">
+            <option value="">— Parent project —</option>
+            ${projects.filter(x=>x.id!==p.id).map(x=>`<option value="${x.id}"${x.id===p.parentProjectId?' selected':''}>${x.name}</option>`).join('')}
+          </select>
         </div>
       </div>
       <div></div>
     </div>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-      <label class="check-label"><input type="checkbox" id="ep-ret-on-${p.id}" ${p.retainerOn?'checked':''} onchange="document.getElementById('ep-ret-amt-wrap-${p.id}').style.display=this.checked?'flex':'none'"> Has retainer</label>
-      <label class="check-label"><input type="checkbox" id="ep-ret-paid-${p.id}" ${p.retainerPaid?'checked':''}> Retainer paid</label>
-      <label class="check-label"><input type="checkbox" id="ep-ret-inbud-${p.id}" ${p.retainerInBudget?'checked':''}> Applied to budget</label>
-    </div>
-    <div id="ep-ret-amt-wrap-${p.id}" style="display:${p.retainerOn?'flex':'none'};gap:12px;margin-bottom:8px;align-items:flex-end">
-      <div style="flex:1"><label>Retainer amount ($)</label><input type="number" id="ep-ret-amt-${p.id}" value="${p.retainerAmt||''}" min="0" step="100"></div>
-    </div>
-    <div class="field"><label>Location (optional)</label><input type="text" id="ep-location-${p.id}" value="${p.location||''}" placeholder="City, State or Remote"></div>
-    <div class="field"><label>Description</label><input type="text" id="ep-desc-${p.id}" value="${p.desc||''}"></div>
-    <div class="field"><label>Team members</label><div class="color-palette" id="ep-team-${p.id}" style="flex-wrap:wrap;gap:6px"></div></div>
-    <div class="edit-actions">
-      <div></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn danger sm" onclick="deleteProject('${p.id}')"><i class="ti ti-trash"></i> Delete</button>
-        <button class="btn primary sm" onclick="saveProjectEdit('${p.id}')"><i class="ti ti-check"></i> Save</button>
+    <div id="${pfx}-retainer-wrap" style="${isSub?'display:none':''}">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <label class="check-label"><input type="checkbox" id="${pfx}-ret-on" ${p.retainerOn?'checked':''} onchange="document.getElementById('${pfx}-ret-amt-wrap').style.display=this.checked?'flex':'none'"> Has retainer</label>
+        <label class="check-label"><input type="checkbox" id="${pfx}-ret-paid" ${p.retainerPaid?'checked':''}> Retainer paid</label>
+        <label class="check-label"><input type="checkbox" id="${pfx}-ret-inbud" ${p.retainerInBudget?'checked':''}> Applied to budget</label>
+      </div>
+      <div id="${pfx}-ret-amt-wrap" style="display:${p.retainerOn?'flex':'none'};gap:12px;margin-bottom:8px">
+        <div style="flex:1"><label>Retainer amount ($)</label><input type="number" id="${pfx}-ret-amt" value="${p.retainerAmt||''}" min="0" step="100"></div>
       </div>
     </div>
+    <div class="field"><label>Location (optional)</label><input type="text" id="${pfx}-location" value="${p.location||''}" placeholder="City, State or Remote"></div>
+    <div class="field"><label>Description (optional)</label><input type="text" id="${pfx}-desc" value="${p.desc||''}"></div>
+    <div class="field">
+      <label>Team members</label>
+      <div style="position:relative">
+        <input type="text" id="${pfx}-team-search" placeholder="Type a name to add..." autocomplete="off" oninput="editProjTeamSearch('${p.id}',this.value)" style="margin-bottom:6px">
+        <div id="${pfx}-team-search-list" class="autofill-list" style="display:none;position:absolute;z-index:10;width:100%"></div>
+      </div>
+      <div id="${pfx}-team-assign" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+    </div>
+    <div class="edit-actions"><div></div><div style="display:flex;gap:8px">
+      <button class="btn danger sm" onclick="deleteProject('${p.id}')"><i class="ti ti-trash"></i> Delete</button>
+      <button class="btn primary sm" onclick="saveProjectEdit('${p.id}')"><i class="ti ti-check"></i> Save</button>
+    </div></div>
   </div>`;
+}
+
+function epToggleBudgetType(projId){
+  const pfx=`ep-${projId}`;
+  const v=document.getElementById(`${pfx}-budget-type`).value;
+  const isSub=v==='sub',isRange=v==='range';
+  document.getElementById(`${pfx}-budget`).style.display=isSub?'none':'block';
+  document.getElementById(`${pfx}-budgetsep`).style.display=isRange?'inline':'none';
+  document.getElementById(`${pfx}-budgetmax`).style.display=isRange?'block':'none';
+  document.getElementById(`${pfx}-budget-parent`).style.display=isSub?'block':'none';
+  document.getElementById(`${pfx}-rate-wrap`).style.display=isSub?'none':'block';
+  document.getElementById(`${pfx}-retainer-wrap`).style.display=isSub?'none':'block';
+}
+
+// Edit project team search (mirrors projTeamSearch but for the edit form)
+const _editProjTeamSelected={};
+function editProjTeamSearch(projId,val){
+  const pfx=`ep-${projId}`;
+  const list=document.getElementById(`${pfx}-team-search-list`);
+  if(!list)return;
+  if(!val||val.length<1){list.style.display='none';return;}
+  const v=val.toLowerCase();
+  if(!_editProjTeamSelected[projId])_editProjTeamSelected[projId]=[];
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  const matches=allMembers.filter(m=>m.name.toLowerCase().includes(v)&&!_editProjTeamSelected[projId].includes(m.id));
+  if(!matches.length){list.style.display='none';return;}
+  list.innerHTML=matches.map(m=>`<div class="autofill-item" onclick="addEditProjTeamMember('${projId}','${m.id}')">
+    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${m.color||'#888'};margin-right:6px;vertical-align:middle"></span>${m.name}
+    ${m.company?`<span style="font-size:11px;color:var(--text3)">(${m.company})</span>`:''}
+  </div>`).join('');
+  list.style.display='block';
+}
+function addEditProjTeamMember(projId,memberId){
+  const pfx=`ep-${projId}`;
+  if(!_editProjTeamSelected[projId])_editProjTeamSelected[projId]=[];
+  if(!_editProjTeamSelected[projId].includes(memberId))_editProjTeamSelected[projId].push(memberId);
+  document.getElementById(`${pfx}-team-search`).value='';
+  document.getElementById(`${pfx}-team-search-list`).style.display='none';
+  renderEditProjTeamChips(projId);
+}
+function removeEditProjTeamMember(projId,memberId){
+  if(!_editProjTeamSelected[projId])return;
+  _editProjTeamSelected[projId]=_editProjTeamSelected[projId].filter(x=>x!==memberId);
+  renderEditProjTeamChips(projId);
+}
+function renderEditProjTeamChips(projId){
+  const pfx=`ep-${projId}`;
+  const el=document.getElementById(`${pfx}-team-assign`);if(!el)return;
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  el.innerHTML=(_editProjTeamSelected[projId]||[]).map(id=>{
+    const m=allMembers.find(x=>x.id===id);if(!m)return'';
+    return`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:12px;background:${m.color}22;border:.5px solid ${m.color};color:${m.color}">
+      ${m.name}<button onclick="removeEditProjTeamMember('${projId}','${id}')" style="background:none;border:none;cursor:pointer;color:${m.color};font-size:13px;padding:0;line-height:1">×</button>
+    </span>`;
+  }).join('');
 }
 
 function saveProjectEdit(id){
   const p=projects.find(x=>x.id===id);if(!p)return;
-  p.num=document.getElementById(`ep-num-${id}`).value.trim();
-  p.name=document.getElementById(`ep-name-${id}`).value.trim();
-  p.clientId=document.getElementById(`ep-client-${id}`).value||'';
-  p.status=document.getElementById(`ep-status-${id}`).value;
-  p.startDate=document.getElementById(`ep-start-${id}`).value;
-  p.endDate=document.getElementById(`ep-end-${id}`).value;
-  p.duration=document.getElementById(`ep-dur-${id}`)?.value.trim()||'';
-  p.rate=document.getElementById(`ep-rate-${id}`)?.value||'';
-  const btype=document.getElementById(`ep-budget-type-${id}`)?.value||'fixed';
+  const pfx=`ep-${id}`;
+  p.num=document.getElementById(`${pfx}-num`).value.trim();
+  p.name=document.getElementById(`${pfx}-name`).value.trim();
+  p.clientId=document.getElementById(`${pfx}-client`).value||'';
+  p.status=document.getElementById(`${pfx}-status`).value;
+  p.startDate=document.getElementById(`${pfx}-start`).value;
+  p.endDate=document.getElementById(`${pfx}-end`).value;
+  p.duration=document.getElementById(`${pfx}-dur`)?.value.trim()||'';
+  p.rate=document.getElementById(`${pfx}-rate`)?.value||'';
+  const btype=document.getElementById(`${pfx}-budget-type`)?.value||'fixed';
   p.budgetType=btype;
-  p.budget=document.getElementById(`ep-budget-${id}`)?.value||'';
-  p.budgetMax=btype==='range'?document.getElementById(`ep-budgetmax-${id}`)?.value||'':'';
-  p.retainerOn=document.getElementById(`ep-ret-on-${id}`).checked;
-  p.retainerPaid=document.getElementById(`ep-ret-paid-${id}`).checked;
-  p.retainerAmt=document.getElementById(`ep-ret-amt-${id}`)?.value||'';
-  p.retainerInBudget=document.getElementById(`ep-ret-inbud-${id}`)?.checked||false;
-  p.desc=document.getElementById(`ep-desc-${id}`).value.trim();
-  p.location=document.getElementById(`ep-location-${id}`)?.value.trim()||'';
-  p.teamIds=getTeamAssignSelected(`ep-team-${id}`);
+  p.budget=btype!=='sub'?document.getElementById(`${pfx}-budget`)?.value||'':'';
+  p.budgetMax=btype==='range'?document.getElementById(`${pfx}-budgetmax`)?.value||'':'';
+  p.parentProjectId=btype==='sub'?document.getElementById(`${pfx}-budget-parent`)?.value||'':'';
+  p.retainerOn=document.getElementById(`${pfx}-ret-on`)?.checked||false;
+  p.retainerPaid=document.getElementById(`${pfx}-ret-paid`)?.checked||false;
+  p.retainerAmt=document.getElementById(`${pfx}-ret-amt`)?.value||'';
+  p.retainerInBudget=document.getElementById(`${pfx}-ret-inbud`)?.checked||false;
+  p.location=document.getElementById(`${pfx}-location`)?.value.trim()||'';
+  p.desc=document.getElementById(`${pfx}-desc`).value.trim();
+  p.teamIds=_editProjTeamSelected[id]||p.teamIds||[];
+  delete _editProjTeamSelected[id];
   save('tracker:projects',projects);
   editing.projects=null;
   allDropdownRefresh();
@@ -2666,7 +2762,11 @@ function toggleEdit(section,id){
     if(editing.projects){
       setTimeout(()=>{
         const p=projects.find(x=>x.id===id);
-        if(p)renderTeamAssignChips(`ep-team-${id}`,p.teamIds||[]);
+        if(p){
+          // Initialize edit team selection from existing teamIds
+          _editProjTeamSelected[id]=[...(p.teamIds||[])];
+          renderEditProjTeamChips(id);
+        }
       },0);
     }
   }
@@ -2724,7 +2824,6 @@ function renderTeamList(){
       <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.09em;margin-bottom:8px;padding-bottom:4px;border-bottom:.5px solid var(--border)">${company}</div>
       ${members.map(m=>{
         const isEditing=editing.team===m.id;
-        const isInternal=m.type==='internal';
         const linkedClient=m.clientLink?clients.find(c=>c.id===m.clientLink):null;
         const assignedProjs=projects.filter(p=>(p.teamIds||[]).includes(m.id));
         return`<div class="card" style="margin-bottom:8px;padding:1rem" draggable="true"
@@ -2739,10 +2838,7 @@ function renderTeamList(){
                 ${m.photo?`<img src="${m.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:(m.name||'?').charAt(0).toUpperCase()}
               </div>
               <div>
-                <div style="font-weight:500;font-size:14px;display:flex;align-items:center;gap:6px">
-                  ${m.name}
-                  <span class="type-badge type-${m.type||'external'}">${isInternal?'Internal':'External'}</span>
-                </div>
+                <div style="font-weight:500;font-size:14px">${m.name}</div>
                 <div style="font-size:12px;color:var(--text2);margin-top:1px">
                   ${m.role||''}${m.email?` · <a href="mailto:${m.email}" style="color:var(--accent)">${m.email}</a>`:''}${m.phone?` · ${m.phone}`:''}
                 </div>
@@ -2775,7 +2871,6 @@ function teamDrop(e,targetId){
 }
 
 function renderTeamEditForm(m){
-  const isInternal=m.type==='internal';
   const colorPaletteId=`etm-colors-${m.id}`;
   const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===m.clientLink?' selected':''}>${c.company||c.contactName}</option>`).join('');
   return`<div class="edit-form" style="margin-top:12px">
@@ -2796,11 +2891,10 @@ function renderTeamEditForm(m){
         </div>
       </div>
     </div>
-    ${!isInternal?`<div class="grid2">
+    <div class="grid2">
       <div><label>Company</label><input type="text" id="etm-company-${m.id}" value="${m.company||''}"></div>
       <div><label>Link to client</label><select id="etm-clink-${m.id}"><option value="">-- None --</option>${clientOpts}</select></div>
-    </div>`:`<div id="etm-company-${m.id}" style="display:none"></div><div id="etm-clink-${m.id}" style="display:none"></div>`}
-    ${isInternal?`<div><label>Hourly cost ($/hr)</label><input type="number" id="etm-rate-${m.id}" value="${m.rate||''}" min="0" step="5"></div><br>`:''}
+    </div>
     <div class="field"><label>Notes</label><input type="text" id="etm-notes-${m.id}" value="${m.notes||''}"></div>
     <div class="field"><label>Color</label><div class="color-palette" id="${colorPaletteId}"></div></div>
     <input type="hidden" id="etm-color-${m.id}" value="${m.color||TEAM_COLORS[1].hex}">
@@ -2817,9 +2911,11 @@ function addTeamMember(){
   const nameEl=document.getElementById('tm-name');
   const name=nameEl.value.trim();if(!name)return;
   if(!_newTmColorVal||_newTmColorVal==='#9151a0'){alert('That color is reserved for your profile. Please choose another.');return;}
-  teamMembers.unshift({
+  // Duplicate check
+  const exists=teamMembers.find(m=>m.name.toLowerCase()===name.toLowerCase());
+  if(exists){alert(`"${name}" is already on the team.`);return;}
+  const newMember={
     id:uid(),name,
-    type:'external',
     role:document.getElementById('tm-role').value.trim(),
     email:document.getElementById('tm-email').value.trim(),
     phone:document.getElementById('tm-phone').value.trim(),
@@ -2828,7 +2924,8 @@ function addTeamMember(){
     photo:document.getElementById('add-tm-photo-data')?.value||'',
     clientLink:nameEl.dataset.clientLink||'',
     color:_newTmColorVal
-  });
+  };
+  teamMembers.push(newMember); // push to bottom, not unshift
   save('tracker:team',teamMembers);
   ['tm-name','tm-role','tm-email','tm-phone','tm-company','tm-notes'].forEach(id=>{
     const el=document.getElementById(id);if(el){el.value='';delete el.dataset.clientLink;}
@@ -2850,16 +2947,10 @@ function saveTeamMemberEdit(id){
   m.role=document.getElementById(`etm-role-${id}`).value.trim();
   m.email=document.getElementById(`etm-email-${id}`).value.trim();
   m.phone=document.getElementById(`etm-phone-${id}`)?.value.trim()||'';
+  m.company=document.getElementById(`etm-company-${id}`)?.value.trim()||'';
+  m.clientLink=document.getElementById(`etm-clink-${id}`)?.value||'';
   m.notes=document.getElementById(`etm-notes-${id}`)?.value.trim()||'';
   m.photo=document.getElementById(`etm-photo-data-${id}`)?.value||m.photo||'';
-  if(m.type!=='internal'){
-    m.company=document.getElementById(`etm-company-${id}`)?.value.trim()||'';
-    const clinkEl=document.getElementById(`etm-clink-${id}`);
-    m.clientLink=clinkEl?clinkEl.value:'';
-  } else {
-    m.company='';m.clientLink='';
-    m.rate=document.getElementById(`etm-rate-${id}`)?.value||'';
-  }
   m.color=newColor;
   save('tracker:team',teamMembers);editing.team=null;allDropdownRefresh();renderTeamList();
 }
@@ -2974,51 +3065,49 @@ function renderMiniGantt(p, opts={}){
   // Milestones without any phase: put between all rows at middle row
   if(!phases.length&&milestones.length){msByRow[0]=milestones;}
 
-  // We'll use a viewBox approach so all x coords can be absolute (0-1000 scale)
-  const VW=1000; // virtual width
+  // SVG layout constants — match screenshot style
+  const VW=1000;
   function vx(pct){return Math.round(pct/100*VW);}
 
-  // Grid lines (in vw coords)
-  const grid=monthLabels.map(m=>`<line x1="${vx(m.pct)}" y1="${headerH}" x2="${vx(m.pct)}" y2="${H-labelH}" stroke="var(--border)" stroke-width="1"/>`).join('');
-  // Month labels: vertically centered in the label strip
-  const labelMidY=H-labelH/2+3;
-  const gridLabels=monthLabels.map(m=>`<text x="${vx(m.pct)+4}" y="${labelMidY}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif" dominant-baseline="middle">${m.label}</text>`).join('');
+  // Month labels at TOP (inside headerH strip)
+  const gridLines=monthLabels.map(m=>`<line x1="${vx(m.pct)}" y1="${headerH}" x2="${vx(m.pct)}" y2="${H}" stroke="var(--border)" stroke-width="0.8"/>`).join('');
+  const monthLabelEls=monthLabels.map(m=>`<text x="${vx(m.pct)+5}" y="${headerH/2+1}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif" dominant-baseline="middle">${m.label}</text>`).join('');
 
-  // TODAY: dashed line + red text above, no background pill
+  // TODAY: solid red line through full chart height including header
   const tvx=vx(todayPct);
   const todayLine=todayInRange?`
-    <line x1="${tvx}" y1="${headerH}" x2="${tvx}" y2="${H-labelH}" stroke="#a32d2d" stroke-width="1.5" stroke-dasharray="4,3"/>
-    <text x="${tvx}" y="${headerH-4}" font-size="9" fill="#a32d2d" font-family="-apple-system,sans-serif" text-anchor="middle" font-weight="600">TODAY</text>
+    <line x1="${tvx}" y1="0" x2="${tvx}" y2="${H}" stroke="#e05252" stroke-width="1.5"/>
+    <text x="${tvx}" y="${headerH/2+1}" font-size="9" fill="#e05252" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="700">TODAY</text>
   `:'';
 
-  // Rebuild svgRows with absolute vx coords
+  // Phase rows
   let svgRowsVW='';
   phases.forEach((ph,i)=>{
     const phY=headerH+i*rowH;
     const col=ph.color||'#4a90d9';
-    // No row dividers — solid single-color background
-    // Phase row - solid bg, rounder corners, wider letter-spacing
-    svgRowsVW+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="var(--bg2)"/>`;
+    // Alternating subtle row background
+    svgRowsVW+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="${i%2===0?'var(--bg)':'var(--bg2)'}"/>`;
+    // Row divider
+    svgRowsVW+=`<line x1="0" y1="${phY+rowH}" x2="${VW}" y2="${phY+rowH}" stroke="var(--border)" stroke-width="0.5"/>`;
     if(ph.startDate){
       const x1=vx(pctOf(ph.startDate));
-      const x2=ph.endDate?vx(pctOf(ph.endDate)):x1+20;
-      const bw=Math.max(4,x2-x1);
-      svgRowsVW+=`<rect x="${x1}" y="${phY+3}" width="${bw}" height="${rowH-6}" fill="${col}" rx="6"/>`;
-      // Phase label with wider letter-spacing
-      const maxChars=Math.floor((bw-8)/7.5);
+      const x2=ph.endDate?vx(pctOf(ph.endDate)):x1+40;
+      const bw=Math.max(8,x2-x1);
+      // Phase bar — tall, fills most of row height, very round ends
+      svgRowsVW+=`<rect x="${x1}" y="${phY+3}" width="${bw}" height="${rowH-6}" fill="${col}" rx="5"/>`;
+      // Phase label inside bar
+      const maxChars=Math.floor((bw-12)/6.5);
       if(maxChars>=3){
         const label=maxChars>=ph.title.length?ph.title:ph.title.slice(0,maxChars-1)+'...';
-        svgRowsVW+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle" letter-spacing="0.08em">${esc(label)}</text>`;
+        svgRowsVW+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="500" letter-spacing="0.04em">${esc(label)}</text>`;
       }
     }
-    // Milestone diamonds: small (r=4), grey (#888)
+    // Milestone diamonds
     (msByRow[i]||[]).forEach(ms=>{
       const mp=pctOf(ms.date);
       if(mp<0||mp>100)return;
-      const mx=vx(mp);
-      const cy=phY+rowH/2;
-      const r=4;
-      svgRowsVW+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="#888" transform="rotate(45,${mx},${cy})"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
+      const mx=vx(mp);const cy=phY+rowH/2;const r=5;
+      svgRowsVW+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="#8a8a8a" transform="rotate(45,${mx},${cy})"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
     });
   });
 
@@ -3027,9 +3116,8 @@ function renderMiniGantt(p, opts={}){
     const msY=headerH+rowH/2;
     milestones.forEach(ms=>{
       const mp=pctOf(ms.date);if(mp<0||mp>100)return;
-      const mx=vx(mp);
-      const r=4;
-      svgRowsVW+=`<rect x="${mx-r}" y="${msY-r}" width="${r*2}" height="${msY-r}" fill="#888" transform="rotate(45,${mx},${msY})"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
+      const mx=vx(mp);const r=5;
+      svgRowsVW+=`<rect x="${mx-r}" y="${msY-r}" width="${r*2}" height="${r*2}" fill="#8a8a8a" transform="rotate(45,${mx},${msY})"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
     });
   }
 
@@ -3038,13 +3126,19 @@ function renderMiniGantt(p, opts={}){
       <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Timeline</span>
       <button class="btn sm" onclick="cycleGanttView('${gId}')" style="padding:2px 10px;font-size:10px">${isCompressed==='1mo'?'1 mo':isCompressed==='3mo'?'3 mo':'Full'} ↻</button>
     </div>
-    <div id="${gId}" data-pid="${p.id}" style="overflow-x:auto;padding-top:${todayInRange?'20px':'0'}">
-      <svg viewBox="0 0 ${VW} ${H}" width="100%" height="${H}" style="display:block;min-width:300px;overflow:visible" preserveAspectRatio="none">
-        <rect x="0" y="${headerH}" width="${VW}" height="${H-headerH-labelH}" fill="var(--bg2)" rx="3"/>
-        ${grid}
+    <div id="${gId}" data-pid="${p.id}">
+      <svg viewBox="0 0 ${VW} ${H}" width="100%" height="${H}" style="display:block;border-radius:var(--radius-sm);overflow:hidden" preserveAspectRatio="none">
+        <!-- Chart background -->
+        <rect x="0" y="0" width="${VW}" height="${H}" fill="var(--bg)"/>
+        <!-- Header background -->
+        <rect x="0" y="0" width="${VW}" height="${headerH}" fill="var(--bg3)"/>
+        <!-- Grid lines + month labels at top -->
+        ${gridLines}
+        ${monthLabelEls}
+        <!-- Phase rows -->
         ${svgRowsVW}
+        <!-- Today line (on top of everything) -->
         ${todayLine}
-        ${gridLabels}
       </svg>
     </div>
   </div>`;
@@ -3111,7 +3205,13 @@ function updateTaskStatus(projId,taskId,status){
 
 function deleteTask(projId,taskId){
   const p=projects.find(x=>x.id===projId);if(!p)return;
+  const deleted=(p.tasks||[]).find(t=>t.id===taskId);
+  const deletedIdx=(p.tasks||[]).findIndex(t=>t.id===taskId);
   p.tasks=(p.tasks||[]).filter(t=>t.id!==taskId);
+  if(deleted)pushUndo('Delete task "'+deleted.title+'"',()=>{
+    if(!p.tasks)p.tasks=[];p.tasks.splice(deletedIdx,0,deleted);
+    save('tracker:projects',projects);renderProjectList();
+  });
   save('tracker:projects',projects);renderProjectList();
 }
 
@@ -3136,7 +3236,13 @@ function toggleMilestone(projId,msId){
 
 function deleteMilestone(projId,msId){
   const p=projects.find(x=>x.id===projId);if(!p)return;
+  const deleted=(p.milestones||[]).find(m=>m.id===msId);
+  const deletedIdx=(p.milestones||[]).findIndex(m=>m.id===msId);
   p.milestones=(p.milestones||[]).filter(m=>m.id!==msId);
+  if(deleted)pushUndo('Delete milestone "'+deleted.title+'"',()=>{
+    if(!p.milestones)p.milestones=[];p.milestones.splice(deletedIdx,0,deleted);
+    save('tracker:projects',projects);renderProjectList();
+  });
   save('tracker:projects',projects);renderProjectList();
 }
 
@@ -3216,6 +3322,9 @@ function toggleTaskExpandEdit(projId,taskId){
 }
 
 function toggleTaskAssignee(projId,taskId,memberId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
+  if(!Array.isArray(t.assigneeIds))t.assigneeIds=t.assigneeId?[t.assigneeId]:[];
   const idx=t.assigneeIds.indexOf(memberId);
   if(idx>=0)t.assigneeIds.splice(idx,1);
   else t.assigneeIds.push(memberId);
@@ -3500,57 +3609,55 @@ function exportProjectPDF(projId){
   const milestones=[...(p.milestones||[])].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
   const projTeam=allMembers.filter(m=>(p.teamIds||[]).includes(m.id)||m.id==='__me__');
-  const fd=(d)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
-  const fm=(n)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n||0);
+  const fd=(d)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'--';
   const h=(s)=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const todayStr=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
 
-  // Mini Gantt SVG
-  function buildGanttSVG(){
+  // Gantt SVG — 3mo view by default, with today line, matching inline style
+  function buildPDFGantt(){
     if(!phases.length&&!milestones.length)return'';
-    let allDates=[...phases.flatMap(ph=>[ph.startDate,ph.endDate]),...milestones.map(m=>m.date)].filter(Boolean).sort();
-    if(!allDates.length)return'';
-    const rangeStart=new Date(allDates[0]+'T00:00:00');
-    const rangeEnd=new Date(allDates[allDates.length-1]+'T00:00:00');
-    rangeStart.setDate(1);
-    rangeEnd.setMonth(rangeEnd.getMonth()+1);rangeEnd.setDate(0);
-    const totalMs=Math.max(1,rangeEnd-rangeStart);
-    const VW=600,rowH=22,headerH=20,labelH=14;
-    const H=headerH+Math.max(1,phases.length)*rowH+labelH;
-    function vx(d){return Math.round(Math.min(100,Math.max(0,(new Date(d+'T12:00:00')-rangeStart)/totalMs*100))/100*VW);}
+    const now=new Date();const weekAgo=new Date(now);weekAgo.setDate(weekAgo.getDate()-7);
+    const minD=new Date(weekAgo.getFullYear(),weekAgo.getMonth(),weekAgo.getDate());
+    const maxD=new Date(minD);maxD.setMonth(maxD.getMonth()+3);
+    const tot=Math.max(1,maxD-minD);
+    const W=560,rowH=22,headerH=20;
+    const H=headerH+Math.max(1,phases.length)*rowH;
+    function vx(d){return Math.round(Math.min(100,Math.max(0,(new Date(d+'T12:00:00')-minD)/tot*100))/100*W);}
+    function vxD(d){return Math.round(Math.min(100,Math.max(0,(d-minD)/tot*100))/100*W);}
     let rows='';
     phases.forEach((ph,i)=>{
-      const phY=headerH+i*rowH;
-      const col=ph.color||'#4a90d9';
-      rows+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="#f5f5f2"/>`;
+      const phY=headerH+i*rowH;const col=ph.color||'#4a90d9';
+      rows+=`<rect x="0" y="${phY}" width="${W}" height="${rowH}" fill="${i%2===0?'#f5f5f2':'#eaeae5'}"/>`;
+      rows+=`<line x1="0" y1="${phY+rowH}" x2="${W}" y2="${phY+rowH}" stroke="#ddd" stroke-width="0.5"/>`;
       if(ph.startDate&&ph.endDate){
-        const x1=vx(ph.startDate),x2=vx(ph.endDate),bw=Math.max(4,x2-x1);
+        const x1=vx(ph.startDate),x2=vx(ph.endDate),bw=Math.max(6,x2-x1);
         rows+=`<rect x="${x1}" y="${phY+3}" width="${bw}" height="${rowH-6}" fill="${col}" rx="4"/>`;
-        if(bw>40)rows+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="9" fill="#fff" font-family="Arial,sans-serif" text-anchor="middle" dominant-baseline="middle" letter-spacing="0.06em">${h(ph.title.slice(0,Math.floor(bw/7)))}</text>`;
+        if(bw>40)rows+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="9" fill="#fff" font-family="Arial,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="500">${h(ph.title.slice(0,Math.floor(bw/6)))}</text>`;
       }
-      milestones.filter(ms=>ms.date&&ph.startDate<=ms.date&&ph.endDate>=ms.date).forEach(ms=>{
+      (milestones.filter(ms=>ms.date&&ph.startDate<=ms.date&&ph.endDate>=ms.date)||[]).forEach(ms=>{
         const mx=vx(ms.date);const cy=phY+rowH/2;const r=4;
-        rows+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="#888" transform="rotate(45,${mx},${cy})"/>`;
+        rows+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="#888" transform="rotate(45,${mx},${cy})"><title>${h(ms.title)}</title></rect>`;
       });
     });
-    // Month labels
-    let cur=new Date(rangeStart.getFullYear(),rangeStart.getMonth(),1);
-    let grid='';
-    while(cur<=rangeEnd){
-      const x=Math.round((cur-rangeStart)/totalMs*VW);
-      const lbl=cur.toLocaleDateString('en-US',{month:'short'});
-      grid+=`<line x1="${x}" y1="${headerH}" x2="${x}" y2="${H-labelH}" stroke="#ddd" stroke-width="0.5"/>`;
-      grid+=`<text x="${x+2}" y="${H-3}" font-size="8" fill="#999" font-family="Arial,sans-serif">${lbl}</text>`;
+    // Month labels at top + grid lines
+    let grid='';let cur=new Date(minD.getFullYear(),minD.getMonth(),1);
+    while(cur<=maxD){
+      const x=vxD(cur);const lbl=cur.toLocaleDateString('en-US',{month:'short'});
+      grid+=`<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="#ddd" stroke-width="0.5"/>`;
+      grid+=`<text x="${x+3}" y="${headerH/2+1}" font-size="8" fill="#999" font-family="Arial,sans-serif" dominant-baseline="middle">${lbl}</text>`;
       cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
     }
-    return`<svg width="${VW}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${VW}" height="${H}" fill="#eaeae5" rx="3"/>
-      <text x="0" y="14" font-size="9" fill="#9a979a" font-family="Arial,sans-serif">${h(allDates[0])}</text>
-      <text x="${VW}" y="14" font-size="9" fill="#9a979a" font-family="Arial,sans-serif" text-anchor="end">${h(allDates[allDates.length-1])}</text>
-      ${grid}${rows}
+    // Today line
+    const tx=vxD(now);
+    const todayLine=tx>=0&&tx<=W?`<line x1="${tx}" y1="0" x2="${tx}" y2="${H}" stroke="#e05252" stroke-width="1.5"/><text x="${tx}" y="${headerH/2+1}" font-size="8" fill="#e05252" font-family="Arial,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="700">TODAY</text>`:'';
+    return`<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="${W}" height="${H}" fill="#f5f5f2"/>
+      <rect width="${W}" height="${headerH}" fill="#E0E0DB"/>
+      ${grid}${rows}${todayLine}
     </svg>`;
   }
 
-  const ganttSVG=buildGanttSVG();
+  const ganttSVG=buildPDFGantt();
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
@@ -3566,52 +3673,47 @@ function exportProjectPDF(projId){
     .badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:8pt;font-weight:600;background:#e8f5ee;color:#0f6e56}
     .badge.critical{background:#fdecea;color:#a32d2d}
     .badge.open{background:#f5f5f2;color:#6b686a}
+    svg{display:block;width:100%;height:auto}
   </style></head><body>
-  <h1>${h(p.num?p.num+' — ':'')}${h(p.name)}</h1>
+  <h1>${h(p.num?p.num+' -- ':'')}${h(p.name)}</h1>
   <div class="meta">
-    ${client?`<strong>${h(client.company)}</strong> · `:''}
-    Status: ${p.status==='active'?'Active':p.status==='on_hold'?'On Hold':'Completed'}
-    ${p.startDate?` · Start: ${fd(p.startDate)}`:''}
-    ${p.endDate?` · End: ${fd(p.endDate)}`:''}
-    ${p.location?` · ${h(p.location)}`:''}
+    ${client?`<strong>${h(client.company)}</strong> &middot; `:''}
+    ${p.status==='active'?'Active':p.status==='on_hold'?'On Hold':'Completed'}
+    ${p.location?` &middot; ${h(p.location)}`:''}
+    &middot; ${todayStr}
   </div>
   ${p.desc?`<p style="font-size:10pt;color:#555;margin-bottom:14px">${h(p.desc)}</p>`:''}
 
-  <h2>Project Details</h2>
-  <table><tr>
-    <th>Rate</th><th>Budget</th><th>Duration</th>
-  </tr><tr>
-    <td>${p.rate?fm(p.rate)+'/hr':'—'}</td>
-    <td>${p.budget?(p.budgetType==='range'?fm(p.budget)+' – '+fm(p.budgetMax):fm(p.budget)):'—'}</td>
-    <td>${h(p.duration||'—')}</td>
-  </tr></table>
+  ${ganttSVG?`<h2>Timeline</h2><div style="margin-bottom:16px">${ganttSVG}</div>`:''}
 
-  ${projTeam.length?`<h2>Team</h2><div>${projTeam.map(m=>`<span class="chip" style="background:${m.color||'#888'}">${h(m.name)}</span>`).join('')}</div>`:''}
+  ${projTeam.length?`<h2>Team</h2><div style="margin-bottom:14px">${projTeam.map(m=>`<span class="chip" style="background:${m.color||'#888'}">${h(m.name)}</span>`).join('')}</div>`:''}
 
   ${phases.length?`<h2>Phases</h2><table><tr><th>Phase</th><th>Start</th><th>End</th></tr>
     ${phases.map(ph=>`<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${ph.color||'#4a90d9'};margin-right:5px;vertical-align:middle"></span>${h(ph.title)}</td><td>${fd(ph.startDate)}</td><td>${fd(ph.endDate)}</td></tr>`).join('')}
   </table>`:''}
 
   ${milestones.length?`<h2>Milestones</h2><table><tr><th>Milestone</th><th>Date</th><th>Status</th></tr>
-    ${milestones.map(ms=>`<tr><td>${h(ms.title)}</td><td>${fd(ms.date)}</td><td>${ms.completed?'✓ Complete':'Pending'}</td></tr>`).join('')}
+    ${milestones.map(ms=>`<tr><td>${h(ms.title)}</td><td>${fd(ms.date)}</td><td>${ms.completed?'Complete':'Pending'}</td></tr>`).join('')}
   </table>`:''}
-
-  ${ganttSVG?`<h2>Timeline</h2><div>${ganttSVG}</div>`:''}
 
   ${phases.length?phases.map(ph=>{
     const pts=(p.tasks||[]).filter(t=>t.phaseId===ph.id);
     if(!pts.length)return'';
-    return`<h2>${h(ph.title)}</h2><table><tr><th>Task</th><th>Type</th><th>Due</th><th>Status</th><th>Assignees</th></tr>
+    return`<h2>${h(ph.title)}</h2><table><tr><th>Task</th><th>Type</th><th>Due</th><th>Status</th><th>Assigned to</th></tr>
       ${pts.map(t=>{
         const ids=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
-        const names=ids.map(id=>allMembers.find(m=>m.id===id)?.name||'').filter(Boolean).join(', ');
-        return`<tr><td>${h(t.title)}</td><td>${t.taskType?`<span class="badge ${t.taskType}">${h(t.taskType)}</span>`:''}</td><td>${fd(t.dueDate)}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In Progress':'To Do'}</td><td>${h(names)}</td></tr>`;
+        const names=ids.map(id=>allMembers.find(m=>m.id===id)).filter(Boolean).map(m=>m.name).join(', ');
+        return`<tr><td>${h(t.title)}</td><td>${t.taskType?`<span class="badge ${t.taskType}">${h(t.taskType)}</span>`:''}</td><td>${fd(t.dueDate)}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In Progress':'To Do'}</td><td style="color:#666">${h(names)}</td></tr>`;
       }).join('')}
     </table>`;
   }).join(''):''}
 
-  ${((p.tasks||[]).filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId))).length?`<h2>Other Tasks</h2><table><tr><th>Task</th><th>Type</th><th>Due</th><th>Status</th></tr>
-    ${(p.tasks||[]).filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId)).map(t=>`<tr><td>${h(t.title)}</td><td>${t.taskType?`<span class="badge ${t.taskType}">${h(t.taskType)}</span>`:''}</td><td>${fd(t.dueDate)}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In Progress':'To Do'}</td></tr>`).join('')}
+  ${(p.tasks||[]).filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId)).length?`<h2>Other Tasks</h2><table><tr><th>Task</th><th>Type</th><th>Due</th><th>Status</th><th>Assigned to</th></tr>
+    ${(p.tasks||[]).filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId)).map(t=>{
+      const ids=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
+      const names=ids.map(id=>allMembers.find(m=>m.id===id)).filter(Boolean).map(m=>m.name).join(', ');
+      return`<tr><td>${h(t.title)}</td><td>${t.taskType?`<span class="badge ${t.taskType}">${h(t.taskType)}</span>`:''}</td><td>${fd(t.dueDate)}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In Progress':'To Do'}</td><td style="color:#666">${h(names)}</td></tr>`;
+    }).join('')}
   </table>`:''}
 
   <script>window.onload=function(){window.print();}<\/script>
