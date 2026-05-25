@@ -3025,10 +3025,10 @@ function renderMiniGantt(p, opts={}){
   }
 
   const totalMs=Math.max(1,maxD-minD);
-  const rowH=24,headerH=20;
+  const rowH=24,headerH=0;
   const rowCount=Math.max(1,phases.length);
   const bodyH=rowCount*rowH;
-  const H=headerH+bodyH;
+  const H=bodyH;
 
   function pctOf(d){return Math.min(100,Math.max(0,(new Date(d+'T12:00:00')-minD)/totalMs*100));}
 
@@ -3076,10 +3076,10 @@ function renderMiniGantt(p, opts={}){
   const VW=1000;
   function vx(pct){return Math.round(pct/100*VW);}
 
-  // Month labels at top in header strip, grid lines through body only
+  // Month labels sit at the very top of the chart body, no background strip
   const bodyTop=headerH;
-  const gridLines=monthLabels.map(m=>`<line x1="${vx(m.pct)}" y1="${bodyTop}" x2="${vx(m.pct)}" y2="${bodyTop+bodyH}" stroke="var(--border)" stroke-width="0.8"/>`).join('');
-  const monthLabelEls=monthLabels.map(m=>`<text x="${vx(m.pct)+5}" y="${headerH/2+1}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif" dominant-baseline="middle">${m.label}</text>`).join('');
+  const gridLines=monthLabels.map(m=>`<line x1="${vx(m.pct)}" y1="${bodyTop}" x2="${vx(m.pct)}" y2="${bodyTop+bodyH}" stroke="rgba(0,0,0,0.08)" stroke-width="0.8"/>`).join('');
+  const monthLabelEls=monthLabels.map(m=>`<text x="${vx(m.pct)+5}" y="${bodyTop+10}" font-size="8" fill="rgba(255,255,255,0.85)" font-family="-apple-system,sans-serif" dominant-baseline="middle">${m.label}</text>`).join('');
 
   // TODAY: solid red line through body only; label rendered BELOW the SVG
   const tvx=vx(todayPct);
@@ -3138,15 +3138,10 @@ function renderMiniGantt(p, opts={}){
     </div>
     <div id="${gId}" data-pid="${p.id}">
       <svg viewBox="0 0 ${VW} ${H}" width="100%" height="${H}" style="display:block;border-radius:${todayInRange?'var(--radius-sm) var(--radius-sm) 0 0':'var(--radius-sm)'};overflow:hidden" preserveAspectRatio="none">
-        <!-- Full background — single solid color -->
         <rect x="0" y="0" width="${VW}" height="${H}" fill="var(--bg2)"/>
-        <!-- Month labels float on same background (no header strip) -->
-        ${monthLabelEls}
-        <!-- Grid lines (body only) -->
         ${gridLines}
-        <!-- Phase rows -->
         ${svgRowsVW}
-        <!-- Today line (body only) -->
+        ${monthLabelEls}
         ${todayLine}
       </svg>
       ${todayLabel}
