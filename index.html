@@ -233,6 +233,8 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- SETTINGS -->
   <div id="settings-panel" class="card" style="display:none">
+
+    <!-- MY PROFILE -->
     <div class="sec-title">My profile</div>
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
       <div class="profile-avatar" id="my-profile-avatar">L</div>
@@ -241,29 +243,82 @@ td{padding:8px 0;vertical-align:top}
           <div><label>My name</label><input id="s-myname" type="text" placeholder="Your name" oninput="saveMyProfile()"></div>
           <div><label>My role</label><input id="s-myrole" type="text" placeholder="Creative Director" oninput="saveMyProfile()"></div>
         </div>
-        <div class="grid2" style="margin-bottom:0">
+        <div class="grid3" style="margin-bottom:0">
           <div><label>My email</label><input id="s-myemail" type="email" placeholder="you@lowtide.cc" oninput="saveMyProfile()"></div>
+          <div><label>My phone</label><input id="s-myphone" type="tel" placeholder="(555) 000-0000" oninput="formatPhone(this);saveMyProfile()"></div>
           <div><label>My hourly rate ($/hr)</label><input id="s-myrate" type="number" placeholder="150" oninput="saveMyProfile();refreshAll()"></div>
         </div>
       </div>
     </div>
-    <div style="height:.5px;background:var(--border);margin-bottom:12px"></div>
+
+    <div style="height:.5px;background:var(--border);margin:12px 0"></div>
+
+    <!-- BUSINESS / STUDIO INFO -->
+    <div class="sec-title">Studio / business info</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Appears on invoices as the "From" block.</div>
+    <div class="grid2" style="margin-bottom:8px">
+      <div><label>Studio name</label><input id="s-bizname" type="text" placeholder="Lowtide.cc" oninput="saveBizInfo()"></div>
+      <div><label>Website</label><input id="s-bizweb" type="text" placeholder="lowtide.cc" oninput="saveBizInfo()"></div>
+    </div>
+    <div class="grid2" style="margin-bottom:8px">
+      <div><label>Email</label><input id="s-bizemail" type="email" placeholder="hello@lowtide.cc" oninput="saveBizInfo()"></div>
+      <div><label>Phone</label><input id="s-bizphone" type="tel" placeholder="(555) 000-0000" oninput="formatPhone(this);saveBizInfo()"></div>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>Address</label>
+      <input id="s-bizaddress" type="text" placeholder="123 Main St, City, CA 90210" oninput="saveBizInfo()">
+    </div>
+
+    <div style="height:.5px;background:var(--border);margin:12px 0"></div>
+
+    <!-- GLOBAL SETTINGS -->
     <div class="sec-title">Global settings</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      <div><label>Invoice prefix</label><input id="s-prefix" type="text" placeholder="INV" oninput="saveSetting('invoicePrefix',this.value);refreshAll()"></div>
-      <div><label>Currency</label>
+      <div><label>Default currency</label>
         <select id="s-currency" onchange="saveSetting('currency',this.value);refreshAll()">
           <option value="USD">USD ($)</option><option value="EUR">EUR (€)</option>
-          <option value="GBP">GBP (£)</option><option value="CAD">CAD (C$)</option><option value="AUD">AUD (A$)</option>
+          <option value="GBP">GBP (£)</option><option value="CAD">CAD (C$)</option>
+          <option value="AUD">AUD (A$)</option><option value="NZD">NZD (NZ$)</option>
+          <option value="CHF">CHF (Fr.)</option><option value="MXN">MXN (MX$)</option>
+          <option value="SGD">SGD (S$)</option><option value="JPY">JPY (¥)</option>
+        </select>
+      </div>
+      <div><label>Default hourly rate ($/hr)</label><input id="s-rate" type="number" placeholder="150" oninput="saveSetting('hourlyRate',this.value);refreshAll()"></div>
+    </div>
+
+    <div style="height:.5px;background:var(--border);margin:12px 0"></div>
+
+    <!-- INVOICE SETTINGS -->
+    <div class="sec-title">Invoice settings</div>
+    <div class="grid2" style="margin-bottom:8px">
+      <div><label>Invoice prefix</label><input id="s-prefix" type="text" placeholder="INV" oninput="saveSetting('invoicePrefix',this.value);refreshAll()"></div>
+      <div><label>Payment terms</label>
+        <select id="s-terms" onchange="saveSetting('paymentTerms',this.value)">
+          <option value="">None</option>
+          <option value="Due on receipt">Due on receipt</option>
+          <option value="Net 7">Net 7</option>
+          <option value="Net 15">Net 15</option>
+          <option value="Net 30">Net 30</option>
+          <option value="Net 45">Net 45</option>
+          <option value="Net 60">Net 60</option>
         </select>
       </div>
     </div>
-    <div class="sec-title" style="margin-top:8px">Expense categories</div>
+    <div class="field" style="margin-bottom:8px">
+      <label>Invoice notes / footer text</label>
+      <textarea id="s-inv-notes" rows="2" placeholder="e.g. Please make checks payable to Lowtide.cc. Thank you for your business!" oninput="saveSetting('invoiceNotes',this.value)" style="width:100%;padding:8px 10px;border:.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;resize:vertical"></textarea>
+    </div>
+
+    <div style="height:.5px;background:var(--border);margin:12px 0"></div>
+
+    <!-- EXPENSE CATEGORIES -->
+    <div class="sec-title" style="margin-top:0">Expense categories</div>
     <div class="cat-wrap" id="cat-list"></div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <input id="new-cat-input" type="text" placeholder="New category…" style="flex:1" onkeydown="if(event.key==='Enter')addCategory()">
       <button class="btn sm" onclick="addCategory()"><i class="ti ti-plus"></i> Add</button>
     </div>
+
     <button class="btn" style="margin-top:1rem" onclick="toggleSettings()">Done</button>
   </div>
 
@@ -540,11 +595,13 @@ td{padding:8px 0;vertical-align:top}
         <div>
           <div style="font-size:22px;font-weight:500">Invoice</div>
           <div style="font-size:12px;color:var(--text2);margin-top:4px" id="inv-number"></div>
+          <div id="inv-from" style="margin-top:10px;font-size:12px;line-height:1.6;color:var(--text2)"></div>
         </div>
         <div style="text-align:right">
           <div style="font-weight:500" id="inv-proj-name"></div>
           <div style="font-size:13px;color:var(--text2);margin-top:2px" id="inv-client-name"></div>
           <div style="font-size:13px;color:var(--text2)" id="inv-period"></div>
+          <div style="font-size:13px;color:var(--text2);margin-top:8px" id="inv-terms"></div>
         </div>
       </div>
       <div id="inv-retainer-section"></div>
@@ -552,6 +609,7 @@ td{padding:8px 0;vertical-align:top}
       <div id="inv-exp-section"></div>
       <div id="inv-empty" style="display:none;text-align:center;padding:2rem 0;color:var(--text2);font-size:14px"></div>
       <div id="inv-totals"></div>
+      <div id="inv-notes-footer" style="margin-top:1.25rem;padding-top:1rem;border-top:.5px solid var(--border);font-size:12px;color:var(--text3)"></div>
     </div>
     <button class="btn no-print" style="margin-top:1rem" onclick="window.print()"><i class="ti ti-printer"></i> Print / save as PDF</button>
   </div>
@@ -668,7 +726,7 @@ td{padding:8px 0;vertical-align:top}
 const GD_CLIENT_ID = '964475055610-sb4e62npukeqrno43qpjnse5pa05ca5n.apps.googleusercontent.com';
 const GD_SCOPE     = 'https://www.googleapis.com/auth/drive.file';
 const GD_FILENAME  = 'tracker-data.json';
-const GD_KEYS      = ['tracker:settings','tracker:time','tracker:expenses','tracker:clients','tracker:projects','tracker:clientInvs','tracker:team','tracker:myProfile'];
+const GD_KEYS      = ['tracker:settings','tracker:time','tracker:expenses','tracker:clients','tracker:projects','tracker:clientInvs','tracker:team','tracker:myProfile','tracker:bizInfo'];
 
 let gdToken=null, gdFileId=null, gdArchiveFolderId=null, gdChangelogFileId=null, gdCodeBackupFolderId=null, syncTimer=null;
 let _lastArchivedDate=null; // track so we only archive once per day
@@ -1036,7 +1094,8 @@ async function writeToDrive(){
     'tracker:projects':projects,
     'tracker:clientInvs':clientInvs,
     'tracker:team':teamMembers,
-    'tracker:myProfile':myProfile
+    'tracker:myProfile':myProfile,
+    'tracker:bizInfo':bizInfo
   };
   try{
     await fetch(`https://www.googleapis.com/upload/drive/v3/files/${gdFileId}?uploadType=media`,{
@@ -1084,7 +1143,7 @@ const TEAM_COLORS=[
 ];
 
 const DEF_CATS=['Software','Travel','Equipment','Subcontractor','Meals','Office','Other'];
-let settings, timeEntries, expenses, clients, projects, clientInvs, teamMembers, myProfile, currentTab='dashboard';
+let settings, timeEntries, expenses, clients, projects, clientInvs, teamMembers, myProfile, bizInfo, currentTab='dashboard';
 let editing={time:null,expenses:null,projects:null,clients:null,team:null,milestones:null,phases:null,tasks:null};
 const _ganttCompressed={}; // '3mo' (default), '1mo', 'full'
 
@@ -1098,14 +1157,15 @@ function cycleGanttView(gId){
 let _projTeamSelected=[];
 
 function reloadState(){
-  settings    =Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD',expenseCategories:DEF_CATS},load('tracker:settings',{})||{});
+  settings    =Object.assign({hourlyRate:'150',invoicePrefix:'INV',currency:'USD',expenseCategories:DEF_CATS,paymentTerms:'',invoiceNotes:''},load('tracker:settings',{})||{});
   timeEntries =load('tracker:time',[])||[];
   expenses    =load('tracker:expenses',[])||[];
   clients     =load('tracker:clients',[])||[];
   projects    =load('tracker:projects',[])||[];
   clientInvs  =load('tracker:clientInvs',{})||{};
   teamMembers =load('tracker:team',[])||[];
-  myProfile   =Object.assign({name:'',role:'',email:'',rate:''},load('tracker:myProfile',{})||{});
+  myProfile   =Object.assign({name:'',role:'',email:'',phone:'',rate:''},load('tracker:myProfile',{})||{});
+  bizInfo     =Object.assign({name:'',email:'',phone:'',website:'',address:''},load('tracker:bizInfo',{})||{});
 }
 reloadState();
 
@@ -1148,10 +1208,19 @@ document.getElementById('p-client').addEventListener('change',function(){
 (function loadSettingsForm(){
   document.getElementById('s-prefix').value=settings.invoicePrefix||'INV';
   document.getElementById('s-currency').value=settings.currency||'USD';
+  document.getElementById('s-rate').value=settings.hourlyRate||'150';
+  document.getElementById('s-terms').value=settings.paymentTerms||'';
+  document.getElementById('s-inv-notes').value=settings.invoiceNotes||'';
   document.getElementById('s-myname').value=myProfile.name||'';
   document.getElementById('s-myrole').value=myProfile.role||'';
   document.getElementById('s-myemail').value=myProfile.email||'';
+  document.getElementById('s-myphone').value=myProfile.phone||'';
   document.getElementById('s-myrate').value=myProfile.rate||'';
+  document.getElementById('s-bizname').value=bizInfo.name||'';
+  document.getElementById('s-bizemail').value=bizInfo.email||'';
+  document.getElementById('s-bizphone').value=bizInfo.phone||'';
+  document.getElementById('s-bizweb').value=bizInfo.website||'';
+  document.getElementById('s-bizaddress').value=bizInfo.address||'';
   updateProfileAvatar();
 })();
 
@@ -1159,9 +1228,19 @@ function saveMyProfile(){
   myProfile.name=document.getElementById('s-myname').value.trim();
   myProfile.role=document.getElementById('s-myrole').value.trim();
   myProfile.email=document.getElementById('s-myemail').value.trim();
+  myProfile.phone=document.getElementById('s-myphone').value.trim();
   myProfile.rate=document.getElementById('s-myrate').value;
   save('tracker:myProfile',myProfile);
   updateProfileAvatar();
+}
+
+function saveBizInfo(){
+  bizInfo.name=document.getElementById('s-bizname').value.trim();
+  bizInfo.email=document.getElementById('s-bizemail').value.trim();
+  bizInfo.phone=document.getElementById('s-bizphone').value.trim();
+  bizInfo.website=document.getElementById('s-bizweb').value.trim();
+  bizInfo.address=document.getElementById('s-bizaddress').value.trim();
+  save('tracker:bizInfo',bizInfo);
 }
 
 function updateProfileAvatar(){
@@ -2669,6 +2748,27 @@ function renderInvoice(){
   document.getElementById('inv-client-name').textContent='';
   document.getElementById('inv-period').textContent='Period: '+fmtMonth(m);
 
+  // Populate "From" block with studio/business info
+  const fromEl=document.getElementById('inv-from');
+  if(fromEl){
+    const lines=[
+      bizInfo.name||myProfile.name||'',
+      bizInfo.address||'',
+      bizInfo.email||(myProfile.email||''),
+      bizInfo.phone||(myProfile.phone||''),
+      bizInfo.website||''
+    ].filter(Boolean);
+    fromEl.innerHTML=lines.map(l=>htmlEsc(l)).join('<br>');
+    fromEl.style.display=lines.length?'block':'none';
+  }
+
+  // Payment terms
+  const termsEl=document.getElementById('inv-terms');
+  if(termsEl){
+    termsEl.textContent=settings.paymentTerms?'Terms: '+settings.paymentTerms:'';
+    termsEl.style.display=settings.paymentTerms?'block':'none';
+  }
+
   // Get projects for this client
   const clientProjects=cid?projects.filter(p=>p.clientId===cid):projects;
   const clientProjIds=new Set(clientProjects.map(p=>p.id));
@@ -2749,6 +2849,13 @@ function renderInvoice(){
     <div class="total-final"><span>Balance due</span><span>${$f(balance)}</span></div>
     ${balance===0&&invTotal>0?'<div style="font-size:12px;color:var(--success);margin-top:6px"><i class="ti ti-circle-check"></i> Fully covered by retainer</div>':''}
   </div>`;
+
+  // Notes / footer text from Invoice Settings
+  const notesEl=document.getElementById('inv-notes-footer');
+  if(notesEl){
+    notesEl.textContent=settings.invoiceNotes||'';
+    notesEl.style.display=settings.invoiceNotes?'block':'none';
+  }
 }
 
 // ═══════════════════════════════════════════════
