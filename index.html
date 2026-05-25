@@ -18,7 +18,7 @@
   :root{--bg:#2A2829;--bg2:#3a3638;--bg3:#221f22;--text:#E0E0DB;--text2:#a09aa0;--text3:#706870;--border:rgba(224,224,219,0.1);--border2:rgba(224,224,219,0.2);}
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:15px;line-height:1.5}
-#app{max-width:1100px;margin:0 auto;padding:2rem 1rem 4rem}
+#app{max-width:900px;margin:0 auto;padding:2rem 1rem 4rem}
 h1{font-size:22px;font-weight:500}
 .sub{font-size:13px;color:var(--text2);margin-top:3px}
 .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem}
@@ -273,7 +273,7 @@ td{padding:8px 0;vertical-align:top}
     <button class="tab" id="tab-time" data-tab="time" title="Time"><i class="ti ti-clock"></i></button>
     <button class="tab" id="tab-projects" data-tab="projects" title="Projects"><i class="ti ti-folder"></i></button>
     <button class="tab" id="tab-board" data-tab="board" title="Board"><i class="ti ti-layout-kanban"></i></button>
-    <button class="tab" id="tab-workload" data-tab="workload" title="Workload"><i class="ti ti-users"></i></button>
+    <button class="tab" id="tab-workload" data-tab="workload" title="Workload"><i class="ti ti-chart-gantt"></i></button>
     <button class="tab" id="tab-team" data-tab="team" title="Team"><i class="ti ti-users-group"></i></button>
     <button class="tab" id="tab-clients" data-tab="clients" title="Clients"><i class="ti ti-users"></i></button>
     <button class="tab" id="tab-expenses" data-tab="expenses" title="Expenses"><i class="ti ti-receipt"></i></button>
@@ -410,7 +410,7 @@ td{padding:8px 0;vertical-align:top}
           </select>
         </div>
       </div>
-      <div class="grid2">
+      <div class="grid3">
         <div><label>Start date</label><input type="date" id="p-start"></div>
         <div>
           <label>End date</label>
@@ -424,8 +424,12 @@ td{padding:8px 0;vertical-align:top}
             <input type="month" id="p-end-month" style="display:none">
           </div>
         </div>
+        <div><label>Duration (optional)</label><input type="text" id="p-duration" placeholder="e.g. 3 months"></div>
       </div>
-      <div class="field"><label>Duration (optional)</label><input type="text" id="p-duration" placeholder="e.g. 3 months"></div>
+      <div class="grid2">
+        <div class="field"><label>Location (optional)</label><input type="text" id="p-location" placeholder="City, State or Remote"></div>
+        <div class="field"><label>Description (optional)</label><input type="text" id="p-desc" placeholder="Brief project overview" onkeydown="if(event.key==='Enter')addProject()"></div>
+      </div>
       <div class="grid2">
         <div>
           <label>Budget</label>
@@ -2106,6 +2110,7 @@ function renderProjectList(){
         </div>
       </div>
       ${isEditing?renderProjectEditForm(p):`
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;margin-bottom:4px">
         ${renderHealthBadge(p)}
         <button onclick="generateClientShare('${p.id}')" style="background:none;border:.5px solid var(--border2);border-radius:20px;padding:2px 8px;font-size:11px;color:var(--text3);cursor:pointer"><i class="ti ti-share" style="font-size:11px"></i> Share with client</button>
       </div>
@@ -3019,7 +3024,7 @@ function renderMiniGantt(p, opts={}){
   }
 
   const totalMs=Math.max(1,maxD-minD);
-  const rowH=22,headerH=20,labelH=14;
+  const rowH=24,headerH=20,labelH=14;
   const rowCount=Math.max(1,phases.length);
   const H=headerH+rowCount*rowH+labelH;
 
@@ -3065,79 +3070,81 @@ function renderMiniGantt(p, opts={}){
   // Milestones without any phase: put between all rows at middle row
   if(!phases.length&&milestones.length){msByRow[0]=milestones;}
 
-  // SVG layout constants — match screenshot style
+  // SVG layout — match screenshot style
   const VW=1000;
   function vx(pct){return Math.round(pct/100*VW);}
 
-  // Month labels at TOP (inside headerH strip)
-  const gridLines=monthLabels.map(m=>`<line x1="${vx(m.pct)}" y1="${headerH}" x2="${vx(m.pct)}" y2="${H}" stroke="var(--border)" stroke-width="0.8"/>`).join('');
+  // Month labels at top in header strip, grid lines through body only
+  const bodyTop=headerH;
+  const bodyH=rowCount*rowH;
+  const gridLines=monthLabels.map(m=>`<line x1="${vx(m.pct)}" y1="${bodyTop}" x2="${vx(m.pct)}" y2="${bodyTop+bodyH}" stroke="var(--border)" stroke-width="0.8"/>`).join('');
   const monthLabelEls=monthLabels.map(m=>`<text x="${vx(m.pct)+5}" y="${headerH/2+1}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif" dominant-baseline="middle">${m.label}</text>`).join('');
 
-  // TODAY: solid red line through full chart height including header
+  // TODAY: solid red vertical line through body, "TODAY" text at BOTTOM below bars
   const tvx=vx(todayPct);
   const todayLine=todayInRange?`
-    <line x1="${tvx}" y1="0" x2="${tvx}" y2="${H}" stroke="#e05252" stroke-width="1.5"/>
-    <text x="${tvx}" y="${headerH/2+1}" font-size="9" fill="#e05252" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="700">TODAY</text>
+    <line x1="${tvx}" y1="${bodyTop}" x2="${tvx}" y2="${bodyTop+bodyH}" stroke="#e05252" stroke-width="1.5"/>
+    <text x="${tvx}" y="${bodyTop+bodyH+labelH-2}" font-size="8" fill="#e05252" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="700">TODAY</text>
   `:'';
 
   // Phase rows
   let svgRowsVW='';
   phases.forEach((ph,i)=>{
-    const phY=headerH+i*rowH;
+    const phY=bodyTop+i*rowH;
     const col=ph.color||'#4a90d9';
-    // Alternating subtle row background
-    svgRowsVW+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="${i%2===0?'var(--bg)':'var(--bg2)'}"/>`;
-    // Row divider
+    // Row background — alternating subtle tones
+    svgRowsVW+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="${i%2===0?'rgba(255,255,255,0.6)':'rgba(0,0,0,0.02)'}"/>`;
+    // Row bottom divider
     svgRowsVW+=`<line x1="0" y1="${phY+rowH}" x2="${VW}" y2="${phY+rowH}" stroke="var(--border)" stroke-width="0.5"/>`;
     if(ph.startDate){
       const x1=vx(pctOf(ph.startDate));
       const x2=ph.endDate?vx(pctOf(ph.endDate)):x1+40;
       const bw=Math.max(8,x2-x1);
-      // Phase bar — tall, fills most of row height, very round ends
-      svgRowsVW+=`<rect x="${x1}" y="${phY+3}" width="${bw}" height="${rowH-6}" fill="${col}" rx="5"/>`;
+      svgRowsVW+=`<rect x="${x1}" y="${phY+4}" width="${bw}" height="${rowH-8}" fill="${col}" rx="4"/>`;
       // Phase label inside bar
-      const maxChars=Math.floor((bw-12)/6.5);
+      const maxChars=Math.floor((bw-12)/6.2);
       if(maxChars>=3){
         const label=maxChars>=ph.title.length?ph.title:ph.title.slice(0,maxChars-1)+'...';
-        svgRowsVW+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="500" letter-spacing="0.04em">${esc(label)}</text>`;
+        svgRowsVW+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="10" fill="#fff" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="500">${esc(label)}</text>`;
       }
     }
-    // Milestone diamonds
+    // Milestone dots (small circle, white fill with phase color stroke)
     (msByRow[i]||[]).forEach(ms=>{
       const mp=pctOf(ms.date);
       if(mp<0||mp>100)return;
-      const mx=vx(mp);const cy=phY+rowH/2;const r=5;
-      svgRowsVW+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="#8a8a8a" transform="rotate(45,${mx},${cy})"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
+      const mx=vx(mp);const cy=phY+rowH/2;
+      svgRowsVW+=`<circle cx="${mx}" cy="${cy}" r="5" fill="white" stroke="${col}" stroke-width="2"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></circle>`;
     });
   });
 
-  // Milestones with no phase
+  // Milestones with no phase — row at top
   if(!phases.length&&milestones.length){
-    const msY=headerH+rowH/2;
+    const msY=bodyTop+rowH/2;
     milestones.forEach(ms=>{
       const mp=pctOf(ms.date);if(mp<0||mp>100)return;
-      const mx=vx(mp);const r=5;
-      svgRowsVW+=`<rect x="${mx-r}" y="${msY-r}" width="${r*2}" height="${r*2}" fill="#8a8a8a" transform="rotate(45,${mx},${msY})"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></rect>`;
+      const mx=vx(mp);
+      svgRowsVW+=`<circle cx="${mx}" cy="${msY}" r="5" fill="white" stroke="#8a8a8a" stroke-width="2"><title>${esc(ms.title)} - ${fmtDate(ms.date)}</title></circle>`;
     });
   }
 
   return`<div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Timeline</span>
-      <button class="btn sm" onclick="cycleGanttView('${gId}')" style="padding:2px 10px;font-size:10px">${isCompressed==='1mo'?'1 mo':isCompressed==='3mo'?'3 mo':'Full'} ↻</button>
+      <button class="btn sm" onclick="cycleGanttView('${gId}')" style="padding:2px 10px;font-size:10px">${viewMode==='1mo'?'1 mo':viewMode==='3mo'?'3 mo':'Full'} ↻</button>
     </div>
     <div id="${gId}" data-pid="${p.id}">
       <svg viewBox="0 0 ${VW} ${H}" width="100%" height="${H}" style="display:block;border-radius:var(--radius-sm);overflow:hidden" preserveAspectRatio="none">
-        <!-- Chart background -->
-        <rect x="0" y="0" width="${VW}" height="${H}" fill="var(--bg)"/>
-        <!-- Header background -->
+        <!-- Full background -->
+        <rect x="0" y="0" width="${VW}" height="${H}" fill="var(--bg2)"/>
+        <!-- Header strip -->
         <rect x="0" y="0" width="${VW}" height="${headerH}" fill="var(--bg3)"/>
-        <!-- Grid lines + month labels at top -->
-        ${gridLines}
+        <!-- Month labels -->
         ${monthLabelEls}
+        <!-- Grid lines (body only) -->
+        ${gridLines}
         <!-- Phase rows -->
         ${svgRowsVW}
-        <!-- Today line (on top of everything) -->
+        <!-- Today line + label at bottom -->
         ${todayLine}
       </svg>
     </div>
@@ -3263,10 +3270,7 @@ function toggleAddPhase(projId){
   renderProjectList();
 }
 function toggleEditPhase(projId,phId){
-  const key=projId+'-'+phId;
-  _editingPhases[key]=!_editingPhases[key];
-  if(!editing.phases)editing.phases=null;
-  editing.phases=_editingPhases[key]?phId:null;
+  editing.phases=editing.phases===phId?null:phId;
   renderProjectList();
 }
 
@@ -3425,7 +3429,7 @@ function renderTasksAndMilestones(p){
     const expandKey=`task-expand-${p.id}-${t.id}`;
     const aIds=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
     const chips=aIds.map(id=>{const m=allMembers.find(x=>x.id===id);return m?`<span style="font-size:10px;background:${m.color||'var(--accent)'};color:#fff;padding:1px 6px;border-radius:10px">${m.name.split(' ')[0]}</span>`:''}).join('');
-    return`<div draggable="true" ondragstart="taskDragStart(event,'${p.id}','${t.id}')" ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'" ondragleave="this.style.outline=''" ondrop="taskDropOnTask(event,'${p.id}','${t.id}')" style="border-bottom:.5px solid var(--border)">
+    return`<div draggable="true" ondragstart="taskDragStart(event,'${p.id}','${t.id}')" ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'" ondragleave="this.style.outline=''" ondrop="taskDropOnTask(event,'${p.id}','${t.id}')" style="background:var(--bg);border-bottom:.5px solid var(--border)">
       <div style="display:flex;align-items:center;gap:6px;padding:5px 0;font-size:13px">
         <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
         ${typeBadge(t)}
@@ -3471,7 +3475,7 @@ function renderTasksAndMilestones(p){
         <span class="sec-title" style="margin:0">Milestones</span>
         <button class="icon-action" onclick="toggleAddMilestone('${p.id}')" style="font-size:14px"><i class="ti ${showAddMs?'ti-x':'ti-plus'}"></i></button>
       </div>
-      ${showAddMs?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+      ${showAddMs?`<div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
         <div class="grid2" style="margin-bottom:8px">
           <div><label>Title</label><input type="text" id="ms-inp-${p.id}" placeholder="Milestone name..."></div>
           <div><label>Date</label><input type="date" id="ms-date-${p.id}"></div>
@@ -3485,7 +3489,7 @@ function renderTasksAndMilestones(p){
       ${milestones.map(ms=>{
         const overdue=!ms.completed&&ms.date&&ms.date<todayStr;
         const isEditingMs=editing.milestones===ms.id;
-        return`<div style="border-bottom:.5px solid var(--border)">
+        return`<div style="background:var(--bg);border-bottom:.5px solid var(--border)">
           <div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px">
             <input type="checkbox" ${ms.completed?'checked':''} onchange="toggleMilestone('${p.id}','${ms.id}')" style="width:auto;flex-shrink:0">
             <i class="ti ti-flag-2" style="color:${ms.completed?'var(--success)':overdue?'var(--danger)':'var(--accent)'};font-size:14px;flex-shrink:0"></i>
@@ -3494,7 +3498,7 @@ function renderTasksAndMilestones(p){
             ${ms.date?`<button class="icon-action" onclick="exportMilestoneICS('${p.id}','${ms.id}')" title="Add to calendar" style="font-size:12px"><i class="ti ti-calendar-plus"></i></button>`:''}
             <button class="icon-action" onclick="toggleEditMilestone('${p.id}','${ms.id}')"><i class="ti ${isEditingMs?'ti-x':'ti-pencil'}"></i></button>
           </div>
-          ${isEditingMs?`<div class="edit-form" style="margin-bottom:6px">
+          ${isEditingMs?`<div class="edit-form" style="margin-bottom:6px;background:var(--bg)">
             <div class="grid2">
               <div><label>Title</label><input type="text" id="ms-edit-title-${ms.id}" value="${ms.title}"></div>
               <div><label>Date</label><input type="date" id="ms-edit-date-${ms.id}" value="${ms.date||''}"></div>
@@ -3514,7 +3518,7 @@ function renderTasksAndMilestones(p){
         <button class="btn sm" onclick="toggleAddTask('${p.id}')" style="font-size:11px;padding:2px 8px"><i class="ti ti-plus"></i> Task</button>
       </div>
     </div>
-    ${showAddPhase?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+    ${showAddPhase?`<div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
       <div class="grid2" style="margin-bottom:8px">
         <div><label>Phase name</label><input type="text" id="phase-inp-${p.id}" placeholder="e.g. Discovery..."></div>
         <div><label>Color</label>
@@ -3533,7 +3537,7 @@ function renderTasksAndMilestones(p){
         <button class="btn sm primary" onclick="addPhase('${p.id}')"><i class="ti ti-check"></i> Add phase</button>
       </div>
     </div>`:''}
-    ${showAddTask?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+    ${showAddTask?`<div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
         <input type="text" id="task-inp-${p.id}" placeholder="Task title..." style="flex:1;min-width:140px;font-size:13px;padding:5px 8px">
         <select id="task-type-${p.id}" onchange="document.getElementById('task-due-wrap-${p.id}').style.display=this.value==='open'?'none':'flex'" style="width:auto;font-size:13px;padding:5px 8px">
@@ -3571,7 +3575,7 @@ function renderTasksAndMilestones(p){
           ${phase.startDate||phase.endDate?`<span style="font-size:11px;color:var(--text3)">${phase.startDate?fmtDate(phase.startDate):''}${phase.startDate&&phase.endDate?' → ':''}${phase.endDate?fmtDate(phase.endDate):''}</span>`:''}
           <button class="icon-action" onclick="toggleEditPhase('${p.id}','${phase.id}')" style="margin-left:auto"><i class="ti ${isEditingPh?'ti-x':'ti-pencil'}"></i></button>
         </div>
-        ${isEditingPh?`<div class="edit-form" style="margin-bottom:8px">
+        ${isEditingPh?`<div class="edit-form" style="margin-bottom:8px;background:var(--bg)">
           <div class="grid2">
             <div><label>Phase name</label><input type="text" id="ph-edit-name-${phase.id}" value="${phase.title}"></div>
             <div><label>Color</label>
@@ -3636,7 +3640,7 @@ function exportProjectPDF(projId){
       }
       (milestones.filter(ms=>ms.date&&ph.startDate<=ms.date&&ph.endDate>=ms.date)||[]).forEach(ms=>{
         const mx=vx(ms.date);const cy=phY+rowH/2;const r=4;
-        rows+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="#888" transform="rotate(45,${mx},${cy})"><title>${h(ms.title)}</title></rect>`;
+        rows+=`<circle cx="${mx}" cy="${cy}" r="4" fill="white" stroke="${col}" stroke-width="1.5"><title>${h(ms.title)}</title></circle>`;
       });
     });
     // Month labels at top + grid lines
@@ -3649,8 +3653,8 @@ function exportProjectPDF(projId){
     }
     // Today line
     const tx=vxD(now);
-    const todayLine=tx>=0&&tx<=W?`<line x1="${tx}" y1="0" x2="${tx}" y2="${H}" stroke="#e05252" stroke-width="1.5"/><text x="${tx}" y="${headerH/2+1}" font-size="8" fill="#e05252" font-family="Arial,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="700">TODAY</text>`:'';
-    return`<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+    const todayLine=tx>=0&&tx<=W?`<line x1="${tx}" y1="${headerH}" x2="${tx}" y2="${H}" stroke="#e05252" stroke-width="1.5"/><text x="${tx}" y="${H-1}" font-size="8" fill="#e05252" font-family="Arial,sans-serif" text-anchor="middle" dominant-baseline="auto" font-weight="700">TODAY</text>`:'';
+    return`<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" xmlns="http://www.w3.org/2000/svg" style="display:block" preserveAspectRatio="none">
       <rect width="${W}" height="${H}" fill="#f5f5f2"/>
       <rect width="${W}" height="${headerH}" fill="#E0E0DB"/>
       ${grid}${rows}${todayLine}
@@ -3688,18 +3692,18 @@ function exportProjectPDF(projId){
 
   ${projTeam.length?`<h2>Team</h2><div style="margin-bottom:14px">${projTeam.map(m=>`<span class="chip" style="background:${m.color||'#888'}">${h(m.name)}</span>`).join('')}</div>`:''}
 
-  ${phases.length?`<h2>Phases</h2><table><tr><th>Phase</th><th>Start</th><th>End</th></tr>
+  ${phases.length?`<h2>Phases</h2><table><colgroup><col style="width:55%"><col style="width:22%"><col style="width:23%"></colgroup><tr><th>Phase</th><th>Start</th><th>End</th></tr>
     ${phases.map(ph=>`<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${ph.color||'#4a90d9'};margin-right:5px;vertical-align:middle"></span>${h(ph.title)}</td><td>${fd(ph.startDate)}</td><td>${fd(ph.endDate)}</td></tr>`).join('')}
   </table>`:''}
 
-  ${milestones.length?`<h2>Milestones</h2><table><tr><th>Milestone</th><th>Date</th><th>Status</th></tr>
+  ${milestones.length?`<h2>Milestones</h2><table><colgroup><col style="width:55%"><col style="width:22%"><col style="width:23%"></colgroup><tr><th>Milestone</th><th>Date</th><th>Status</th></tr>
     ${milestones.map(ms=>`<tr><td>${h(ms.title)}</td><td>${fd(ms.date)}</td><td>${ms.completed?'Complete':'Pending'}</td></tr>`).join('')}
   </table>`:''}
 
   ${phases.length?phases.map(ph=>{
     const pts=(p.tasks||[]).filter(t=>t.phaseId===ph.id);
     if(!pts.length)return'';
-    return`<h2>${h(ph.title)}</h2><table><tr><th>Task</th><th>Type</th><th>Due</th><th>Status</th><th>Assigned to</th></tr>
+    return`<h2>${h(ph.title)}</h2><table><colgroup><col style="width:55%"><col style="width:0"><col style="width:22%"><col style="width:0"><col style="width:23%"></colgroup><tr><th>Task</th><th>Type</th><th>Due</th><th>Status</th><th>Assigned to</th></tr>
       ${pts.map(t=>{
         const ids=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
         const names=ids.map(id=>allMembers.find(m=>m.id===id)).filter(Boolean).map(m=>m.name).join(', ');
@@ -3794,7 +3798,7 @@ function renderBoard(){
   ];
   el.innerHTML=cols.map(col=>{
     const colTasks=allTasks.filter(t=>t.status===col.id);
-    return`<div style="flex:0 0 280px;background:var(--bg2);border-radius:var(--radius);padding:12px;min-height:200px"
+    return`<div style="flex:1;min-width:200px;background:var(--bg2);border-radius:var(--radius);padding:12px"
       ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'"
       ondragleave="this.style.outline=''"
       ondrop="boardDropTask(event,'${col.id}');this.style.outline=''">
@@ -3960,7 +3964,7 @@ function generateClientShare(projId){
     milestones.forEach(ms=>{
       if(!ms.date)return;const mp=new Date(ms.date+'T12:00:00');if(mp<rs||mp>re)return;
       const mx=vx(ms.date);const r=4;const cy=headerH+phases.length*rowH/2;
-      rows+=`<rect x="${mx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" fill="#888" transform="rotate(45,${mx},${cy})"/>`;
+      rows+=`<circle cx="${mx}" cy="${cy}" r="4" fill="white" stroke="${col}" stroke-width="1.5"/>`;
     });
     let grid='';let cur=new Date(rs.getFullYear(),rs.getMonth(),1);
     while(cur<=re){const x=Math.round((cur-rs)/tot*VW);const lbl=cur.toLocaleDateString('en-US',{month:'short'});
