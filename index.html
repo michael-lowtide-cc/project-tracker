@@ -273,7 +273,7 @@ td{padding:8px 0;vertical-align:top}
     <button class="tab" id="tab-time" data-tab="time" title="Time"><i class="ti ti-clock"></i></button>
     <button class="tab" id="tab-projects" data-tab="projects" title="Projects"><i class="ti ti-folder"></i></button>
     <button class="tab" id="tab-board" data-tab="board" title="Board"><i class="ti ti-layout-kanban"></i></button>
-    <button class="tab" id="tab-workload" data-tab="workload" title="Workload"><i class="ti ti-user-cog"></i></button>
+    <button class="tab" id="tab-workload" data-tab="workload" title="Workload"><i class="ti ti-settings-2"></i></button>
     <button class="tab" id="tab-team" data-tab="team" title="Team"><i class="ti ti-users-group"></i></button>
     <button class="tab" id="tab-clients" data-tab="clients" title="Clients"><i class="ti ti-users"></i></button>
     <button class="tab" id="tab-expenses" data-tab="expenses" title="Expenses"><i class="ti ti-receipt"></i></button>
@@ -1418,7 +1418,9 @@ function toggleAddProject(){
 }
 
 function refreshTeamAssignChipsForNewProject(){
-  renderTeamAssignChips('p-team-assign',[]);
+  // Just clear — chips only appear after typing a name and adding
+  const el=document.getElementById('p-team-assign');
+  if(el)el.innerHTML='';
 }
 
 function toggleEndDateType(){
@@ -3138,9 +3140,7 @@ function renderMiniGantt(p, opts={}){
       <svg viewBox="0 0 ${VW} ${H}" width="100%" height="${H}" style="display:block;border-radius:${todayInRange?'var(--radius-sm) var(--radius-sm) 0 0':'var(--radius-sm)'};overflow:hidden" preserveAspectRatio="none">
         <!-- Full background — single solid color -->
         <rect x="0" y="0" width="${VW}" height="${H}" fill="var(--bg2)"/>
-        <!-- Header strip slightly darker -->
-        <rect x="0" y="0" width="${VW}" height="${headerH}" fill="var(--bg3)"/>
-        <!-- Month labels -->
+        <!-- Month labels float on same background (no header strip) -->
         ${monthLabelEls}
         <!-- Grid lines (body only) -->
         ${gridLines}
@@ -3941,50 +3941,98 @@ function renderHealthBadge(p){
 //  CLIENT SHAREABLE LINK
 // ═══════════════════════════════════════════════
 function generateClientShare(projId){
-  const p=projects.find(x=>x.id===projId);if(!p)return;
+  // Open the popup IMMEDIATELY before any work — preserves the user gesture chain
+  // so browsers don't block it as a programmatic popup
+  let w;
+  try{
+    w=window.open('','_blank','width=740,height=880');
+    if(!w){alert('Popup blocked — please allow popups for this site and try again.');return;}
+  }catch(err){alert('Could not open share view: '+err.message);return;}
+
+  const p=projects.find(x=>x.id===projId);
+  if(!p){w.close();return;}
   const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
   const phases=[...(p.phases||[])].sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
   const milestones=[...(p.milestones||[])].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   const he=(s)=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const fd=(d)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'--';
+
+  // Build gantt matching current inline timeline style
+  // 3mo view from 1 week before today; solid bg, month labels top, today line, dots for milestones
   function buildShareGantt(){
-    const allDates=[...phases.flatMap(ph=>[ph.startDate,ph.endDate]),...milestones.map(m=>m.date)].filter(Boolean).sort();
-    if(!allDates.length||!phases.length)return'';
-    const rs=new Date(allDates[0]+'T00:00:00');const re=new Date(allDates[allDates.length-1]+'T00:00:00');
-    rs.setDate(1);re.setMonth(re.getMonth()+1);re.setDate(0);
-    const tot=Math.max(1,re-rs);const VW=560,rowH=22,headerH=18,labelH=14;
-    const H=headerH+phases.length*rowH+labelH;
-    function vx(d){return Math.round(Math.min(100,Math.max(0,(new Date(d+'T12:00:00')-rs)/tot*100))/100*VW);}
+    if(!phases.length&&!milestones.length)return{svg:'',todayPct:null};
+    const now=new Date();
+    const weekAgo=new Date(now);weekAgo.setDate(weekAgo.getDate()-7);
+    const minD=new Date(weekAgo.getFullYear(),weekAgo.getMonth(),weekAgo.getDate());
+    const maxD=new Date(minD);maxD.setMonth(maxD.getMonth()+3);
+    const tot=Math.max(1,maxD-minD);
+    const VW=1000,rowH=24,headerH=20;
+    const H=headerH+Math.max(1,phases.length)*rowH;
+    function vx(d){return Math.round(Math.min(100,Math.max(0,(new Date(d+'T12:00:00')-minD)/tot*100))/100*VW);}
+    function vxD(d){return Math.round(Math.min(100,Math.max(0,(d-minD)/tot*100))/100*VW);}
+    const todayX=vxD(now);
+    const todayInRange=todayX>=0&&todayX<=VW;
+    const todayPct=(now-minD)/tot*100;
+
+    // Month labels + grid lines
+    let grid='';
+    let cur=new Date(minD.getFullYear(),minD.getMonth(),1);
+    while(cur<=maxD){
+      const x=vxD(cur);
+      const lbl=cur.toLocaleDateString('en-US',{month:'short'});
+      grid+=`<line x1="${x}" y1="${headerH}" x2="${x}" y2="${H}" stroke="#ddd" stroke-width="0.8"/>`;
+      grid+=`<text x="${x+5}" y="${headerH/2+1}" font-size="9" fill="#9a979a" font-family="Arial,sans-serif" dominant-baseline="middle">${lbl}</text>`;
+      cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+    }
+
+    // Phase rows
     let rows='';
+    // Milestone lookup by phase
+    const msByPhase={};
+    phases.forEach((ph,i)=>{milestones.filter(ms=>ms.date&&ph.startDate&&ph.endDate&&ms.date>=ph.startDate&&ms.date<=ph.endDate).forEach(ms=>{if(!msByPhase[i])msByPhase[i]=[];msByPhase[i].push(ms);});});
+
     phases.forEach((ph,i)=>{
       const phY=headerH+i*rowH;const col=ph.color||'#4a90d9';
-      rows+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="#f5f5f2"/>`;
-      if(ph.startDate&&ph.endDate){const x1=vx(ph.startDate),x2=vx(ph.endDate),bw=Math.max(4,x2-x1);
+      rows+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="#eaeae5"/>`;
+      rows+=`<line x1="0" y1="${phY+rowH}" x2="${VW}" y2="${phY+rowH}" stroke="#ddd" stroke-width="0.5"/>`;
+      if(ph.startDate){
+        const x1=vx(ph.startDate);
+        const x2=ph.endDate?vx(ph.endDate):x1+40;
+        const bw=Math.max(8,x2-x1);
         rows+=`<rect x="${x1}" y="${phY+3}" width="${bw}" height="${rowH-6}" fill="${col}" rx="4"/>`;
-        if(bw>40)rows+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="9" fill="#fff" font-family="Arial,sans-serif" text-anchor="middle" dominant-baseline="middle">${he(ph.title.slice(0,Math.floor(bw/7)))}</text>`;
+        const maxChars=Math.floor((bw-12)/6.2);
+        if(maxChars>=3){const lbl=maxChars>=ph.title.length?ph.title:ph.title.slice(0,maxChars-1)+'...';
+          rows+=`<text x="${x1+bw/2}" y="${phY+rowH/2}" font-size="10" fill="#fff" font-family="Arial,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="500">${he(lbl)}</text>`;}
       }
+      (msByPhase[i]||[]).forEach(ms=>{
+        const mx=vx(ms.date);const cy=phY+rowH/2;
+        rows+=`<circle cx="${mx}" cy="${cy}" r="5" fill="white" stroke="${col}" stroke-width="2"/>`;
+      });
     });
-    milestones.forEach(ms=>{
-      if(!ms.date)return;const mp=new Date(ms.date+'T12:00:00');if(mp<rs||mp>re)return;
-      const mx=vx(ms.date);const r=4;const cy=headerH+phases.length*rowH/2;
-      rows+=`<circle cx="${mx}" cy="${cy}" r="4" fill="white" stroke="${col}" stroke-width="1.5"/>`;
-    });
-    let grid='';let cur=new Date(rs.getFullYear(),rs.getMonth(),1);
-    while(cur<=re){const x=Math.round((cur-rs)/tot*VW);const lbl=cur.toLocaleDateString('en-US',{month:'short'});
-      grid+=`<line x1="${x}" y1="${headerH}" x2="${x}" y2="${H-labelH}" stroke="#ddd" stroke-width="0.5"/>`;
-      grid+=`<text x="${x+2}" y="${H-2}" font-size="8" fill="#999" font-family="Arial,sans-serif">${lbl}</text>`;
-      cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);}
-    return`<svg width="${VW}" height="${H}" xmlns="http://www.w3.org/2000/svg"><rect width="${VW}" height="${H}" fill="#eaeae5" rx="3"/>${grid}${rows}</svg>`;
+
+    // Today line
+    const todayLine=todayInRange?`<line x1="${todayX}" y1="${headerH}" x2="${todayX}" y2="${H}" stroke="#e05252" stroke-width="1.5"/>`:'' ;
+
+    const svg=`<svg viewBox="0 0 ${VW} ${H}" width="100%" height="${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="display:block;border-radius:6px ${todayInRange?'6px 0 0':'6px'};overflow:hidden">
+      <rect width="${VW}" height="${H}" fill="#eaeae5"/>
+      ${grid}${rows}${todayLine}
+    </svg>`;
+    return{svg,todayPct:todayInRange?todayPct:null};
   }
+
+  const {svg:ganttSVG,todayPct}=buildShareGantt();
+  const todayLabel=todayPct!==null?`<div style="position:relative;height:16px"><span style="position:absolute;left:${todayPct.toFixed(2)}%;transform:translateX(-50%);font-size:9px;color:#e05252;font-weight:700;white-space:nowrap;top:2px">TODAY</span></div>`:'';
+
   const todayStr=today();
   const upcomingMs=milestones.filter(m=>!m.completed&&m.date&&m.date>=todayStr).slice(0,5);
   const publicTasks=(p.tasks||[]).filter(t=>t.status!=='done').slice(0,8);
   const healthMap={green:{bg:'#e8f5ee',color:'#0f6e56',label:'On Track'},yellow:{bg:'#fff8e1',color:'#b45309',label:'At Risk'},red:{bg:'#fdecea',color:'#a32d2d',label:'Off Track'}};
   const hc=p.healthStatus?healthMap[p.healthStatus]:null;
+
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>${he(p.name)} -- Project Update</title>
   <style>
-    body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f5f2;color:#2A2829;margin:0;padding:20px;max-width:680px;margin:0 auto;padding:24px}
+    body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f5f2;color:#2A2829;margin:0 auto;padding:24px;max-width:680px}
     .card{background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;border:.5px solid rgba(42,40,41,.1)}
     h1{font-size:20px;color:#9151a0;margin:0 0 4px}
     h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#9a979a;border-bottom:1px solid #eee;padding-bottom:6px;margin:0 0 10px}
@@ -3994,35 +4042,26 @@ function generateClientShare(projId){
     .task-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;border-bottom:.5px solid #eee}
     .badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:600}
     .in_progress{background:#fff3cd;color:#b45309}.todo{background:#f5f5f2;color:#666}
+    svg{display:block;width:100%}
     footer{font-size:11px;color:#aaa;text-align:center;margin-top:24px}
   </style></head><body>
   <div class="card">
     <h1>${he(p.name)}</h1>
-    <div class="meta">${client?`${he(client.company)} &middot; `:''} ${p.status==='active'?'Active':p.status==='on_hold'?'On Hold':'Completed'}${p.startDate?` &middot; Started ${fd(p.startDate)}`:''}${p.endDate?` &middot; Due ${fd(p.endDate)}`:''}
+    <div class="meta">${client?`${he(client.company)} &middot; `:''} ${p.status==='active'?'Active':p.status==='on_hold'?'On Hold':'Completed'}
     ${hc?`<br><span style="display:inline-block;margin-top:6px;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;background:${hc.bg};color:${hc.color}">&#9679; ${hc.label}</span>`:''}
     </div>
     ${p.desc?`<p style="font-size:13px;color:#555;margin:0">${he(p.desc)}</p>`:''}
   </div>
-  ${buildShareGantt()?`<div class="card"><h2>Timeline</h2>${buildShareGantt()}</div>`:''}
+  ${ganttSVG?`<div class="card"><h2>Timeline</h2>${ganttSVG}${todayLabel}</div>`:''}
   ${phases.length?`<div class="card"><h2>Phases</h2>${phases.map(ph=>`<div class="phase-row"><span style="width:10px;height:10px;border-radius:50%;background:${ph.color||'#4a90d9'};flex-shrink:0;display:inline-block"></span><span style="flex:1">${he(ph.title)}</span><span style="font-size:11px;color:#888">${ph.startDate?fd(ph.startDate):''}${ph.startDate&&ph.endDate?' - ':''}${ph.endDate?fd(ph.endDate):''}</span></div>`).join('')}</div>`:''}
   ${upcomingMs.length?`<div class="card"><h2>Upcoming Milestones</h2>${upcomingMs.map(m=>`<div class="ms-row"><span style="color:#9151a0;font-size:14px">&#9873;</span><span style="flex:1">${he(m.title)}</span><span style="font-size:11px;color:#888">${fd(m.date)}</span></div>`).join('')}</div>`:''}
   ${publicTasks.length?`<div class="card"><h2>Active Work</h2>${publicTasks.map(t=>`<div class="task-row"><span style="flex:1">${he(t.title)}</span><span class="badge ${t.status}">${t.status==='in_progress'?'In Progress':'To Do'}</span></div>`).join('')}</div>`:''}
   <footer>Shared via Lowtide.cc &middot; ${new Date().toLocaleDateString('en-US',{dateStyle:'long'})}</footer>
   </body></html>`;
-  try{
-    const w=window.open('','_blank','width=720,height=860');
-    if(!w){
-      alert('Popup blocked — please allow popups for this site, then try again.');
-      return;
-    }
-    w.document.write(html);
-    w.document.close();
-  }catch(err){
-    console.error('Share error:',err);
-    alert('Could not open share view: '+err.message);
-  }
-}
 
+  w.document.write(html);
+  w.document.close();
+}
 // ═══════════════════════════════════════════════
 //  ADD MILESTONE TO CALENDAR (.ics)
 // ═══════════════════════════════════════════════
