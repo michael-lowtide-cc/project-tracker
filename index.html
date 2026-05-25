@@ -273,7 +273,7 @@ td{padding:8px 0;vertical-align:top}
     <button class="tab" id="tab-time" data-tab="time" title="Time"><i class="ti ti-clock"></i></button>
     <button class="tab" id="tab-projects" data-tab="projects" title="Projects"><i class="ti ti-folder"></i></button>
     <button class="tab" id="tab-board" data-tab="board" title="Board"><i class="ti ti-layout-kanban"></i></button>
-    <button class="tab" id="tab-workload" data-tab="workload" title="Workload"><i class="ti ti-chart-gantt"></i></button>
+    <button class="tab" id="tab-workload" data-tab="workload" title="Workload"><i class="ti ti-user-cog"></i></button>
     <button class="tab" id="tab-team" data-tab="team" title="Team"><i class="ti ti-users-group"></i></button>
     <button class="tab" id="tab-clients" data-tab="clients" title="Clients"><i class="ti ti-users"></i></button>
     <button class="tab" id="tab-expenses" data-tab="expenses" title="Expenses"><i class="ti ti-receipt"></i></button>
@@ -459,8 +459,6 @@ td{padding:8px 0;vertical-align:top}
           </div>
         </div>
       </div>
-      <div class="field"><label>Location (optional)</label><input type="text" id="p-location" placeholder="City, State or Remote"></div>
-      <div class="field"><label>Description (optional)</label><input type="text" id="p-desc" placeholder="Brief project overview" onkeydown="if(event.key==='Enter')addProject()"></div>
       <div class="field">
         <label>Team members</label>
         <div style="position:relative">
@@ -1411,7 +1409,12 @@ function toggleAddProject(){
   const btn=document.getElementById('add-project-btn');
   const open=form.classList.toggle('open');
   btn.innerHTML=open?'<i class="ti ti-x"></i> Cancel':'<i class="ti ti-plus"></i> Add project';
-  if(open)refreshTeamAssignChipsForNewProject();
+  if(open){
+    // Reset team selection so old chips never carry over between form opens
+    _projTeamSelected=[];
+    renderProjTeamChips();
+    refreshTeamAssignChipsForNewProject();
+  }
 }
 
 function refreshTeamAssignChipsForNewProject(){
@@ -1741,23 +1744,6 @@ function renderDashBudgets(){
         <button onclick="generateClientShare('${p.id}')" style="background:none;border:.5px solid var(--border2);border-radius:20px;padding:2px 8px;font-size:11px;color:var(--text3);cursor:pointer"><i class="ti ti-share" style="font-size:11px"></i> Share</button>
       </div>
       ${timeline}
-      ${subs.length?`<div style="margin-top:10px;padding-top:8px;border-top:.5px solid var(--border)">
-        <div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Sub-projects</div>
-        ${subs.map(s=>{
-          const parentProj=projects.find(x=>x.id===s.parentProjectId);
-          return`<div style="margin-left:16px;padding:8px 10px;background:var(--bg2);border-radius:var(--radius-sm);margin-bottom:6px;border-left:2px solid var(--accent)">
-            <div style="display:flex;align-items:center;gap:8px">
-              <div style="flex:1;font-size:13px;font-weight:500">${s.num?`<span style="font-size:11px;color:var(--text2)">${s.num} — </span>`:''}${s.name}</div>
-              <button class="btn sm" onclick="document.getElementById('dash-proj-${p.id}').scrollIntoView({behavior:'smooth',block:'center'})" style="font-size:11px;padding:2px 8px"><i class="ti ti-arrow-up"></i> ${p.name}</button>
-            </div>
-            ${(s.tasks||[]).filter(t=>t.status!=='done'&&(t.assigneeId===myId||(t.assigneeIds||[]).includes(myId))).slice(0,3).map(t=>`
-              <div style="display:flex;align-items:center;gap:5px;font-size:12px;margin-top:4px;color:var(--text2)">
-                <input type="checkbox" onchange="updateTaskStatus('${s.id}','${t.id}',this.checked?'done':'todo')" style="width:auto">
-                <span>${t.title}</span>
-              </div>`).join('')}
-          </div>`;
-        }).join('')}
-      </div>`:''}
       ${upcoming.length?`<div style="margin-top:10px;padding-top:8px;border-top:.5px solid var(--border)">
         <div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Upcoming milestones</div>
         ${upcoming.map(m=>`<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0">
@@ -1775,6 +1761,19 @@ function renderDashBudgets(){
           ${t.dueDate?`<span style="color:var(--text2)">${fmtDate(t.dueDate)}</span>`:''}
         </div>`).join('')}
         ${myTasks.length>5?`<div style="font-size:11px;color:var(--text3);margin-top:2px">+${myTasks.length-5} more</div>`:''}
+      </div>`:''}
+      ${subs.length?`<div style="margin-top:10px;padding-top:8px;border-top:.5px solid var(--border)">
+        <div style="font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Sub-projects</div>
+        ${subs.map(s=>`<div style="margin-left:16px;padding:8px 10px;background:var(--bg2);border-radius:var(--radius-sm);margin-bottom:6px;border-left:2px solid var(--accent)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="flex:1;font-size:13px;font-weight:500">${s.num?`<span style="font-size:11px;color:var(--text2)">${s.num} — </span>`:''}${s.name}</div>
+            </div>
+            ${(s.tasks||[]).filter(t=>t.status!=='done'&&(t.assigneeId===myId||(t.assigneeIds||[]).includes(myId))).slice(0,3).map(t=>`
+              <div style="display:flex;align-items:center;gap:5px;font-size:12px;margin-top:4px;color:var(--text2)">
+                <input type="checkbox" onchange="updateTaskStatus('${s.id}','${t.id}',this.checked?'done':'todo')" style="width:auto">
+                <span>${t.title}</span>
+              </div>`).join('')}
+          </div>`).join('')}
       </div>`:''}
     </div>`;
   }).join('');
@@ -3024,9 +3023,10 @@ function renderMiniGantt(p, opts={}){
   }
 
   const totalMs=Math.max(1,maxD-minD);
-  const rowH=24,headerH=20,labelH=14;
+  const rowH=24,headerH=20;
   const rowCount=Math.max(1,phases.length);
-  const H=headerH+rowCount*rowH+labelH;
+  const bodyH=rowCount*rowH;
+  const H=headerH+bodyH;
 
   function pctOf(d){return Math.min(100,Math.max(0,(new Date(d+'T12:00:00')-minD)/totalMs*100));}
 
@@ -3076,31 +3076,33 @@ function renderMiniGantt(p, opts={}){
 
   // Month labels at top in header strip, grid lines through body only
   const bodyTop=headerH;
-  const bodyH=rowCount*rowH;
   const gridLines=monthLabels.map(m=>`<line x1="${vx(m.pct)}" y1="${bodyTop}" x2="${vx(m.pct)}" y2="${bodyTop+bodyH}" stroke="var(--border)" stroke-width="0.8"/>`).join('');
   const monthLabelEls=monthLabels.map(m=>`<text x="${vx(m.pct)+5}" y="${headerH/2+1}" font-size="9" fill="var(--text3)" font-family="-apple-system,sans-serif" dominant-baseline="middle">${m.label}</text>`).join('');
 
-  // TODAY: solid red vertical line through body, "TODAY" text at BOTTOM below bars
+  // TODAY: solid red line through body only; label rendered BELOW the SVG
   const tvx=vx(todayPct);
   const todayLine=todayInRange?`
     <line x1="${tvx}" y1="${bodyTop}" x2="${tvx}" y2="${bodyTop+bodyH}" stroke="#e05252" stroke-width="1.5"/>
-    <text x="${tvx}" y="${bodyTop+bodyH+labelH-2}" font-size="8" fill="#e05252" font-family="-apple-system,sans-serif" text-anchor="middle" dominant-baseline="middle" font-weight="700">TODAY</text>
   `:'';
+  const todayLabel=todayInRange?`<div style="position:relative;height:16px;font-size:0">
+    <span style="position:absolute;left:${todayPct.toFixed(2)}%;transform:translateX(-50%);font-size:9px;color:#e05252;font-weight:700;white-space:nowrap;top:2px">TODAY</span>
+  </div>`:'';
 
   // Phase rows
   let svgRowsVW='';
   phases.forEach((ph,i)=>{
     const phY=bodyTop+i*rowH;
     const col=ph.color||'#4a90d9';
-    // Row background — alternating subtle tones
-    svgRowsVW+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="${i%2===0?'rgba(255,255,255,0.6)':'rgba(0,0,0,0.02)'}"/>`;
+    // Row background — single solid color
+    svgRowsVW+=`<rect x="0" y="${phY}" width="${VW}" height="${rowH}" fill="var(--bg2)"/>`;
     // Row bottom divider
     svgRowsVW+=`<line x1="0" y1="${phY+rowH}" x2="${VW}" y2="${phY+rowH}" stroke="var(--border)" stroke-width="0.5"/>`;
     if(ph.startDate){
       const x1=vx(pctOf(ph.startDate));
       const x2=ph.endDate?vx(pctOf(ph.endDate)):x1+40;
       const bw=Math.max(8,x2-x1);
-      svgRowsVW+=`<rect x="${x1}" y="${phY+4}" width="${bw}" height="${rowH-8}" fill="${col}" rx="4"/>`;
+      // Taller bars — 3px breathing room each side
+      svgRowsVW+=`<rect x="${x1}" y="${phY+3}" width="${bw}" height="${rowH-6}" fill="${col}" rx="4"/>`;
       // Phase label inside bar
       const maxChars=Math.floor((bw-12)/6.2);
       if(maxChars>=3){
@@ -3133,10 +3135,10 @@ function renderMiniGantt(p, opts={}){
       <button class="btn sm" onclick="cycleGanttView('${gId}')" style="padding:2px 10px;font-size:10px">${viewMode==='1mo'?'1 mo':viewMode==='3mo'?'3 mo':'Full'} ↻</button>
     </div>
     <div id="${gId}" data-pid="${p.id}">
-      <svg viewBox="0 0 ${VW} ${H}" width="100%" height="${H}" style="display:block;border-radius:var(--radius-sm);overflow:hidden" preserveAspectRatio="none">
-        <!-- Full background -->
+      <svg viewBox="0 0 ${VW} ${H}" width="100%" height="${H}" style="display:block;border-radius:${todayInRange?'var(--radius-sm) var(--radius-sm) 0 0':'var(--radius-sm)'};overflow:hidden" preserveAspectRatio="none">
+        <!-- Full background — single solid color -->
         <rect x="0" y="0" width="${VW}" height="${H}" fill="var(--bg2)"/>
-        <!-- Header strip -->
+        <!-- Header strip slightly darker -->
         <rect x="0" y="0" width="${VW}" height="${headerH}" fill="var(--bg3)"/>
         <!-- Month labels -->
         ${monthLabelEls}
@@ -3144,9 +3146,10 @@ function renderMiniGantt(p, opts={}){
         ${gridLines}
         <!-- Phase rows -->
         ${svgRowsVW}
-        <!-- Today line + label at bottom -->
+        <!-- Today line (body only) -->
         ${todayLine}
       </svg>
+      ${todayLabel}
     </div>
   </div>`;
 }
@@ -4006,8 +4009,18 @@ function generateClientShare(projId){
   ${publicTasks.length?`<div class="card"><h2>Active Work</h2>${publicTasks.map(t=>`<div class="task-row"><span style="flex:1">${he(t.title)}</span><span class="badge ${t.status}">${t.status==='in_progress'?'In Progress':'To Do'}</span></div>`).join('')}</div>`:''}
   <footer>Shared via Lowtide.cc &middot; ${new Date().toLocaleDateString('en-US',{dateStyle:'long'})}</footer>
   </body></html>`;
-  const w=window.open('','_blank','width=720,height=860');
-  w.document.write(html);w.document.close();
+  try{
+    const w=window.open('','_blank','width=720,height=860');
+    if(!w){
+      alert('Popup blocked — please allow popups for this site, then try again.');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+  }catch(err){
+    console.error('Share error:',err);
+    alert('Could not open share view: '+err.message);
+  }
 }
 
 // ═══════════════════════════════════════════════
