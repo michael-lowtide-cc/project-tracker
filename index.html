@@ -3037,19 +3037,20 @@ function buildGanttSVG(phases, milestones, opts={}){
   const labelCol =forExport?'#9a979a':'var(--text3)';
   const fontFam  =forExport?'Arial,sans-serif':'-apple-system,sans-serif';
 
-  // Month grid lines + label positions (used for HTML label div)
+  // Month grid lines + label positions
+  // pct can be negative when view starts mid-month (e.g. 3mo starts May 18, but May 1 is in the list)
   const monthMarks=[];
   let cur=new Date(minD.getFullYear(),minD.getMonth(),1);
   while(cur<=maxD){
     const x=vxD(cur);
     const pct=(cur-minD)/tot*100;
     const lbl=cur.toLocaleDateString('en-US',{month:'short'});
-    monthMarks.push({x,pct,lbl});
+    monthMarks.push({x,pct,lbl,inRange:pct>=0});
     cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
   }
 
-  // Grid lines inside SVG
-  const gridLines=monthMarks.map(m=>`<line x1="${m.x}" y1="0" x2="${m.x}" y2="${bodyH}" stroke="${gridCol}" stroke-width="0.8"/>`).join('');
+  // Grid lines — only draw lines that are within the view (pct >= 0)
+  const gridLines=monthMarks.filter(m=>m.inRange).map(m=>`<line x1="${m.x}" y1="0" x2="${m.x}" y2="${bodyH}" stroke="${gridCol}" stroke-width="0.8"/>`).join('');
 
   // Milestone lookup by phase
   const msByPhase={};
@@ -3096,9 +3097,9 @@ function buildGanttSVG(phases, milestones, opts={}){
   // TODAY line (inside SVG — no label inside)
   const todayLine=todayInRange?`<line x1="${todayX}" y1="0" x2="${todayX}" y2="${bodyH}" stroke="#e05252" stroke-width="1.5"/>`:'' ;
 
-  // Month labels as HTML (above SVG) — same colour as app text3
-  const monthLabelDiv=`<div style="position:relative;height:16px;margin-bottom:2px">
-    ${monthMarks.map(m=>`<span style="position:absolute;left:${m.pct.toFixed(2)}%;font-size:9px;color:${labelCol};font-family:${fontFam};white-space:nowrap;transform:translateX(2px)">${m.lbl}</span>`).join('')}
+  // Month labels as HTML (above SVG) — clamp to 0% so labels never overflow left edge
+  const monthLabelDiv=`<div style="position:relative;height:16px;margin-bottom:2px;overflow:hidden">
+    ${monthMarks.map(m=>`<span style="position:absolute;left:${Math.max(0,m.pct).toFixed(2)}%;font-size:9px;color:${labelCol};font-family:${fontFam};white-space:nowrap;transform:translateX(2px)">${m.lbl}</span>`).join('')}
   </div>`;
 
   // TODAY label as HTML (below SVG)
@@ -3919,8 +3920,9 @@ function generateClientShare(projId){
 
   // Build gantt matching current inline timeline style
   // 3mo view from 1 week before today; solid bg, month labels top, today line, dots for milestones
-  // Use shared gantt builder — 3mo view, not forExport (CSS vars work in popup windows)
-  const {monthLabelDiv:ganttMonthDiv,svg:ganttSVGBody,todayLabel:ganttTodayLbl}=buildGanttSVG(phases,milestones,{viewMode:'3mo',forExport:false,escFn:he});
+  // forExport:true — popup windows don't have access to the app's CSS variables,
+  // so we use hardcoded hex colours to prevent the black-background bug
+  const {monthLabelDiv:ganttMonthDiv,svg:ganttSVGBody,todayLabel:ganttTodayLbl}=buildGanttSVG(phases,milestones,{viewMode:'3mo',forExport:true,escFn:he});
   const ganttSVG=ganttSVGBody?`${ganttMonthDiv}${ganttSVGBody}${ganttTodayLbl}`:'';
   const todayStr=today();
   const upcomingMs=milestones.filter(m=>!m.completed&&m.date&&m.date>=todayStr).slice(0,5);
