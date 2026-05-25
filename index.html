@@ -871,8 +871,8 @@ async function archiveToday(){
     if(dateCheck.result.files&&dateCheck.result.files.length>0){_lastArchivedDate=dateStr;return;}
 
     const archiveName=`v${version} — Lowtide Backup ${dateStr}`;
-    const h=(s)=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const fd=(d)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'--';
+    const h=htmlEsc;
+    const fd=fmtDateShort;
     const fm=(n)=>new Intl.NumberFormat('en-US',{style:'currency',currency:settings.currency||'USD'}).format(n||0);
 
     let docHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
@@ -1342,43 +1342,7 @@ function pickEditProjTeamColor(hex, containerId){
 }
 
 // -- TEAM MEMBER ASSIGNMENT CHIPS --
-function renderTeamAssignChips(containerId, selectedIds=[], projId=null){
-  const el=document.getElementById(containerId);if(!el)return;
-  const allMembers=[
-    {id:'__me__',name:myProfile.name||'Me',color:'#9151a0',type:'internal'},
-    ...teamMembers
-  ];
-  el.innerHTML=allMembers.map(m=>{
-    const sel=selectedIds.includes(m.id);
-    return`<span onclick="toggleTeamAssign('${containerId}','${m.id}')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'var(--bg2)'};color:${sel?m.color:'var(--text2)'};font-weight:${sel?'500':'400'}">
-      <span style="width:10px;height:10px;border-radius:50%;background:${m.color};flex-shrink:0"></span>
-      ${m.name}
-    </span>`;
-  }).join('');
-}
-
-function toggleTeamAssign(containerId, memberId){
-  const el=document.getElementById(containerId);if(!el)return;
-  // Read current state from chip classes
-  const chips=[...el.querySelectorAll('span[onclick]')];
-  const selected=chips.filter(c=>c.style.fontWeight==='500').map(c=>c.getAttribute('onclick').match(/'([^']+)'\)$/)?.[1]);
-  // Build updated list
-  const updated=selected.includes(memberId)?selected.filter(x=>x!==memberId):[...selected,memberId];
-  el.dataset.selected=JSON.stringify(updated);
-  // Re-render chips with new selection
-  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0',type:'internal'},...teamMembers];
-  el.innerHTML=allMembers.map(m=>{
-    const sel=updated.includes(m.id);
-    return`<span onclick="toggleTeamAssign('${containerId}','${m.id}')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'var(--bg2)'};color:${sel?m.color:'var(--text2)'};font-weight:${sel?'500':'400'}">
-      <span style="width:10px;height:10px;border-radius:50%;background:${m.color};flex-shrink:0"></span>${m.name}</span>`;
-  }).join('');
-}
-
-function getTeamAssignSelected(containerId){
-  const el=document.getElementById(containerId);
-  if(!el)return[];
-  try{return JSON.parse(el.dataset.selected||'[]');}catch{return[];}
-}
+// OLD: renderTeamAssignChips / toggleTeamAssign / getTeamAssignSelected removed v21
 
 function toggleSettings(){
   const p=document.getElementById('settings-panel');
@@ -1657,6 +1621,39 @@ function refreshAll(){
   if(currentTab==='projects')renderProjectList();
 }
 
+
+function buildBudgetBar(p){
+  const rate=getProjRate(p);
+  const budget=getProjBudget(p);
+  const bTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*rate,0);
+  const bExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+  const billed=bTime+bExp;
+  const budgetMin=budget.min||0;const budgetMax=budget.max||0;
+  const retainerOn=p.retainerOn&&parseFloat(p.retainerAmt||0)>0;
+  const retainerAmt=retainerOn?parseFloat(p.retainerAmt):0;
+  let barSegments='';
+  if(budgetMax>0){
+    const billedPct=Math.min(100,billed/budgetMax*100);
+    const retPct=retainerAmt>0?Math.min(100,retainerAmt/budgetMax*100):0;
+    const minPct=budgetMin>0?Math.min(100,budgetMin/budgetMax*100):100;
+    if(retainerAmt>0&&billed<=retainerAmt){
+      barSegments=`<div style="position:absolute;left:0;top:0;height:100%;width:${billedPct.toFixed(1)}%;background:#f0b429;border-radius:5px"></div>`;
+    } else if(billed<=budgetMin||budgetMin===0){
+      const yellowPct=retPct;const greenPct=billedPct-yellowPct;
+      barSegments=`${yellowPct>0?`<div style="position:absolute;left:0;top:0;height:100%;width:${yellowPct.toFixed(1)}%;background:#f0b429;border-radius:5px 0 0 5px"></div>`:''}
+        <div style="position:absolute;left:${yellowPct.toFixed(1)}%;top:0;height:100%;width:${Math.max(0,greenPct).toFixed(1)}%;background:var(--success);border-radius:${yellowPct>0?'0 5px 5px 0':'5px'}"></div>`;
+    } else {
+      const yellowPct=retPct;const greenPct=minPct-yellowPct;const redPct=billedPct-minPct;
+      barSegments=`${yellowPct>0?`<div style="position:absolute;left:0;top:0;height:100%;width:${yellowPct.toFixed(1)}%;background:#f0b429;border-radius:5px 0 0 5px"></div>`:''}
+        ${greenPct>0?`<div style="position:absolute;left:${yellowPct.toFixed(1)}%;top:0;height:100%;width:${greenPct.toFixed(1)}%;background:var(--success);border-radius:0"></div>`:''}
+        <div style="position:absolute;left:${minPct.toFixed(1)}%;top:0;height:100%;width:${Math.max(0,redPct).toFixed(1)}%;background:var(--danger);border-radius:0 5px 5px 0"></div>`;
+    }
+    if(retPct>0&&retPct<100)barSegments+=`<div style="position:absolute;left:${retPct.toFixed(1)}%;top:0;height:100%;width:2px;background:var(--bg);z-index:2"></div>`;
+  }
+  return{billed,budgetMax,budget,retainerOn,retainerAmt,barSegments,billedPct:budgetMax>0?Math.min(100,billed/budgetMax*100):0,overBudget:budgetMax>0&&billed>budgetMax};
+}
+
+
 function renderDashBudgets(){
   const el=document.getElementById('dash-project-budgets');
   const oneMonthOut=new Date();oneMonthOut.setMonth(oneMonthOut.getMonth()+1);
@@ -1677,36 +1674,6 @@ function renderDashBudgets(){
     el.innerHTML='<div class="card" style="font-size:13px;color:var(--text2)">No active projects yet. Add a project to see budget tracking here.</div>';return;
   }
 
-  function buildBudgetBar(p){
-    const rate=getProjRate(p);
-    const budget=getProjBudget(p);
-    const bTime=timeEntries.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*rate,0);
-    const bExp=expenses.filter(e=>e.projectId===p.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
-    const billed=bTime+bExp;
-    const budgetMin=budget.min||0;const budgetMax=budget.max||0;
-    const retainerOn=p.retainerOn&&parseFloat(p.retainerAmt||0)>0;
-    const retainerAmt=retainerOn?parseFloat(p.retainerAmt):0;
-    let barSegments='';
-    if(budgetMax>0){
-      const billedPct=Math.min(100,billed/budgetMax*100);
-      const retPct=retainerAmt>0?Math.min(100,retainerAmt/budgetMax*100):0;
-      const minPct=budgetMin>0?Math.min(100,budgetMin/budgetMax*100):100;
-      if(retainerAmt>0&&billed<=retainerAmt){
-        barSegments=`<div style="position:absolute;left:0;top:0;height:100%;width:${billedPct.toFixed(1)}%;background:#f0b429;border-radius:5px"></div>`;
-      } else if(billed<=budgetMin||budgetMin===0){
-        const yellowPct=retPct;const greenPct=billedPct-yellowPct;
-        barSegments=`${yellowPct>0?`<div style="position:absolute;left:0;top:0;height:100%;width:${yellowPct.toFixed(1)}%;background:#f0b429;border-radius:5px 0 0 5px"></div>`:''}
-          <div style="position:absolute;left:${yellowPct.toFixed(1)}%;top:0;height:100%;width:${Math.max(0,greenPct).toFixed(1)}%;background:var(--success);border-radius:${yellowPct>0?'0 5px 5px 0':'5px'}"></div>`;
-      } else {
-        const yellowPct=retPct;const greenPct=minPct-yellowPct;const redPct=billedPct-minPct;
-        barSegments=`${yellowPct>0?`<div style="position:absolute;left:0;top:0;height:100%;width:${yellowPct.toFixed(1)}%;background:#f0b429;border-radius:5px 0 0 5px"></div>`:''}
-          ${greenPct>0?`<div style="position:absolute;left:${yellowPct.toFixed(1)}%;top:0;height:100%;width:${greenPct.toFixed(1)}%;background:var(--success);border-radius:0"></div>`:''}
-          <div style="position:absolute;left:${minPct.toFixed(1)}%;top:0;height:100%;width:${Math.max(0,redPct).toFixed(1)}%;background:var(--danger);border-radius:0 5px 5px 0"></div>`;
-      }
-      if(retPct>0&&retPct<100)barSegments+=`<div style="position:absolute;left:${retPct.toFixed(1)}%;top:0;height:100%;width:2px;background:var(--bg);z-index:2"></div>`;
-    }
-    return{billed,budgetMax,budget,retainerOn,retainerAmt,barSegments,billedPct:budgetMax>0?Math.min(100,billed/budgetMax*100):0,overBudget:budgetMax>0&&billed>budgetMax};
-  }
 
   el.innerHTML=active.map(p=>{
     const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
@@ -1955,7 +1922,14 @@ function saveTimeEdit(id){
   refreshAll();
 }
 
-function deleteTime(id){if(!confirm('Delete this time entry?'))return;timeEntries=timeEntries.filter(e=>e.id!==id);save('tracker:time',timeEntries);editing.time=null;refreshAll();}
+function deleteTime(id){
+  if(!confirm('Delete this time entry?'))return;
+  const deleted=timeEntries.find(e=>e.id===id);
+  const idx=timeEntries.findIndex(e=>e.id===id);
+  timeEntries=timeEntries.filter(e=>e.id!==id);
+  if(deleted)pushUndo('Delete time entry "'+deleted.task+'"',()=>{timeEntries.splice(idx,0,deleted);save('tracker:time',timeEntries);renderTimeList();refreshAll();});
+  save('tracker:time',timeEntries);editing.time=null;refreshAll();
+}
 
 function addTime(){
   const date=document.getElementById('t-date').value;
@@ -2052,7 +2026,14 @@ function saveExpenseEdit(id){
   refreshAll();
 }
 
-function deleteExpense(id){if(!confirm('Delete this expense?'))return;expenses=expenses.filter(e=>e.id!==id);save('tracker:expenses',expenses);editing.expenses=null;refreshAll();}
+function deleteExpense(id){
+  if(!confirm('Delete this expense?'))return;
+  const deleted=expenses.find(e=>e.id===id);
+  const idx=expenses.findIndex(e=>e.id===id);
+  expenses=expenses.filter(e=>e.id!==id);
+  if(deleted)pushUndo('Delete expense "'+deleted.description+'"',()=>{expenses.splice(idx,0,deleted);save('tracker:expenses',expenses);renderExpenseList();refreshAll();});
+  save('tracker:expenses',expenses);editing.expenses=null;refreshAll();
+}
 
 function addExpense(){
   const date=document.getElementById('e-date').value;
@@ -2064,6 +2045,18 @@ function addExpense(){
   save('tracker:expenses',expenses);
   document.getElementById('e-desc').value='';document.getElementById('e-amount').value='';
   refreshAll();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  saveProject(p) — single source of truth for persisting
+//  project changes. Always saves + re-renders + syncs Drive.
+//  Use instead of calling save('tracker:projects', projects) directly.
+// ─────────────────────────────────────────────────────────────
+function saveProject(p){
+  // p is already mutated in-place — just persist and refresh
+  save('tracker:projects',projects);
+  renderProjectList();
+  renderDashBudgets();
 }
 
 // ═══════════════════════════════════════════════
@@ -2277,7 +2270,14 @@ function saveProjectEdit(id){
   refreshAll();
 }
 
-function deleteProject(id){if(!confirm('Delete this project?'))return;projects=projects.filter(p=>p.id!==id);save('tracker:projects',projects);editing.projects=null;allDropdownRefresh();refreshAll();}
+function deleteProject(id){
+  if(!confirm('Delete this project?'))return;
+  const deleted=projects.find(p=>p.id===id);
+  const didx=projects.findIndex(p=>p.id===id);
+  projects=projects.filter(p=>p.id!==id);
+  if(deleted)pushUndo('Delete project "'+deleted.name+'"',()=>{projects.splice(didx,0,deleted);save('tracker:projects',projects);allDropdownRefresh();refreshAll();});
+  save('tracker:projects',projects);editing.projects=null;allDropdownRefresh();refreshAll();
+}
 
 function addProject(){
   const name=document.getElementById('p-name').value.trim();if(!name)return;
@@ -2598,7 +2598,10 @@ function addClient(){
 
 function deleteClient(id){
   if(!confirm('Remove this client?'))return;
+  const deleted=clients.find(c=>c.id===id);
+  const idx=clients.findIndex(c=>c.id===id);
   clients=clients.filter(c=>c.id!==id);
+  if(deleted)pushUndo('Delete client "'+(deleted.company||deleted.contactName||'')+'"',()=>{clients.splice(idx,0,deleted);save('tracker:clients',clients);allDropdownRefresh();renderClientList();});
   save('tracker:clients',clients);
   editing.clients=null;
   allDropdownRefresh();
@@ -2793,6 +2796,7 @@ function allDropdownRefresh(){
   refreshTimeAssigneeDropdown();
   refreshBoardFilters();
   refreshWorkloadFilters();
+  refreshGanttProjectFilter();
 }
 
 // ═══════════════════════════════════════════════
@@ -2963,7 +2967,10 @@ function saveTeamMemberEdit(id){
 
 function deleteTeamMember(id){
   if(!confirm('Remove this team member?'))return;
+  const deleted=teamMembers.find(m=>m.id===id);
+  const idx=teamMembers.findIndex(m=>m.id===id);
   teamMembers=teamMembers.filter(m=>m.id!==id);
+  if(deleted)pushUndo('Remove team member "'+deleted.name+'"',()=>{teamMembers.splice(idx,0,deleted);save('tracker:team',teamMembers);allDropdownRefresh();renderTeamList();});
   save('tracker:team',teamMembers);editing.team=null;allDropdownRefresh();renderTeamList();
 }
 
@@ -3381,9 +3388,18 @@ function addPhase(projId){
 
 function deletePhase(projId,phId){
   const p=projects.find(x=>x.id===projId);if(!p)return;
+  const deleted=(p.phases||[]).find(x=>x.id===phId);
+  const idx=(p.phases||[]).findIndex(x=>x.id===phId);
+  // Snapshot affected tasks and milestones for undo
+  const affectedTasks=(p.tasks||[]).filter(t=>t.phaseId===phId).map(t=>t.id);
   p.phases=(p.phases||[]).filter(x=>x.id!==phId);
-  // unassign tasks from deleted phase
+  // Unassign tasks AND milestones from deleted phase
   (p.tasks||[]).forEach(t=>{if(t.phaseId===phId)t.phaseId='';});
+  if(deleted)pushUndo('Delete phase "'+deleted.title+'"',()=>{
+    if(!p.phases)p.phases=[];p.phases.splice(idx,0,deleted);
+    affectedTasks.forEach(tid=>{const t=(p.tasks||[]).find(x=>x.id===tid);if(t)t.phaseId=phId;});
+    save('tracker:projects',projects);renderProjectList();
+  });
   save('tracker:projects',projects);renderProjectList();
 }
 
@@ -3601,8 +3617,8 @@ function exportProjectPDF(projId){
   const milestones=[...(p.milestones||[])].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
   const projTeam=allMembers.filter(m=>(p.teamIds||[]).includes(m.id)||m.id==='__me__');
-  const fd=(d)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'--';
-  const h=(s)=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const fd=fmtDateShort;
+  const h=htmlEsc;
   const todayStr=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
 
   // Gantt SVG — 3mo view by default, with today line, matching inline style
@@ -3898,8 +3914,8 @@ function generateClientShare(projId){
   const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
   const phases=[...(p.phases||[])].sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
   const milestones=[...(p.milestones||[])].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  const he=(s)=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const fd=(d)=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'--';
+  const he=htmlEsc;
+  const fd=fmtDateShort;
 
   // Build gantt matching current inline timeline style
   // 3mo view from 1 week before today; solid bg, month labels top, today line, dots for milestones
@@ -4147,6 +4163,11 @@ function renderGantt(){
 }
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// Global HTML-escape alias (same as esc, for use outside template literals)
+const htmlEsc=esc;
+// Global short date formatter (used in archive, PDF, share — eliminates local const fd=... copies)
+function fmtDateShort(d){return d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'--';}
 // ═══════════════════════════════════════════════
 //  REPORTS
 // ═══════════════════════════════════════════════
@@ -4338,7 +4359,8 @@ function exportProjectOverviewPDF(){
     <span><b>Tasks:</b> ${done}/${tasks.length} done</span>
   </div>
   ${projTeam.length?`<h3>Team</h3><div>${projTeam.map(m=>`<span class="chip" style="background:${m.color}22;color:${m.color};border:.5px solid ${m.color}">${m.name}</span>`).join('')}</div>`:''}
-  <h3>Tasks by Phase</h3>
+  <h3>${(()=>{const {monthLabelDiv:glDiv,svg:gsvg,todayLabel:gtl}=buildGanttSVG(phases,milestones,{viewMode:'3mo',forExport:false});return gsvg?`<h3>Timeline</h3>${glDiv}${gsvg}${gtl}`:'';})()}
+  Tasks by Phase</h3>
   ${phases.length===0&&tasks.length===0?'<p style="color:#9a979a;font-size:13px">No tasks.</p>':''}
   ${tasks.filter(t=>!t.phaseId).length?`<table><thead><tr><th>Task</th><th>Type</th><th>Assignee</th><th>Due</th><th>Status</th></tr></thead><tbody>
     ${tasks.filter(t=>!t.phaseId).map(t=>{const m=t.assigneeId?allMembers.find(x=>x.id===t.assigneeId):null;return`<tr><td style="${t.status==='done'?'text-decoration:line-through;color:#9a979a':''}">${t.title}</td><td>${t.taskType?`<span class="badge ${t.taskType}">${t.taskType}</span>`:''}</td><td>${m?m.name:''}</td><td>${t.dueDate?fmtDate(t.dueDate):''}</td><td>${t.status==='done'?'Done':t.status==='in_progress'?'In progress':'To do'}</td></tr>`;}).join('')}
