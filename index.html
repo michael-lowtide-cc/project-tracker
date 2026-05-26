@@ -216,7 +216,6 @@ td{padding:8px 0;vertical-align:top}
       </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button class="icon-btn no-print" id="gdrive-btn" onclick="handleDriveAuth()" title="Connect Google Drive" style="display:none"><i class="ti ti-brand-google-drive"></i></button>
       <button class="icon-btn no-print" onclick="toggleSettings()" aria-label="Settings"><i class="ti ti-settings"></i></button>
     </div>
   </div>
@@ -267,6 +266,16 @@ td{padding:8px 0;vertical-align:top}
     <div class="field" style="margin-bottom:0">
       <label>Address</label>
       <input id="s-bizaddress" type="text" placeholder="123 Main St, City, CA 90210" oninput="saveBizInfo()">
+    </div>
+
+    <div style="height:.5px;background:var(--border);margin:12px 0"></div>
+
+    <!-- GOOGLE DRIVE -->
+    <div class="sec-title">Google Drive sync</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:0">
+      <div id="settings-drive-status" style="font-size:13px;color:var(--text3)">Not connected</div>
+      <button id="settings-drive-btn" class="btn sm" onclick="handleDriveAuth()" style="display:none"><i class="ti ti-brand-google-drive"></i> Connect Drive</button>
+      <button id="settings-drive-disconnect" class="btn sm danger" onclick="disconnectDrive()" style="display:none"><i class="ti ti-plug-x"></i> Disconnect</button>
     </div>
 
     <div style="height:.5px;background:var(--border);margin:12px 0"></div>
@@ -843,21 +852,45 @@ async function initDriveWithToken(){
   gapi.client.setToken({access_token:gdToken});
   await findOrCreateFile();
   await loadFromDrive();
+  updateSettingsDriveUI();
 }
 
 function gapiLoaded(){
   gapi.load('client',async()=>{
-    // Show the Drive icon button in the header
-    const driveBtn=document.getElementById('gdrive-btn');
-    if(driveBtn)driveBtn.style.display='flex';
+    // Update settings panel Drive button now that gapi is ready
+    updateSettingsDriveUI();
     // Check if we have a hash token from a redirect
     if(checkHashToken()){
       await initDriveWithToken();
       return;
     }
-    // Update sync bar to show Connect Drive
     setSyncUI('offline','Google Drive not connected',true,'Connect Drive');
   });
+}
+
+function updateSettingsDriveUI(){
+  const statusEl=document.getElementById('settings-drive-status');
+  const connectBtn=document.getElementById('settings-drive-btn');
+  const disconnectBtn=document.getElementById('settings-drive-disconnect');
+  if(!statusEl)return;
+  if(gdToken){
+    statusEl.textContent='Connected';
+    statusEl.style.color='var(--success)';
+    if(connectBtn)connectBtn.style.display='none';
+    if(disconnectBtn)disconnectBtn.style.display='inline-flex';
+  } else {
+    statusEl.textContent='Not connected';
+    statusEl.style.color='var(--text3)';
+    if(connectBtn)connectBtn.style.display='inline-flex';
+    if(disconnectBtn)disconnectBtn.style.display='none';
+  }
+}
+
+function disconnectDrive(){
+  gdToken=null;gdFileId=null;gdArchiveFolderId=null;gdChangelogFileId=null;gdCodeBackupFolderId=null;
+  localStorage.removeItem('gd:wasConnected');
+  setSyncUI('offline','Google Drive not connected',true,'Connect Drive');
+  updateSettingsDriveUI();
 }
 
 async function findOrCreateFile(){
@@ -1502,15 +1535,57 @@ function projTeamSearch(val){
   const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
   const matches=allMembers.filter(m=>m.name.toLowerCase().includes(v)&&!_projTeamSelected.includes(m.id));
   if(!matches.length){
-    // Offer to add as new team member
-    list.innerHTML=`<div class="autofill-item" onclick="promptNewTeamMember('${val.replace(/'/g,'\\\'')}')" style="color:var(--accent)"><i class="ti ti-plus"></i> Add "${val}" as new team member</div>`;
+    // Show inline mini-form to create a new team member
+    list.innerHTML=`<div style="padding:10px">
+      <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px"><i class="ti ti-plus" style="font-size:12px"></i> Add "${htmlEsc(val)}" as new team member</div>
+      <div class="grid2" style="margin-bottom:6px">
+        <div><label style="font-size:11px">Name</label><input type="text" id="ntm-name" value="${htmlEsc(val)}" style="font-size:12px"></div>
+        <div><label style="font-size:11px">Role</label><input type="text" id="ntm-role" placeholder="e.g. Designer" style="font-size:12px"></div>
+      </div>
+      <div class="grid2" style="margin-bottom:6px">
+        <div><label style="font-size:11px">Company</label><input type="text" id="ntm-company" placeholder="Studio or agency" style="font-size:12px"></div>
+        <div><label style="font-size:11px">Color</label>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+            ${['#c27fd4','#6b3fa0','#4a90d9','#2d6fa8','#5ba08a','#2d8a6b','#d4756b','#d4a056','#8a7a6b','#5a5068'].map((col,ci)=>`<span onclick="document.querySelectorAll('.ntm-col').forEach(s=>s.style.outline='none');this.style.outline='2px solid var(--text)';document.getElementById('ntm-color').value='${col}'" class="ntm-col" style="width:18px;height:18px;border-radius:50%;background:${col};cursor:pointer;outline:${ci===0?'2px solid var(--text)':'none'}"></span>`).join('')}
+          </div>
+          <input type="hidden" id="ntm-color" value="#c27fd4">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:6px">
+        <button class="btn sm" onclick="document.getElementById('p-team-search-list').style.display='none';document.getElementById('p-team-search').value=''">Cancel</button>
+        <button class="btn sm primary" onclick="createAndAddTeamMember()"><i class="ti ti-check"></i> Add member</button>
+      </div>
+    </div>`;
     list.style.display='block';
+    setTimeout(()=>document.getElementById('ntm-name')?.focus(),50);
     return;
   }
   list.innerHTML=matches.map(m=>`<div class="autofill-item" onclick="addProjTeamMember('${m.id}')">
-    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${m.color||'#888'};margin-right:6px;vertical-align:middle"></span>${m.name}${m.type==='external'?` <span style="font-size:11px;color:var(--text3)">(${m.company||'External'})</span>`:''}
+    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${m.color||'#888'};margin-right:6px;vertical-align:middle"></span>${m.name}
+    ${m.company?`<span style="font-size:11px;color:var(--text3)">(${m.company})</span>`:''}
   </div>`).join('');
   list.style.display='block';
+}
+
+function createAndAddTeamMember(){
+  const name=(document.getElementById('ntm-name')?.value||'').trim();
+  if(!name)return;
+  const exists=teamMembers.find(m=>m.name.toLowerCase()===name.toLowerCase());
+  if(exists){
+    addProjTeamMember(exists.id);
+    return;
+  }
+  const newMember={
+    id:uid(),name,
+    role:(document.getElementById('ntm-role')?.value||'').trim(),
+    company:(document.getElementById('ntm-company')?.value||'').trim(),
+    color:document.getElementById('ntm-color')?.value||'#c27fd4',
+    email:'',phone:'',notes:'',photo:'',clientLink:''
+  };
+  teamMembers.push(newMember);
+  save('tracker:team',teamMembers);
+  allDropdownRefresh();
+  addProjTeamMember(newMember.id);
 }
 
 function addProjTeamMember(id){
@@ -1519,6 +1594,7 @@ function addProjTeamMember(id){
   document.getElementById('p-team-search-list').style.display='none';
   renderProjTeamChips();
 }
+
 
 function removeProjTeamMember(id){
   _projTeamSelected=_projTeamSelected.filter(x=>x!==id);
@@ -1536,16 +1612,6 @@ function renderProjTeamChips(){
       <button onclick="removeProjTeamMember('${id}')" style="background:none;border:none;cursor:pointer;color:${m.color};font-size:13px;padding:0;line-height:1">×</button>
     </span>`;
   }).join('');
-}
-
-function promptNewTeamMember(name){
-  document.getElementById('p-team-search-list').style.display='none';
-  document.getElementById('p-team-search').value='';
-  // Switch to team tab with name pre-filled
-  document.getElementById('tm-name').value=name;
-  switchTab('team');
-  document.getElementById('tm-name').focus();
-  setSyncUI('idle','Fill in details and click Add member, then return to add this project.');
 }
 
 function toggleRetainerFields(){
@@ -2166,7 +2232,7 @@ function renderProjectList(){
     const statusLabel=p.status==='on_hold'?'On Hold':p.status==='active'?'Active':'Completed';
     const isEditing=editing.projects===p.id;
     const endDisp=p.endDateType==='specific'?fmtDate(p.endDate):p.endDateType==='monthyear'?fmtMonth(p.endDateMonth):'';
-    return`<div class="project-card">
+    return`<div class="project-card" id="proj-card-${p.id}">
       <div class="project-header">
         <div style="flex:1;min-width:0">
           <div style="font-size:15px;font-weight:500">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} -- </span>`:''}${p.name}</div>
@@ -2259,6 +2325,7 @@ function renderProjectEditForm(p){
     </div>
     <div class="edit-actions"><div></div><div style="display:flex;gap:8px">
       <button class="btn danger sm" onclick="deleteProject('${p.id}')"><i class="ti ti-trash"></i> Delete</button>
+      <button class="btn sm" onclick="duplicateProject('${p.id}')"><i class="ti ti-copy"></i> Duplicate</button>
       <button class="btn primary sm" onclick="saveProjectEdit('${p.id}')"><i class="ti ti-check"></i> Save</button>
     </div></div>
   </div>`;
@@ -2287,13 +2354,56 @@ function editProjTeamSearch(projId,val){
   if(!_editProjTeamSelected[projId])_editProjTeamSelected[projId]=[];
   const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
   const matches=allMembers.filter(m=>m.name.toLowerCase().includes(v)&&!_editProjTeamSelected[projId].includes(m.id));
-  if(!matches.length){list.style.display='none';return;}
+  if(!matches.length){
+    // Inline mini-form to create new team member
+    list.innerHTML=`<div style="padding:10px">
+      <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px"><i class="ti ti-plus" style="font-size:12px"></i> Add "${htmlEsc(val)}" as new team member</div>
+      <div class="grid2" style="margin-bottom:6px">
+        <div><label style="font-size:11px">Name</label><input type="text" id="entm-name" value="${htmlEsc(val)}" style="font-size:12px"></div>
+        <div><label style="font-size:11px">Role</label><input type="text" id="entm-role" placeholder="e.g. Designer" style="font-size:12px"></div>
+      </div>
+      <div class="grid2" style="margin-bottom:6px">
+        <div><label style="font-size:11px">Company</label><input type="text" id="entm-company" placeholder="Studio or agency" style="font-size:12px"></div>
+        <div><label style="font-size:11px">Color</label>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+            ${['#c27fd4','#6b3fa0','#4a90d9','#2d6fa8','#5ba08a','#2d8a6b','#d4756b','#d4a056','#8a7a6b','#5a5068'].map((col,ci)=>`<span onclick="document.querySelectorAll('.entm-col').forEach(s=>s.style.outline='none');this.style.outline='2px solid var(--text)';document.getElementById('entm-color').value='${col}'" class="entm-col" style="width:18px;height:18px;border-radius:50%;background:${col};cursor:pointer;outline:${ci===0?'2px solid var(--text)':'none'}"></span>`).join('')}
+          </div>
+          <input type="hidden" id="entm-color" value="#c27fd4">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:6px">
+        <button class="btn sm" onclick="document.getElementById('${pfx}-team-search-list').style.display='none';document.getElementById('${pfx}-team-search').value=''">Cancel</button>
+        <button class="btn sm primary" onclick="createAndAddEditTeamMember('${projId}')"><i class="ti ti-check"></i> Add member</button>
+      </div>
+    </div>`;
+    list.style.display='block';
+    setTimeout(()=>document.getElementById('entm-name')?.focus(),50);
+    return;
+  }
   list.innerHTML=matches.map(m=>`<div class="autofill-item" onclick="addEditProjTeamMember('${projId}','${m.id}')">
     <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${m.color||'#888'};margin-right:6px;vertical-align:middle"></span>${m.name}
     ${m.company?`<span style="font-size:11px;color:var(--text3)">(${m.company})</span>`:''}
   </div>`).join('');
   list.style.display='block';
 }
+function createAndAddEditTeamMember(projId){
+  const name=(document.getElementById('entm-name')?.value||'').trim();
+  if(!name)return;
+  const exists=teamMembers.find(m=>m.name.toLowerCase()===name.toLowerCase());
+  if(exists){addEditProjTeamMember(projId,exists.id);return;}
+  const newMember={
+    id:uid(),name,
+    role:(document.getElementById('entm-role')?.value||'').trim(),
+    company:(document.getElementById('entm-company')?.value||'').trim(),
+    color:document.getElementById('entm-color')?.value||'#c27fd4',
+    email:'',phone:'',notes:'',photo:'',clientLink:''
+  };
+  teamMembers.push(newMember);
+  save('tracker:team',teamMembers);
+  allDropdownRefresh();
+  addEditProjTeamMember(projId,newMember.id);
+}
+
 function addEditProjTeamMember(projId,memberId){
   const pfx=`ep-${projId}`;
   if(!_editProjTeamSelected[projId])_editProjTeamSelected[projId]=[];
@@ -2317,6 +2427,67 @@ function renderEditProjTeamChips(projId){
       ${m.name}<button onclick="removeEditProjTeamMember('${projId}','${id}')" style="background:none;border:none;cursor:pointer;color:${m.color};font-size:13px;padding:0;line-height:1">×</button>
     </span>`;
   }).join('');
+}
+
+function duplicateProject(id){
+  const src=projects.find(p=>p.id===id);if(!src)return;
+
+  // Smart number: AIA-01.1 → AIA-01.2, AIA-01 → AIA-01.1
+  function nextNum(num){
+    if(!num)return'';
+    const lastDot=num.lastIndexOf('.');
+    if(lastDot<0){
+      // No decimal — start at .1
+      const base=num;
+      let n=1;
+      while(projects.find(p=>p.num===`${base}.${n}`))n++;
+      return`${base}.${n}`;
+    }
+    const base=num.slice(0,lastDot);
+    let n=parseInt(num.slice(lastDot+1),10)||1;
+    n++;
+    while(projects.find(p=>p.num===`${base}.${n}`))n++;
+    return`${base}.${n}`;
+  }
+
+  // Deep-copy phases, tasks, milestones with fresh IDs
+  const newPhaseIds={};
+  const phases=(src.phases||[]).map(ph=>{
+    const newId=uid();
+    newPhaseIds[ph.id]=newId;
+    return{...ph,id:newId};
+  });
+  const tasks=(src.tasks||[]).map(t=>({
+    ...t,
+    id:uid(),
+    status:'todo',
+    phaseId:t.phaseId?newPhaseIds[t.phaseId]||'':'',
+    comments:[],
+    dependsOn:[]
+  }));
+  const milestones=(src.milestones||[]).map(m=>({...m,id:uid(),completed:false}));
+
+  const copy={
+    ...src,
+    id:uid(),
+    num:nextNum(src.num),
+    phases,tasks,milestones
+  };
+
+  // Insert immediately after the source project
+  const srcIdx=projects.findIndex(p=>p.id===id);
+  projects.splice(srcIdx+1,0,copy);
+  save('tracker:projects',projects);
+  editing.projects=null;
+  allDropdownRefresh();
+  refreshAll();
+
+  // Open the edit form on the copy so user can rename/adjust
+  setTimeout(()=>{
+    toggleEdit('projects',copy.id);
+    const el=document.getElementById(`proj-card-${copy.id}`);
+    if(el)el.scrollIntoView({behavior:'smooth',block:'center'});
+  },100);
 }
 
 function saveProjectEdit(id){
@@ -3428,6 +3599,14 @@ function toggleTaskExpandEdit(projId,taskId){
   if(el)el.style.display=el.style.display==='none'?'block':'none';
 }
 
+function updateTaskDueDate(projId,taskId,val){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
+  t.dueDate=val||'';
+  save('tracker:projects',projects);
+  renderProjectList();
+}
+
 function toggleTaskAssignee(projId,taskId,memberId){
   const p=projects.find(x=>x.id===projId);if(!p)return;
   const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
@@ -3555,6 +3734,11 @@ function renderTasksAndMilestones(p){
         <button class="icon-action danger" onclick="deleteTask('${p.id}','${t.id}')" style="font-size:12px"><i class="ti ti-x"></i></button>
       </div>
       <div id="${expandKey}" style="display:none;padding:6px 8px 8px;background:var(--bg2);border-radius:4px;margin-bottom:4px">
+        ${!isOpen?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:11px;color:var(--text3);flex-shrink:0">Due date:</span>
+          <input type="date" value="${t.dueDate||''}" onchange="updateTaskDueDate('${p.id}','${t.id}',this.value)" style="font-size:12px;padding:2px 6px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text)">
+          ${t.dueDate?`<button onclick="updateTaskDueDate('${p.id}','${t.id}','')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:0" title="Clear date">✕</button>`:''}
+        </div>`:''}
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Assign (project members):</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${projMembers.map(m=>{const sel=aIds.includes(m.id);return`<span onclick="toggleTaskAssignee('${p.id}','${t.id}','${m.id}')" style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;}).join('')}</div>
         ${tasks.filter(ot=>ot.id!==t.id).length?`<div style="font-size:11px;color:var(--text3);margin-bottom:4px">Depends on (blocks this task):</div>
@@ -4624,6 +4808,14 @@ document.addEventListener('keydown',e=>{
       const action=_undoStack.pop();
       action.undoFn();
       setSyncUI('idle',`Undid: ${action.description}`);
+      // Reset sync bar back to proper state after 2.5s
+      setTimeout(()=>{
+        if(gdToken){
+          setSyncUI('idle',`Synced · ${new Date().toLocaleTimeString()}`);
+        } else {
+          setSyncUI('offline','Google Drive not connected',true,'Connect Drive');
+        }
+      },2500);
     }
     e.preventDefault();
   }
