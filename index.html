@@ -3999,7 +3999,7 @@ function renderTasksAndMilestones(p){
       <div style="display:flex;align-items:center;gap:6px;padding:5px 0;font-size:13px">
         <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
         ${typeBadge(t)}
-        <span id="${titleKey}" style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;padding:1px 3px;border-radius:3px">${t.title}</span>
+        <span style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;padding:1px 3px;border-radius:3px">${t.title}</span>
         ${t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'}">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}
         ${(t.dependsOn||[]).some(depId=>{const dep=tasks.find(x=>x.id===depId);return dep&&dep.status!=='done';})?'<span style="font-size:10px;background:var(--warning);color:#fff;padding:1px 6px;border-radius:10px">Blocked</span>':''}
         ${(t.comments||[]).length?`<span style="font-size:10px;color:var(--text3)"><i class="ti ti-message" style="font-size:10px"></i> ${t.comments.length}</span>`:''}
