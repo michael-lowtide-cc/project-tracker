@@ -271,6 +271,17 @@ td{padding:8px 0;vertical-align:top}
 
     <div style="height:.5px;background:var(--border);margin:12px 0"></div>
 
+    <!-- DATA BACKUP -->
+    <div class="sec-title">Data backup</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Download a full backup of all your data as a JSON file. Do this before any app update.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0">
+      <button class="btn sm" onclick="downloadBackup()"><i class="ti ti-download"></i> Download backup</button>
+      <button class="btn sm" onclick="restoreFromBackupFile()"><i class="ti ti-upload"></i> Restore from file</button>
+    </div>
+    <input type="file" id="restore-file-input" accept=".json" style="display:none" onchange="processRestoreFile(this)">
+
+    <div style="height:.5px;background:var(--border);margin:12px 0"></div>
+
     <!-- GOOGLE DRIVE -->
     <div class="sec-title">Google Drive sync</div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:0">
@@ -1158,7 +1169,8 @@ async function writeToDrive(){
       headers:{'Content-Type':'application/json','Authorization':`Bearer ${gdToken}`},
       body:JSON.stringify(data)
     });
-    setSyncUI('idle',`Saved . ${new Date().toLocaleTimeString()}`);
+    setSyncUI('idle',`Saved · ${new Date().toLocaleTimeString()}`);
+    markSynced();
     document.getElementById('sync-force-btn').style.display='inline-flex';
     // Create a daily backup in the Archives folder (silently, non-blocking)
     archiveToday();
@@ -1169,14 +1181,93 @@ function scheduleDriveSync(){
   if(!gdToken||!gdFileId)return;
   setSyncUI('saving','Saving...');
   clearTimeout(syncTimer);
-  syncTimer=setTimeout(writeToDrive,1500);
+  syncTimer=setTimeout(writeToDrive,500); // reduced from 1500ms for faster sync
 }
 
-// ═══════════════════════════════════════════════
-//  STORAGE
-// ═══════════════════════════════════════════════
+function save(k,v){
+  try{
+    localStorage.setItem(k,JSON.stringify(v));
+    if(k==='tracker:projects'){
+      localStorage.setItem('tracker:projects:backup',JSON.stringify({ts:Date.now(),data:v}));
+    }
+  }catch(e){console.error('localStorage save failed:',e);}
+  scheduleDriveSync();
+}
+
 function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
-function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}scheduleDriveSync();}
+
+// Heartbeat autosave — every 30s write in-memory state to localStorage as a safety net
+// ═══════════════════════════════════════════════
+//  DATA BACKUP & RESTORE
+// ═══════════════════════════════════════════════
+function downloadBackup(){
+  const backup={};
+  GD_KEYS.forEach(k=>{
+    const v=localStorage.getItem(k);
+    if(v)try{backup[k]=JSON.parse(v);}catch{}
+  });
+  backup['_exported']=new Date().toISOString();
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='lowtide-tracker-backup-'+today()+'.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setSyncUI('idle','Backup downloaded');
+  setTimeout(()=>setSyncUI(gdToken?'idle':'offline',gdToken?'Synced · '+new Date().toLocaleTimeString():'Not connected'),2000);
+}
+
+function restoreFromBackupFile(){
+  document.getElementById('restore-file-input').click();
+}
+
+function processRestoreFile(input){
+  const file=input.files[0];if(!file)return;
+  if(!confirm('This will overwrite all current data with the backup file. Are you sure?')){input.value='';return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      let count=0;
+      GD_KEYS.forEach(k=>{if(data[k]!=null){localStorage.setItem(k,JSON.stringify(data[k]));count++;}});
+      reloadState();
+      allDropdownRefresh();
+      refreshAll();
+      input.value='';
+      setSyncUI('idle','Restored '+count+' data keys from backup');
+      alert('Restore complete. '+count+' data categories loaded from backup dated '+(data._exported||'unknown')+'.');
+    }catch(err){
+      alert('Could not read backup file: '+err.message);
+      input.value='';
+    }
+  };
+  reader.readAsText(file);
+}
+
+function startAutosaveHeartbeat(){
+  setInterval(()=>{
+    if(!projects)return;
+    try{
+      localStorage.setItem('tracker:projects',JSON.stringify(projects));
+      localStorage.setItem('tracker:projects:backup',JSON.stringify({ts:Date.now(),data:projects}));
+      localStorage.setItem('tracker:time',JSON.stringify(timeEntries||[]));
+      localStorage.setItem('tracker:expenses',JSON.stringify(expenses||[]));
+    }catch(e){console.warn('Heartbeat save failed:',e);}
+  },30000);
+}
+
+// Warn if leaving page with unsynced changes
+let _lastSyncedHash='';
+function markSynced(){
+  try{_lastSyncedHash=JSON.stringify(projects).length+'';}catch{}
+}
+window.addEventListener('beforeunload',e=>{
+  if(!projects)return;
+  const cur=JSON.stringify(projects).length+'';
+  if(cur!==_lastSyncedHash&&_lastSyncedHash!==''){
+    e.preventDefault();e.returnValue='You may have unsaved changes. Are you sure you want to leave?';
+  }
+});
 
 // ═══════════════════════════════════════════════
 //  STATE
@@ -1223,9 +1314,7 @@ function reloadState(){
   bizInfo     =Object.assign({name:'',email:'',phone:'',website:'',address:''},load('tracker:bizInfo',{})||{});
 }
 reloadState();
-
-// ═══════════════════════════════════════════════
-//  HELPERS
+startAutosaveHeartbeat();
 // ═══════════════════════════════════════════════
 function uid(){return Math.random().toString(36).slice(2,10)}
 function today(){return new Date().toISOString().split('T')[0]}
