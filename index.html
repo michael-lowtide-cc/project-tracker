@@ -3559,6 +3559,8 @@ function addTask(projId){
     comments:[],
     dependsOn:[]
   });
+  // Remember last phase used for this project
+  if(phaseEl&&phaseEl.value)_lastPhaseUsed[projId]=phaseEl.value;
   save('tracker:projects',projects);
   inp.value='';if(dueEl)dueEl.value='';
   renderProjectList();
@@ -3566,11 +3568,26 @@ function addTask(projId){
   setTimeout(()=>initTaskAssignChips(projId),0);
 }
 
+function openTaskExpand(projId,taskId){
+  const expandKey=`task-expand-${projId}-${taskId}`;
+  const el=document.getElementById(expandKey);
+  if(!el)return;
+  const wasOpen=el.style.display!=='none';
+  el.style.display=wasOpen?'none':'block';
+  if(!wasOpen){
+    // Focus the title input when expanding
+    setTimeout(()=>{
+      const inp=document.getElementById(`task-edit-title-${taskId}`);
+      if(inp){inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);}
+    },30);
+  }
+}
+
 function saveTaskTitle(projId,taskId,newTitle){
   const p=projects.find(x=>x.id===projId);if(!p)return;
   const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
-  const trimmed=newTitle.trim();
-  if(trimmed&&trimmed!==t.title){t.title=trimmed;save('tracker:projects',projects);}
+  const trimmed=(newTitle||'').trim();
+  if(trimmed&&trimmed!==t.title){t.title=trimmed;save('tracker:projects',projects);renderProjectList();}
 }
 
 function updateTaskStatus(projId,taskId,status){
@@ -3628,10 +3645,78 @@ function toggleAddMilestone(projId){
   editing.milestones=editing.milestones===key?null:key;
   renderProjectList();
 }
+function cycleNewTaskPriority(projId){
+  const inp=document.getElementById(`task-pri-${projId}`);
+  const btn=document.getElementById(`task-pri-btn-${projId}`);
+  if(!inp||!btn)return;
+  const order=['low','medium','high'];
+  const cur=order.indexOf(inp.value||'medium');
+  const next=order[(cur+1)%3];
+  inp.value=next;
+  const colors={low:'var(--text3)',medium:'var(--warning)',high:'var(--danger)'};
+  const labels={low:'L',medium:'M',high:'H'};
+  btn.textContent=labels[next];
+  btn.style.borderColor=colors[next];
+  btn.style.background=colors[next].replace(')',',0.13)').replace('var(','rgba(').replace('--text3','155,151,154').replace('--warning','186,117,23').replace('--danger','163,45,45');
+  btn.style.color=colors[next];
+}
+
+function cycleTaskPriority(projId,taskId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
+  const order=['low','medium','high'];
+  const cur=order.indexOf(t.priority||'medium');
+  t.priority=order[(cur+1)%3];
+  save('tracker:projects',projects);renderProjectList();
+}
+
+// Default last-used phase when add-task form opens
+function initAddTaskForm(projId){
+  const phSel=document.getElementById(`task-phase-${projId}`);
+  if(phSel&&_lastPhaseUsed[projId]){phSel.value=_lastPhaseUsed[projId];}
+}
+
+// Per-project task filter state
+function getTaskFilter(projId){
+  return _taskFilters[projId]||{status:'all',type:'all',priority:'all',hideDone:false};
+}
+
+function setTaskFilter(projId,key,val){
+  if(!_taskFilters[projId])_taskFilters[projId]={status:'all',type:'all',priority:'all',hideDone:false};
+  _taskFilters[projId][key]=val;
+  renderProjectList();
+}
+
+function toggleFilterPanel(projId){
+  const el=document.getElementById(`task-filter-panel-${projId}`);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
+
+function applyTaskFilters(tasks,projId){
+  const f=getTaskFilter(projId);
+  return tasks.filter(t=>{
+    if(f.hideDone&&t.status==='done')return false;
+    if(f.status!=='all'&&t.status!==f.status)return false;
+    if(f.type!=='all'){
+      const tt=t.taskType||'';
+      if(f.type==='normal'&&tt!=='')return false;
+      if(f.type!=='normal'&&tt!==f.type)return false;
+    }
+    if(f.priority!=='all'&&(t.priority||'medium')!==f.priority)return false;
+    return true;
+  });
+}
+
 function toggleAddTask(projId){
   const key=`add-task-${projId}`;
   editing.tasks=editing.tasks===key?null:key;
   renderProjectList();
+  if(editing.tasks===key){
+    setTimeout(()=>{
+      initAddTaskForm(projId);
+      document.getElementById(`task-inp-${projId}`)?.focus();
+    },30);
+  }
 }
 function toggleAddPhase(projId){
   const key=`add-phase-${projId}`;
@@ -3714,14 +3799,19 @@ function toggleTaskAssignee(projId,taskId,memberId){
   renderProjectList();
 }
 
-// Init task-assign chips after render
+// Init task-assign chips after render — project members only
 function initTaskAssignChips(projId){
   const container=document.getElementById(`task-assign-chips-${projId}`);
   if(!container)return;
+  const p=projects.find(x=>x.id===projId);
   const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  // Filter to project members only
+  const projMemberIds=new Set((p&&p.teamIds)||[]);
+  projMemberIds.add('__me__');
+  const projMembers=allMembers.filter(m=>projMemberIds.has(m.id));
   let selected=[];
   container.dataset.selected=JSON.stringify(selected);
-  container.innerHTML=allMembers.map(m=>`
+  container.innerHTML=projMembers.map(m=>`
     <span onclick="toggleNewTaskAssignee('${projId}','${m.id}')" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid var(--border2);background:transparent;color:var(--text2)" id="nta-${projId}-${m.id}">
       ${m.name.split(' ')[0]}
     </span>`).join('');
@@ -3813,34 +3903,48 @@ function renderTasksAndMilestones(p){
     const isOpen=t.taskType==='open';
     const overdue=!isOpen&&t.dueDate&&t.dueDate<todayStr&&t.status!=='done';
     const expandKey=`task-expand-${p.id}-${t.id}`;
+    const titleKey=`task-title-${p.id}-${t.id}`;
     const aIds=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
-    const chips=aIds.map(id=>{const m=allMembers.find(x=>x.id===id);return m?`<span style="font-size:10px;background:${m.color||'var(--accent)'};color:#fff;padding:1px 6px;border-radius:10px">${m.name.split(' ')[0]}</span>`:''}).join('');
+    const validAIds=aIds.filter(id=>projMemberIds.has(id));
+    const chips=validAIds.map(id=>{const m=allMembers.find(x=>x.id===id);return m?`<span style="font-size:10px;background:${m.color||'var(--accent)'};color:#fff;padding:1px 6px;border-radius:10px">${m.name.split(' ')[0]}</span>`:''}).join('');
+    // Priority badge colours
+    const priColor={low:'var(--text3)',medium:'var(--warning)',high:'var(--danger)'};
+    const priLabel={low:'L',medium:'M',high:'H'};
+    const pri=t.priority||'medium';
+    const depOtherTasks=tasks.filter(ot=>ot.id!==t.id);
+    const deps=(t.dependsOn||[]).filter(id=>tasks.find(x=>x.id===id));
     return`<div draggable="true" ondragstart="taskDragStart(event,'${p.id}','${t.id}')" ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'" ondragleave="this.style.outline=''" ondrop="taskDropOnTask(event,'${p.id}','${t.id}')" style="background:var(--bg);border-bottom:.5px solid var(--border)">
       <div style="display:flex;align-items:center;gap:6px;padding:5px 0;font-size:13px">
         <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
         ${typeBadge(t)}
-        <span contenteditable="true" onblur="saveTaskTitle('${p.id}','${t.id}',this.textContent)" style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;outline:none;border-radius:3px;padding:1px 3px;cursor:text" onmouseenter="this.style.background='var(--bg2)'" onmouseleave="if(document.activeElement!==this)this.style.background=''" onfocus="this.style.background='var(--bg2)'">${t.title}</span>
-        ${!isOpen&&t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'}">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}
+        <span id="${titleKey}" style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;padding:1px 3px;border-radius:3px">${t.title}</span>
+        ${t.dueDate?`<span style="font-size:11px;color:${overdue?'var(--danger)':'var(--text3)'}">${overdue?'⚠ ':''}${fmtDate(t.dueDate)}</span>`:''}
         ${(t.dependsOn||[]).some(depId=>{const dep=tasks.find(x=>x.id===depId);return dep&&dep.status!=='done';})?'<span style="font-size:10px;background:var(--warning);color:#fff;padding:1px 6px;border-radius:10px">Blocked</span>':''}
         ${(t.comments||[]).length?`<span style="font-size:10px;color:var(--text3)"><i class="ti ti-message" style="font-size:10px"></i> ${t.comments.length}</span>`:''}
         ${chips}
-        <button class="icon-action" onclick="document.getElementById('${expandKey}').style.display=document.getElementById('${expandKey}').style.display==='none'?'block':'none'" style="font-size:13px"><i class="ti ti-user-plus"></i></button>
         <select onchange="updateTaskStatus('${p.id}','${t.id}',this.value)" style="width:auto;font-size:11px;padding:2px 4px">${statusOpts(t.status)}</select>
-        <button class="icon-action danger" onclick="deleteTask('${p.id}','${t.id}')" style="font-size:12px"><i class="ti ti-x"></i></button>
+        <button class="icon-action" onclick="openTaskExpand('${p.id}','${t.id}')" title="Edit task" style="font-size:13px"><i class="ti ti-user-plus"></i></button>
       </div>
-      <div id="${expandKey}" style="display:none;padding:6px 8px 8px;background:var(--bg2);border-radius:4px;margin-bottom:4px">
-        ${!isOpen?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div id="${expandKey}" style="display:none;padding:8px 10px 10px;background:var(--bg2);border-radius:4px;margin-bottom:4px">
+        <div style="margin-bottom:8px">
+          <label style="font-size:11px;color:var(--text3)">Title</label>
+          <input type="text" id="task-edit-title-${t.id}" value="${t.title}" onblur="saveTaskTitle('${p.id}','${t.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:100%;font-size:13px;padding:4px 8px;margin-top:2px">
+        </div>
+        ${!isOpen?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <span style="font-size:11px;color:var(--text3);flex-shrink:0">Due date:</span>
           <input type="date" value="${t.dueDate||''}" onchange="updateTaskDueDate('${p.id}','${t.id}',this.value)" style="font-size:12px;padding:2px 6px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text)">
           ${t.dueDate?`<button onclick="updateTaskDueDate('${p.id}','${t.id}','')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:0" title="Clear date">✕</button>`:''}
         </div>`:''}
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Assign (project members):</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${projMembers.map(m=>{const sel=aIds.includes(m.id);return`<span onclick="toggleTaskAssignee('${p.id}','${t.id}','${m.id}')" style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;}).join('')}</div>
-        ${tasks.filter(ot=>ot.id!==t.id).length?`<div style="font-size:11px;color:var(--text3);margin-bottom:4px">Depends on (blocks this task):</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${tasks.filter(ot=>ot.id!==t.id).map(ot=>{
-          const dep=(t.dependsOn||[]).includes(ot.id);
-          return`<span onclick="toggleTaskDep('${p.id}','${t.id}','${ot.id}')" style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${dep?'var(--accent)':'var(--border2)'};background:${dep?'var(--accent)22':'transparent'};color:${dep?'var(--accent)':'var(--text2)'};text-decoration:${ot.status==='done'?'line-through':''}">${ot.title.slice(0,30)}${ot.title.length>30?'...':''}</span>`;
-        }).join('')}</div>`:''}
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${projMembers.map(m=>{const sel=validAIds.includes(m.id);return`<span onclick="toggleTaskAssignee('${p.id}','${t.id}','${m.id}')" style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;}).join('')}</div>
+        ${depOtherTasks.length?`<div style="font-size:11px;color:var(--text3);margin-bottom:4px">Depends on:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+          ${deps.map(depId=>{const ot=tasks.find(x=>x.id===depId);if(!ot)return'';return`<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;background:var(--accent)22;border:.5px solid var(--accent);color:var(--accent)">${ot.title.slice(0,25)}${ot.title.length>25?'...':''}<button onclick="toggleTaskDep('${p.id}','${t.id}','${depId}')" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12px;padding:0;line-height:1;margin-left:2px">×</button></span>`;}).join('')}
+        </div>
+        <select onchange="if(this.value)toggleTaskDep('${p.id}','${t.id}',this.value);this.value=''" style="font-size:12px;margin-bottom:10px;width:100%">
+          <option value="">+ Add dependency...</option>
+          ${depOtherTasks.filter(ot=>!deps.includes(ot.id)).map(ot=>`<option value="${ot.id}">${ot.title.slice(0,40)}${ot.title.length>40?'...':''}</option>`).join('')}
+        </select>`:''}
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Comments:</div>
         <div id="task-comments-${t.id}" style="margin-bottom:6px">
           ${(t.comments||[]).map(c=>`<div style="font-size:12px;padding:5px 8px;background:var(--bg3);border-radius:4px;margin-bottom:4px">
@@ -3849,16 +3953,19 @@ function renderTasksAndMilestones(p){
             <div style="margin-top:2px">${c.text}</div>
           </div>`).join('')}
         </div>
-        <div style="display:flex;gap:6px;align-items:flex-end">
+        <div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:8px">
           <input type="text" id="comment-inp-${t.id}" placeholder="Add a comment..." style="flex:1;font-size:12px;padding:4px 8px" onkeydown="if(event.key==='Enter')addTaskComment('${p.id}','${t.id}')">
           <button class="btn sm" onclick="addTaskComment('${p.id}','${t.id}')" style="flex-shrink:0"><i class="ti ti-send"></i></button>
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="btn danger sm" onclick="deleteTask('${p.id}','${t.id}')"><i class="ti ti-trash"></i> Delete task</button>
         </div>
       </div>
     </div>`;
   }
 
-  const ungrouped=tasks.filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId));
-  const grouped=phases.map(ph=>({phase:ph,tasks:tasks.filter(t=>t.phaseId===ph.id)}));
+  const ungrouped=applyTaskFilters(tasks.filter(t=>!t.phaseId||!phases.find(ph=>ph.id===t.phaseId)),p.id);
+  const grouped=phases.map(ph=>({phase:ph,tasks:applyTaskFilters(tasks.filter(t=>t.phaseId===ph.id),p.id)}));
 
   return`<div style="margin-top:14px;border-top:.5px solid var(--border);padding-top:12px">
     <div style="margin-bottom:14px">
@@ -3904,9 +4011,37 @@ function renderTasksAndMilestones(p){
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:4px">
       <span class="sec-title" style="margin:0">Phases & Tasks <span style="font-weight:400;color:var(--text3)">(${doneTasks}/${tasks.length})</span></span>
-      <div style="display:flex;gap:4px">
+      <div style="display:flex;gap:4px;align-items:center">
+        <button class="icon-action" onclick="toggleFilterPanel('${p.id}')" title="Filter tasks" style="font-size:14px;${Object.values(getTaskFilter(p.id)).some(v=>v!=='all'&&v!==false)?'color:var(--accent)':''}"><i class="ti ti-filter"></i></button>
         <button class="btn sm" onclick="toggleAddPhase('${p.id}')" style="font-size:11px;padding:2px 8px"><i class="ti ti-plus"></i> Phase</button>
         <button class="btn sm" onclick="toggleAddTask('${p.id}')" style="font-size:11px;padding:2px 8px"><i class="ti ti-plus"></i> Task</button>
+      </div>
+    </div>
+    <div id="task-filter-panel-${p.id}" style="display:none;background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px;font-size:12px">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+        <div><label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Status</label>
+          <select onchange="setTaskFilter('${p.id}','status',this.value)" style="font-size:12px">
+            <option value="all"${getTaskFilter(p.id).status==='all'?' selected':''}>All</option>
+            <option value="todo"${getTaskFilter(p.id).status==='todo'?' selected':''}>To Do</option>
+            <option value="in_progress"${getTaskFilter(p.id).status==='in_progress'?' selected':''}>In Progress</option>
+            <option value="done"${getTaskFilter(p.id).status==='done'?' selected':''}>Done</option>
+          </select></div>
+        <div><label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Type</label>
+          <select onchange="setTaskFilter('${p.id}','type',this.value)" style="font-size:12px">
+            <option value="all"${getTaskFilter(p.id).type==='all'?' selected':''}>All</option>
+            <option value="normal"${getTaskFilter(p.id).type==='normal'?' selected':''}>Normal</option>
+            <option value="open"${getTaskFilter(p.id).type==='open'?' selected':''}>Open</option>
+            <option value="critical"${getTaskFilter(p.id).type==='critical'?' selected':''}>Critical</option>
+          </select></div>
+        <div><label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Priority</label>
+          <select onchange="setTaskFilter('${p.id}','priority',this.value)" style="font-size:12px">
+            <option value="all"${getTaskFilter(p.id).priority==='all'?' selected':''}>All</option>
+            <option value="low"${getTaskFilter(p.id).priority==='low'?' selected':''}>Low</option>
+            <option value="medium"${getTaskFilter(p.id).priority==='medium'?' selected':''}>Med</option>
+            <option value="high"${getTaskFilter(p.id).priority==='high'?' selected':''}>High</option>
+          </select></div>
+        <label class="check-label" style="font-size:12px"><input type="checkbox" ${getTaskFilter(p.id).hideDone?'checked':''} onchange="setTaskFilter('${p.id}','hideDone',this.checked)"> Hide completed</label>
+        <button class="btn sm" onclick="delete _taskFilters['${p.id}'];renderProjectList()" style="font-size:11px">Reset</button>
       </div>
     </div>
     ${showAddPhase?`<div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
@@ -3931,20 +4066,19 @@ function renderTasksAndMilestones(p){
     ${showAddTask?`<div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
         <input type="text" id="task-inp-${p.id}" placeholder="Task title..." style="flex:1;min-width:140px;font-size:13px;padding:5px 8px">
-        <select id="task-type-${p.id}" onchange="document.getElementById('task-due-wrap-${p.id}').style.display=this.value==='open'?'none':'flex'" style="width:auto;font-size:13px;padding:5px 8px">
+        <select id="task-type-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
           <option value="">Normal</option><option value="open">Open</option><option value="critical">Critical</option>
         </select>
-        <select id="task-phase-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
+        <button id="task-pri-btn-${p.id}" onclick="cycleNewTaskPriority('${p.id}')" title="Priority" style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;border:.5px solid var(--warning);background:var(--warning)22;color:var(--warning);cursor:pointer">M</button>
+        <input type="hidden" id="task-pri-${p.id}" value="medium">
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
+        <input type="date" id="task-due-${p.id}" style="width:140px;font-size:13px;padding:5px 8px">
+        <select id="task-phase-${p.id}" style="flex:1;font-size:13px;padding:5px 8px">
           <option value="">No phase</option>${phaseOpts}
         </select>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap" id="task-due-wrap-${p.id}">
-        <input type="date" id="task-due-${p.id}" style="width:140px;font-size:13px;padding:5px 8px">
-        <select id="task-pri-${p.id}" style="width:auto;font-size:13px;padding:5px 8px">
-          <option value="low">Low</option><option value="medium" selected>Med</option><option value="high">High</option>
-        </select>
-      </div>
-      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+      <div style="margin-top:2px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
         <span style="font-size:11px;color:var(--text3)">Assign:</span>
         <div id="task-assign-chips-${p.id}" style="display:flex;flex-wrap:wrap;gap:4px">
           ${projMembers.map(m=>`<span onclick="toggleNewTaskAssignee('${p.id}','${m.id}')" id="nta-${p.id}-${m.id}" style="display:inline-flex;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid var(--border2);color:var(--text2)">${m.name.split(' ')[0]}</span>`).join('')}
@@ -4183,6 +4317,8 @@ function renderBoard(){
 }
 
 let _boardDragTaskId=null,_boardDragProjId=null;
+const _lastPhaseUsed={}; // { [projId]: phaseId } — remembers last phase used per project
+const _taskFilters={}; // { [projId]: {status,type,priority,hideDone} }
 function boardDragStart(e,taskId,projId){
   _boardDragTaskId=taskId;_boardDragProjId=projId;
   e.dataTransfer.effectAllowed='move';
@@ -4201,6 +4337,14 @@ function boardDropTask(e,newStatus){
 // ═══════════════════════════════════════════════
 //  WORKLOAD VIEW
 // ═══════════════════════════════════════════════
+function toggleWorkloadExpand(triggerEl, memberId){
+  const extra=document.querySelector(`.workload-extra-${memberId}`);
+  if(!extra)return;
+  const expanded=extra.style.display!=='none';
+  extra.style.display=expanded?'none':'block';
+  if(triggerEl)triggerEl.textContent=expanded?`+${extra.querySelectorAll('div[style*="border-bottom"]').length} more tasks`:'Show less';
+}
+
 function refreshWorkloadFilters(){
   const sel=document.getElementById('workload-project-filter');if(!sel)return;
   const prev=sel.value;
@@ -4259,7 +4403,15 @@ function renderWorkload(){
         <span style="font-size:11px;color:var(--text3)">${t._proj.name}</span>
         ${t.dueDate?`<span style="font-size:11px;color:${t.dueDate<today()&&t.status!=='done'?'var(--danger)':'var(--text3)'}">${fmtDate(t.dueDate)}</span>`:''}
       </div>`).join('')}
-      ${activeTasks.length>5?`<div style="font-size:11px;color:var(--text3);margin-top:4px">+${activeTasks.length-5} more tasks</div>`:''}
+      ${activeTasks.length>5?`<div style="font-size:11px;color:var(--accent);margin-top:4px;cursor:pointer" onclick="toggleWorkloadExpand(this,'${m.id}')">+${activeTasks.length-5} more tasks</div>
+        <div class="workload-extra-${m.id}" style="display:none">${activeTasks.slice(5).map(t=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:.5px solid var(--border)">
+          <span style="width:6px;height:6px;border-radius:50%;background:${t.status==='in_progress'?'var(--warning)':'var(--border2)'};flex-shrink:0"></span>
+          <span style="flex:1">${t.title}</span>
+          <span style="font-size:11px;color:var(--text3)">${t._proj.name}</span>
+          ${t.dueDate?`<span style="font-size:11px;color:${t.dueDate<today()&&t.status!=='done'?'var(--danger)':'var(--text3)'}">${fmtDate(t.dueDate)}</span>`:''}
+        </div>`).join('')}
+        <div style="font-size:11px;color:var(--accent);margin-top:4px;cursor:pointer" onclick="toggleWorkloadExpand(this.parentElement.previousElementSibling,'${m.id}')">Show less</div>
+        </div>`:''}
     </div>`;
   }).join('');
 }
