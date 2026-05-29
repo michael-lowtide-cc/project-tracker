@@ -3653,12 +3653,16 @@ function cycleNewTaskPriority(projId){
   const cur=order.indexOf(inp.value||'medium');
   const next=order[(cur+1)%3];
   inp.value=next;
-  const colors={low:'var(--text3)',medium:'var(--warning)',high:'var(--danger)'};
-  const labels={low:'L',medium:'M',high:'H'};
-  btn.textContent=labels[next];
-  btn.style.borderColor=colors[next];
-  btn.style.background=colors[next].replace(')',',0.13)').replace('var(','rgba(').replace('--text3','155,151,154').replace('--warning','186,117,23').replace('--danger','163,45,45');
-  btn.style.color=colors[next];
+  const styles={
+    low:{label:'L',border:'#9a979a',bg:'rgba(155,151,154,0.13)',color:'#9a979a'},
+    medium:{label:'M',border:'#ba7517',bg:'rgba(186,117,23,0.13)',color:'#ba7517'},
+    high:{label:'H',border:'#a32d2d',bg:'rgba(163,45,45,0.13)',color:'#a32d2d'}
+  };
+  const s=styles[next];
+  btn.textContent=s.label;
+  btn.style.borderColor=s.border;
+  btn.style.background=s.bg;
+  btn.style.color=s.color;
 }
 
 function cycleTaskPriority(projId,taskId){
@@ -4012,7 +4016,7 @@ function renderTasksAndMilestones(p){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:4px">
       <span class="sec-title" style="margin:0">Phases & Tasks <span style="font-weight:400;color:var(--text3)">(${doneTasks}/${tasks.length})</span></span>
       <div style="display:flex;gap:4px;align-items:center">
-        <button class="icon-action" onclick="toggleFilterPanel('${p.id}')" title="Filter tasks" style="font-size:14px;${Object.values(getTaskFilter(p.id)).some(v=>v!=='all'&&v!==false)?'color:var(--accent)':''}"><i class="ti ti-filter"></i></button>
+        <button class="icon-action" onclick="toggleFilterPanel('${p.id}')" title="Filter tasks" style="font-size:14px;color:${(()=>{const f=getTaskFilter(p.id);return(f.status!=='all'||f.type!=='all'||f.priority!=='all'||f.hideDone)?'var(--accent)':'var(--text3)'})()}"><i class="ti ti-filter"></i></button>
         <button class="btn sm" onclick="toggleAddPhase('${p.id}')" style="font-size:11px;padding:2px 8px"><i class="ti ti-plus"></i> Phase</button>
         <button class="btn sm" onclick="toggleAddTask('${p.id}')" style="font-size:11px;padding:2px 8px"><i class="ti ti-plus"></i> Task</button>
       </div>
