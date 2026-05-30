@@ -307,39 +307,6 @@ td{padding:8px 0;vertical-align:top}
       <div><label>Default hourly rate ($/hr)</label><input id="s-rate" type="number" placeholder="150" oninput="saveSetting('hourlyRate',this.value);refreshAll()"></div>
     </div>
 
-    <div style="height:.5px;background:var(--border);margin:12px 0"></div>
-
-    <!-- INVOICE SETTINGS -->
-    <div class="sec-title">Invoice settings</div>
-    <div class="grid2" style="margin-bottom:8px">
-      <div><label>Invoice prefix</label><input id="s-prefix" type="text" placeholder="INV" oninput="saveSetting('invoicePrefix',this.value);refreshAll()"></div>
-      <div><label>Payment terms</label>
-        <select id="s-terms" onchange="saveSetting('paymentTerms',this.value)">
-          <option value="">None</option>
-          <option value="Due on receipt">Due on receipt</option>
-          <option value="Net 7">Net 7</option>
-          <option value="Net 15">Net 15</option>
-          <option value="Net 30">Net 30</option>
-          <option value="Net 45">Net 45</option>
-          <option value="Net 60">Net 60</option>
-        </select>
-      </div>
-    </div>
-    <div class="field" style="margin-bottom:8px">
-      <label>Invoice notes / footer text</label>
-      <textarea id="s-inv-notes" rows="2" placeholder="e.g. Please make checks payable to Lowtide.cc. Thank you for your business!" oninput="saveSetting('invoiceNotes',this.value)" style="width:100%;padding:8px 10px;border:.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;resize:vertical"></textarea>
-    </div>
-
-    <div style="height:.5px;background:var(--border);margin:12px 0"></div>
-
-    <!-- EXPENSE CATEGORIES -->
-    <div class="sec-title" style="margin-top:0">Expense categories</div>
-    <div class="cat-wrap" id="cat-list"></div>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <input id="new-cat-input" type="text" placeholder="New category…" style="flex:1" onkeydown="if(event.key==='Enter')addCategory()">
-      <button class="btn sm" onclick="addCategory()"><i class="ti ti-plus"></i> Add</button>
-    </div>
-
     <button class="btn" style="margin-top:1rem" onclick="toggleSettings()">Done</button>
   </div>
 
@@ -647,8 +614,7 @@ td{padding:8px 0;vertical-align:top}
         <div>
           <div style="font-size:22px;font-weight:500">Invoice</div>
           <div style="font-size:12px;color:var(--text2);margin-top:4px" id="inv-number"></div>
-          <div id="inv-from" style="margin-top:10px;font-size:12px;line-height:1.6;color:var(--text2)"></div>
-          <div id="inv-from-divider" style="display:none;height:3px;background:#9151a0;border-radius:2px;margin-top:8px;width:120px"></div>
+          <div id="inv-from" style="margin-top:10px;font-size:12px;line-height:1.6;color:var(--text2);padding-bottom:10px;border-bottom:3px solid #9151a0;display:none"></div>
         </div>
         <div style="text-align:right">
           <div style="font-weight:500" id="inv-proj-name"></div>
@@ -3163,14 +3129,26 @@ function addExpenseCategoryInline(){
 }
 
 function printInvoiceOnly(){
-  // Print only the invoice card by temporarily hiding everything else
   const card=document.getElementById('invoice-card');if(!card)return;
-  const style=document.createElement('style');
-  style.id='print-invoice-only';
-  style.textContent='@media print{body>*{display:none!important}#invoice-card{display:block!important;max-width:100%!important;box-shadow:none!important;border:none!important}}';
-  document.head.appendChild(style);
-  window.print();
-  setTimeout(()=>document.getElementById('print-invoice-only')?.remove(),1000);
+  let w;
+  try{w=window.open('','_blank');if(!w){alert('Popup blocked — please allow popups and try again.');return;}}
+  catch(e){alert('Could not open print view: '+e.message);return;}
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Invoice</title>
+  <style>
+    @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
+    body{font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;color:#2A2829;margin:0;padding:24px;max-width:800px}
+    .invoice-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1rem}
+    th{text-align:left;padding:6px 8px;background:#f0eaf7!important;font-weight:600;border-bottom:1px solid #ddd;color:#9151a0}
+    td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top}
+    .totals{margin-top:1rem;border-top:1px solid #eee;padding-top:0.75rem;text-align:right}
+    .total-row{display:flex;justify-content:flex-end;gap:2rem;font-size:14px;padding:4px 0;color:#6b686a}
+    .total-final{display:flex;justify-content:flex-end;gap:2rem;font-size:16px;font-weight:600;padding:8px 0;border-top:1px solid #ddd;margin-top:4px}
+    #inv-from{border-bottom:3px solid #9151a0;padding-bottom:10px}
+  </style>
+  </head><body>${card.innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
 }
 
 function updateInvoicePrefix(){
@@ -3216,7 +3194,6 @@ function renderInvoice(){
 
   // Populate "From" block with studio/business info
   const fromEl=document.getElementById('inv-from');
-  const fromDivider=document.getElementById('inv-from-divider');
   if(fromEl){
     const lines=[
       bizInfo.name||myProfile.name||'',
@@ -3227,7 +3204,6 @@ function renderInvoice(){
     ].filter(Boolean);
     fromEl.innerHTML=lines.map(l=>htmlEsc(l)).join('<br>');
     fromEl.style.display=lines.length?'block':'none';
-    if(fromDivider)fromDivider.style.display=lines.length?'block':'none';
   }
 
   // Payment terms
@@ -3794,13 +3770,31 @@ function saveTaskTitle(projId,taskId,newTitle){
   if(trimmed&&trimmed!==t.title){t.title=trimmed;save('tracker:projects',projects);renderProjectList();}
 }
 
+function cycleExpandPriority(projId,taskId,btn){
+  const order=['low','medium','high'];
+  const cur=btn.dataset.priority||'medium';
+  const next=order[(order.indexOf(cur)+1)%3];
+  btn.dataset.priority=next;
+  const styles={low:{label:'Low',color:'#9a979a'},medium:{label:'Med',color:'#ba7517'},high:{label:'High',color:'#a32d2d'}};
+  const s=styles[next];
+  btn.textContent=s.label;
+  btn.style.borderColor=s.color;
+  btn.style.background=s.color+'22';
+  btn.style.color=s.color;
+}
+
 // ── Expand panel helpers (operate without full re-render) ────────────────────
 function saveTaskExpand(projId,taskId){
+  // Close panel on save
+  const expandEl=document.getElementById('task-expand-'+projId+'-'+taskId);
+  if(expandEl)expandEl.style.display='none';
   const p=projects.find(x=>x.id===projId);if(!p)return;
   const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
   const titleEl=document.getElementById('task-edit-title-'+taskId);
   const phaseEl=document.getElementById('task-edit-phase-'+taskId);
   const dueEl=document.getElementById('task-edit-due-'+taskId);
+  const priBtnEl=document.getElementById('expand-pri-btn-'+taskId);
+  if(priBtnEl&&priBtnEl.dataset.priority)t.priority=priBtnEl.dataset.priority;
   if(titleEl&&titleEl.value.trim())t.title=titleEl.value.trim();
   if(phaseEl)t.phaseId=phaseEl.value||'';
   if(dueEl)t.dueDate=dueEl.value||'';
@@ -4021,6 +4015,35 @@ function togglePhaseCollapse(projId,phId){
   renderProjectList();
 }
 
+function toggleMsPicker(id){
+  const el=document.getElementById(id);if(!el)return;
+  // Close all other pickers first
+  document.querySelectorAll('[id^="ph-ms-"]').forEach(p=>{if(p.id!==id)p.style.display='none';});
+  el.style.display=el.style.display==='none'?'block':'none';
+  // Close on outside click
+  if(el.style.display==='block'){
+    setTimeout(()=>document.addEventListener('click',function handler(e){
+      if(!el.contains(e.target)&&e.target.onclick&&e.target.onclick.toString().includes(id))return;
+      el.style.display='none';document.removeEventListener('click',handler);
+    }),10);
+  }
+}
+
+function setPhaseMsLink(phId,field,msId){
+  // Store the ms link directly on the phase object in memory
+  // savePhaseEdit will persist it
+  const inp=document.getElementById('ph-edit-'+(field==='start'?'start':'end')+'-ms-id-'+phId);
+  if(inp)inp.value=msId;
+  // Also store temporarily in a data attribute on the date input
+  const dateInp=document.getElementById('ph-edit-'+(field==='start'?'start':'end')+'-'+phId);
+  if(dateInp)dateInp.dataset.msId=msId;
+}
+
+function clearPhaseMsLink(phId,field){
+  const dateInp=document.getElementById('ph-edit-'+(field==='start'?'start':'end')+'-'+phId);
+  if(dateInp){dateInp.dataset.msId='';dateInp.value='';}
+}
+
 function toggleEditPhase(projId,phId){
   editing.phases=editing.phases===phId?null:phId;
   renderProjectList();
@@ -4040,11 +4063,15 @@ function savePhaseEdit(projId,phId){
   const ph=(p.phases||[]).find(x=>x.id===phId);if(!ph)return;
   ph.title=document.getElementById(`ph-edit-name-${phId}`).value.trim()||ph.title;
   ph.color=document.getElementById(`ph-edit-color-${phId}`).value||ph.color;
-  ph.startMsId=document.getElementById(`ph-edit-start-ms-${phId}`)?.value||'';
-  ph.endMsId=document.getElementById(`ph-edit-end-ms-${phId}`)?.value||'';
-  // Only save manual date if no milestone linked
-  if(!ph.startMsId)ph.startDate=document.getElementById(`ph-edit-start-${phId}`).value||'';
-  if(!ph.endMsId)ph.endDate=document.getElementById(`ph-edit-end-${phId}`).value||'';
+  const startEl=document.getElementById(`ph-edit-start-${phId}`);
+  const endEl=document.getElementById(`ph-edit-end-${phId}`);
+  // Read ms links from data-ms-id attributes set by the picker
+  const newStartMs=startEl?.dataset?.msId;
+  const newEndMs=endEl?.dataset?.msId;
+  if(newStartMs!==undefined)ph.startMsId=newStartMs;
+  if(newEndMs!==undefined)ph.endMsId=newEndMs;
+  if(!ph.startMsId)ph.startDate=startEl?.value||'';
+  if(!ph.endMsId)ph.endDate=endEl?.value||'';
   save('tracker:projects',projects);
   editing.phases=null;
   renderProjectList();
@@ -4206,7 +4233,7 @@ function renderTasksAndMilestones(p){
     const priColors={high:'#a32d2d',medium:'#ba7517',low:'#9a979a'};
     const priBorder=priColors[t.priority||'medium']||priColors.medium;
     const phaseOpts2=(p.phases||[]).map(function(ph){return'<option value="'+ph.id+'"'+(t.phaseId===ph.id?' selected':'')+'>'+htmlEsc(ph.title)+'</option>';}).join('');
-    return`<div draggable="true" ondragstart="taskDragStart(event,'${p.id}','${t.id}')" ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'" ondragleave="this.style.outline=''" ondrop="taskDropOnTask(event,'${p.id}','${t.id}')" style="background:var(--bg);border-bottom:.5px solid var(--border);border-left:3px solid ${priBorder}">
+    return`<div draggable="true" ondragstart="taskDragStart(event,'${p.id}','${t.id}')" ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'" ondragleave="this.style.outline=''" ondrop="taskDropOnTask(event,'${p.id}','${t.id}')" style="background:var(--bg);border-bottom:.5px solid var(--border)">
       <div style="display:flex;align-items:center;gap:6px;padding:5px 0 5px 6px;font-size:13px">
         <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
         ${typeBadge(t)}
@@ -4223,6 +4250,10 @@ function renderTasksAndMilestones(p){
           <label style="font-size:11px;color:var(--text3)">Title</label>
           <input type="text" id="task-edit-title-${t.id}" value="${t.title}" onkeydown="if(event.key==='Enter')saveTaskField('${p.id}','${t.id}')" style="width:100%;font-size:13px;padding:4px 8px;margin-top:2px">
         </div>
+        <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--text3)">Priority:</span>
+          ${(()=>{const priStyles={low:{label:'Low',color:'#9a979a'},medium:{label:'Med',color:'#ba7517'},high:{label:'High',color:'#a32d2d'}};const cur=t.priority||'medium';const s=priStyles[cur];return`<button id="expand-pri-btn-${t.id}" onclick="cycleExpandPriority('${p.id}','${t.id}',this)" style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;border:.5px solid ${s.color};background:${s.color}22;color:${s.color};cursor:pointer" data-priority="${cur}">${s.label}</button>`;})()}
+        </div>
         <div class="grid2" style="margin-bottom:8px">
           <div><label style="font-size:11px;color:var(--text3)">Phase</label>
             <select id="task-edit-phase-${t.id}" style="width:100%;font-size:12px;margin-top:2px">
@@ -4236,7 +4267,7 @@ function renderTasksAndMilestones(p){
           </div>
         </div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Assign (project members):</div>
-        <div id="expand-assignees-${t.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${projMembers.map(m=>{const sel=validAIds.includes(m.id);return`<span onclick="toggleExpandAssignee('${p.id}','${t.id}','${m.id}',this)" data-mid="${m.id}" data-sel="${sel?'1':'0'}" style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;}).join('')}</div>
+        <div id="expand-assignees-${t.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${sortedMemberChips(projMembers).map(m=>{const sel=validAIds.includes(m.id);return`<span onclick="toggleExpandAssignee('${p.id}','${t.id}','${m.id}',this)" data-mid="${m.id}" data-sel="${sel?'1':'0'}" style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;}).join('')}</div>
         ${(function(){
           if(!depOtherTasks.length)return'';
           var dchips=curDeps.map(function(depId){var ot=tasks.find(function(x){return x.id===depId;});if(!ot)return'';return'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;background:#9151a022;border:.5px solid var(--accent);color:var(--accent)">'+htmlEsc(ot.title.slice(0,25))+(ot.title.length>25?'..':'')+'<button onclick="removeTaskDep(\''+p.id+'\',\''+t.id+'\',\''+depId+'\')" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12px;padding:0;line-height:1;margin-left:2px">×</button></span>';}).join('');
@@ -4324,21 +4355,15 @@ function renderTasksAndMilestones(p){
           const on=(f[key]||[]).includes(val);
           return `<button onclick="toggleTaskFilterChip('${p.id}','${key}','${val}')" style="padding:2px 9px;border-radius:12px;font-size:11px;cursor:pointer;border:.5px solid ${on?'var(--accent)':'var(--border2)'};background:${on?'var(--accent)22':'transparent'};color:${on?'var(--accent)':'var(--text2)'};font-weight:${on?'600':'400'}">${label}</button>`;
         }
-        return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px">
-          <span style="font-size:11px;color:var(--text3);min-width:50px">Status</span>
+        return `<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">
           ${chip('status','todo','To Do')}${chip('status','in_progress','In Progress')}${chip('status','done','Done')}
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px">
-          <span style="font-size:11px;color:var(--text3);min-width:50px">Type</span>
+          <span style="width:.5px;height:14px;background:var(--border2);display:inline-block;margin:0 2px"></span>
           ${chip('type','normal','Normal')}${chip('type','open','Open')}${chip('type','critical','Critical')}
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px">
-          <span style="font-size:11px;color:var(--text3);min-width:50px">Priority</span>
+          <span style="width:.5px;height:14px;background:var(--border2);display:inline-block;margin:0 2px"></span>
           ${chip('priority','low','Low')}${chip('priority','medium','Med')}${chip('priority','high','High')}
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button onclick="toggleTaskFilterChip('${p.id}','showDone')" style="padding:2px 9px;border-radius:12px;font-size:11px;cursor:pointer;border:.5px solid ${f.showDone?'var(--accent)':'var(--border2)'};background:${f.showDone?'var(--accent)22':'transparent'};color:${f.showDone?'var(--accent)':'var(--text2)'}">Show completed</button>
-          <button class="btn sm" onclick="delete _taskFilters['${p.id}'];renderProjectList()" style="font-size:11px">Reset</button>
+          <span style="width:.5px;height:14px;background:var(--border2);display:inline-block;margin:0 2px"></span>
+          <button onclick="toggleTaskFilterChip('${p.id}','showDone')" style="padding:2px 9px;border-radius:12px;font-size:11px;cursor:pointer;border:.5px solid ${f.showDone?'var(--accent)':'var(--border2)'};background:${f.showDone?'var(--accent)22':'transparent'};color:${f.showDone?'var(--accent)':'var(--text2)'}">Completed</button>
+          <button class="btn sm" onclick="delete _taskFilters['${p.id}'];renderProjectList()" style="font-size:10px;padding:1px 7px">Reset</button>
         </div>`;
       })()}
     </div>
@@ -4379,7 +4404,7 @@ function renderTasksAndMilestones(p){
       <div style="margin-top:2px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
         <span style="font-size:11px;color:var(--text3)">Assign:</span>
         <div id="task-assign-chips-${p.id}" style="display:flex;flex-wrap:wrap;gap:4px">
-          ${projMembers.map(m=>`<span onclick="toggleNewTaskAssignee('${p.id}','${m.id}')" id="nta-${p.id}-${m.id}" style="display:inline-flex;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid var(--border2);color:var(--text2)">${m.name.split(' ')[0]}</span>`).join('')}
+          ${sortedMemberChips(projMembers).map(m=>`<span onclick="toggleNewTaskAssignee('${p.id}','${m.id}')" id="nta-${p.id}-${m.id}" style="display:inline-flex;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid var(--border2);color:var(--text2)">${m.name.split(' ')[0]}</span>`).join('')}
         </div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px">
@@ -4415,24 +4440,33 @@ function renderTasksAndMilestones(p){
             </div>
           </div>
           <div class="grid2">
-            <div><label>Start date</label><input type="date" id="ph-edit-start-${phase.id}" value="${phase.startDate||''}"></div>
-            <div><label>End date</label><input type="date" id="ph-edit-end-${phase.id}" value="${phase.endDate||''}"></div>
-          </div>
-          ${msOpts?`<div class="grid2" style="margin-top:4px">
-            <div><label style="font-size:11px;color:var(--text3)">Start date from milestone</label>
-              <select id="ph-edit-start-ms-${phase.id}" onchange="document.getElementById('ph-edit-start-${phase.id}').value=''" style="font-size:12px">
-                <option value="">— Manual date —</option>${msOpts}
-              </select>
-              <script>document.getElementById('ph-edit-start-ms-${phase.id}').value='${phase.startMsId||''}';<\/script>
+            <div><label>Start date</label>
+              <div style="position:relative;display:flex;align-items:center;gap:4px">
+                <input type="date" id="ph-edit-start-${phase.id}" value="${phase.startDate||''}" style="flex:1">
+                ${(p.milestones||[]).length?`<div style="position:relative">
+                  <button onclick="toggleMsPicker('ph-ms-start-${phase.id}')" title="Use milestone date" style="padding:3px 6px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;font-size:12px">↓</button>
+                  <div id="ph-ms-start-${phase.id}" style="display:none;position:absolute;right:0;top:100%;z-index:50;background:var(--bg);border:.5px solid var(--border2);border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,.1);min-width:180px;max-height:180px;overflow-y:auto">
+                    <div onclick="clearPhaseMsLink('${phase.id}','start');toggleMsPicker('ph-ms-start-${phase.id}')" style="padding:6px 10px;font-size:12px;cursor:pointer;color:var(--text3);border-bottom:.5px solid var(--border)">— Manual date —</div>
+                    ${(p.milestones||[]).filter(m=>m.date).map(m=>`<div onclick="setPhaseMsLink('${phase.id}','start','${m.id}');document.getElementById('ph-edit-start-${phase.id}').value='${m.date}';toggleMsPicker('ph-ms-start-${phase.id}')" style="padding:6px 10px;font-size:12px;cursor:pointer;border-bottom:.5px solid var(--border)" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">${htmlEsc(m.title)}<span style="float:right;color:var(--text3);font-size:10px">${fmtDate(m.date)}</span></div>`).join('')}
+                  </div>
+                </div>`:''}
+              </div>
+              ${phase.startMsId?`<div style="font-size:10px;color:var(--accent);margin-top:2px">↳ Linked to milestone</div>`:''}
             </div>
-            <div><label style="font-size:11px;color:var(--text3)">End date from milestone</label>
-              <select id="ph-edit-end-ms-${phase.id}" onchange="document.getElementById('ph-edit-end-${phase.id}').value=''" style="font-size:12px">
-                <option value="">— Manual date —</option>${msOpts}
-              </select>
-              <script>document.getElementById('ph-edit-end-ms-${phase.id}').value='${phase.endMsId||''}';<\/script>
+            <div><label>End date</label>
+              <div style="position:relative;display:flex;align-items:center;gap:4px">
+                <input type="date" id="ph-edit-end-${phase.id}" value="${phase.endDate||''}" style="flex:1">
+                ${(p.milestones||[]).length?`<div style="position:relative">
+                  <button onclick="toggleMsPicker('ph-ms-end-${phase.id}')" title="Use milestone date" style="padding:3px 6px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);cursor:pointer;font-size:12px">↓</button>
+                  <div id="ph-ms-end-${phase.id}" style="display:none;position:absolute;right:0;top:100%;z-index:50;background:var(--bg);border:.5px solid var(--border2);border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,.1);min-width:180px;max-height:180px;overflow-y:auto">
+                    <div onclick="clearPhaseMsLink('${phase.id}','end');toggleMsPicker('ph-ms-end-${phase.id}')" style="padding:6px 10px;font-size:12px;cursor:pointer;color:var(--text3);border-bottom:.5px solid var(--border)">— Manual date —</div>
+                    ${(p.milestones||[]).filter(m=>m.date).map(m=>`<div onclick="setPhaseMsLink('${phase.id}','end','${m.id}');document.getElementById('ph-edit-end-${phase.id}').value='${m.date}';toggleMsPicker('ph-ms-end-${phase.id}')" style="padding:6px 10px;font-size:12px;cursor:pointer;border-bottom:.5px solid var(--border)" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">${htmlEsc(m.title)}<span style="float:right;color:var(--text3);font-size:10px">${fmtDate(m.date)}</span></div>`).join('')}
+                  </div>
+                </div>`:''}
+              </div>
+              ${phase.endMsId?`<div style="font-size:10px;color:var(--accent);margin-top:2px">↳ Linked to milestone</div>`:''}
             </div>
-          </div>`:''}
-          <div class="edit-actions"><div></div><div style="display:flex;gap:6px">
+          </div>          <div class="edit-actions"><div></div><div style="display:flex;gap:6px">
             <button class="btn danger sm" onclick="deletePhase('${p.id}','${phase.id}')"><i class="ti ti-trash"></i> Delete</button>
             <button class="btn primary sm" onclick="savePhaseEdit('${p.id}','${phase.id}')"><i class="ti ti-check"></i> Save</button>
           </div></div>
@@ -4497,7 +4531,7 @@ function exportProjectPDF(projId){
 
   ${ganttSVG?`<h2>Timeline</h2><div style="margin-bottom:16px">${ganttSVG}</div>`:''}
 
-  ${projTeam.length?`<h2>Team</h2><div style="margin-bottom:14px">${projTeam.map(m=>`<span class="chip" style="background:${m.color||'#888'}">${h(m.name)}</span>`).join('')}</div>`:''}
+  ${projTeam.length?`<h2>Team</h2><div style="margin-bottom:14px">${sortedMemberChips(projTeam).map(m=>`<span class="chip" style="background:${m.color||'#888'}">${h(m.name)}</span>`).join('')}</div>`:''}
   ${phases.length?`<h2>Phases</h2><table><colgroup><col style="width:55%"><col style="width:22%"><col style="width:23%"></colgroup><tr><th>Phase</th><th>Start</th><th>End</th></tr>
     ${phases.map(ph=>`<tr><td><span class="phase-dot" style="background:${ph.color||'#4a90d9'}">&nbsp;</span>${h(ph.title)}</td><td>${fd(ph.startDate)}</td><td>${fd(ph.endDate)}</td></tr>`).join('')}
   </table>`:''}
