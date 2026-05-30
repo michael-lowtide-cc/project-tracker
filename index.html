@@ -1638,7 +1638,7 @@ function projTeamSearch(val){
   if(!val||val.length<1){list.style.display='none';return;}
   const v=val.toLowerCase();
   const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
-  const matches=allMembers.filter(m=>m.name.toLowerCase().includes(v)&&!_projTeamSelected.includes(m.id));
+  const matches=sortedMemberChips(allMembers.filter(m=>m.name.toLowerCase().includes(v)&&!_projTeamSelected.includes(m.id)));
   if(!matches.length){
     // Show inline mini-form to create a new team member
     list.classList.add('as-form');
@@ -1712,16 +1712,13 @@ function removeProjTeamMember(id){
 }
 
 function renderProjTeamChips(){
-  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0',company:''},...teamMembers];
   const el=document.getElementById('p-team-assign');
-  el.innerHTML=_projTeamSelected.map(id=>{
-    const m=allMembers.find(x=>x.id===id);
-    if(!m)return'';
-    return`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:12px;background:${m.color}22;border:.5px solid ${m.color};color:${m.color}">
+  const selectedMembers=sortedMemberChips(_projTeamSelected.map(id=>allMembers.find(x=>x.id===id)).filter(Boolean));
+  el.innerHTML=selectedMembers.map(m=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:12px;background:${m.color}22;border:.5px solid ${m.color};color:${m.color}">
       ${m.name}
-      <button onclick="removeProjTeamMember('${id}')" style="background:none;border:none;cursor:pointer;color:${m.color};font-size:13px;padding:0;line-height:1">×</button>
-    </span>`;
-  }).join('');
+      <button onclick="removeProjTeamMember('${m.id}')" style="background:none;border:none;cursor:pointer;color:${m.color};font-size:13px;padding:0;line-height:1">×</button>
+    </span>`).join('');
 }
 
 function toggleRetainerFields(){
@@ -2482,7 +2479,7 @@ function editProjTeamSearch(projId,val){
   const v=val.toLowerCase();
   if(!_editProjTeamSelected[projId])_editProjTeamSelected[projId]=[];
   const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
-  const matches=allMembers.filter(m=>m.name.toLowerCase().includes(v)&&!_editProjTeamSelected[projId].includes(m.id));
+  const matches=sortedMemberChips(allMembers.filter(m=>m.name.toLowerCase().includes(v)&&!_editProjTeamSelected[projId].includes(m.id)));
   if(!matches.length){
     // Inline mini-form to create new team member
     list.classList.add('as-form');
@@ -2554,13 +2551,11 @@ function removeEditProjTeamMember(projId,memberId){
 function renderEditProjTeamChips(projId){
   const pfx=`ep-${projId}`;
   const el=document.getElementById(`${pfx}-team-assign`);if(!el)return;
-  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers];
-  el.innerHTML=(_editProjTeamSelected[projId]||[]).map(id=>{
-    const m=allMembers.find(x=>x.id===id);if(!m)return'';
-    return`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:12px;background:${m.color}22;border:.5px solid ${m.color};color:${m.color}">
-      ${m.name}<button onclick="removeEditProjTeamMember('${projId}','${id}')" style="background:none;border:none;cursor:pointer;color:${m.color};font-size:13px;padding:0;line-height:1">×</button>
-    </span>`;
-  }).join('');
+  const allMembers=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0',company:''},...teamMembers];
+  const selectedMembers=sortedMemberChips((_editProjTeamSelected[projId]||[]).map(id=>allMembers.find(x=>x.id===id)).filter(Boolean));
+  el.innerHTML=selectedMembers.map(m=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:12px;background:${m.color}22;border:.5px solid ${m.color};color:${m.color}">
+      ${m.name}<button onclick="removeEditProjTeamMember('${projId}','${m.id}')" style="background:none;border:none;cursor:pointer;color:${m.color};font-size:13px;padding:0;line-height:1">×</button>
+    </span>`).join('');
 }
 
 let _dupProjectId=null;
@@ -4220,7 +4215,7 @@ function renderTasksAndMilestones(p){
     const expandKey='task-expand-'+p.id+'-'+t.id;
     const aIds=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
     const validAIds=aIds.filter(id=>projMemberIds.has(id));
-    const chips=validAIds.map(id=>{const m=allMembers.find(x=>x.id===id);return m?'<span style="font-size:10px;background:'+m.color+';color:#fff;padding:1px 6px;border-radius:10px">'+m.name.split(' ')[0]+'</span>':'';}).join('');
+    const chips=sortedMemberChips(validAIds.map(id=>allMembers.find(x=>x.id===id)).filter(Boolean)).map(m=>'<span style="font-size:10px;background:'+m.color+';color:#fff;padding:1px 6px;border-radius:10px">'+m.name.split(' ')[0]+'</span>').join('');
     const depOtherTasks=tasks.filter(ot=>ot.id!==t.id);
     const curDeps=(t.dependsOn||[]).filter(id=>tasks.find(x=>x.id===id));
     const priColors={high:'#a32d2d',medium:'#ba7517',low:'#9a979a'};
@@ -4642,7 +4637,7 @@ function renderBoard(){
       </div>
       ${colTasks.map(t=>{
         const aIds=Array.isArray(t.assigneeIds)?t.assigneeIds:(t.assigneeId?[t.assigneeId]:[]);
-        const chips=aIds.slice(0,3).map(id=>{const m=allMembers.find(x=>x.id===id);return m?`<span style="font-size:9px;background:${m.color};color:#fff;padding:1px 5px;border-radius:8px">${m.name.split(' ')[0]}</span>`:''}).join('');
+        const chips=sortedMemberChips(aIds.map(id=>allMembers.find(x=>x.id===id)).filter(Boolean)).slice(0,3).map(m=>`<span style="font-size:9px;background:${m.color};color:#fff;padding:1px 5px;border-radius:8px">${m.name.split(' ')[0]}</span>`).join('');
         const overdue=t.dueDate&&t.dueDate<today()&&t.status!=='done';
         const isBlocked=(t.dependsOn||[]).some(depId=>{const dep=allTasks.find(x=>x.id===depId);return dep&&dep.status!=='done';});
         return`<div draggable="true" ondragstart="boardDragStart(event,'${t.id}','${t._proj.id}')"
@@ -5263,7 +5258,7 @@ function exportProjectOverviewPDF(){
     <span><b>Billed:</b> ${$f(bTime+bExp)}</span>
     <span><b>Tasks:</b> ${done}/${tasks.length} done</span>
   </div>
-  ${projTeam.length?`<h3>Team</h3><div>${projTeam.map(m=>`<span class="chip" style="background:${m.color}22;color:${m.color};border:.5px solid ${m.color}">${m.name}</span>`).join('')}</div>`:''}
+  ${projTeam.length?`<h3>Team</h3><div>${sortedMemberChips(projTeam).map(m=>`<span class="chip" style="background:${m.color}22;color:${m.color};border:.5px solid ${m.color}">${m.name}</span>`).join('')}</div>`:''}
   <h3>${(()=>{const {monthLabelDiv:glDiv,svg:gsvg,todayLabel:gtl}=buildGanttSVG(phases,milestones,{viewMode:'3mo',forExport:false});return gsvg?`<h3>Timeline</h3>${glDiv}${gsvg}${gtl}`:'';})()}
   Tasks by Phase</h3>
   ${phases.length===0&&tasks.length===0?'<p style="color:#9a979a;font-size:13px">No tasks.</p>':''}
