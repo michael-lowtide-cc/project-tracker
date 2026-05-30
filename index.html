@@ -390,7 +390,7 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- EXPENSES -->
   <div id="expenses-section" style="display:none">
-    <div class="page-header"><h2 class="page-title">Expenses <button class="icon-action" onclick="toggleExpenseSettings()" title="Expense categories" style="font-size:16px;vertical-align:middle"><i class="ti ti-settings"></i></button></h2></div>
+    <div class="page-header"><h2 class="page-title">Expenses</h2><button class="icon-action" onclick="toggleExpenseSettings()" title="Expense categories" style="font-size:18px"><i class="ti ti-settings"></i></button></div>
     <!-- Inline expense categories panel -->
     <div id="expense-settings-panel" class="card" style="display:none;margin-bottom:1rem">
       <div class="sec-title" style="margin-top:0">Expense categories</div>
@@ -578,7 +578,7 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- INVOICE (print) -->
   <div id="invoice-section" style="display:none">
-    <div class="page-header no-print"><h2 class="page-title">Invoice <button class="icon-action" onclick="toggleInvoiceSettings()" title="Invoice settings" style="font-size:16px;vertical-align:middle"><i class="ti ti-settings"></i></button></h2></div>
+    <div class="page-header no-print"><h2 class="page-title">Invoice</h2><button class="icon-action" onclick="toggleInvoiceSettings()" title="Invoice settings" style="font-size:18px"><i class="ti ti-settings"></i></button></div>
     <!-- Inline invoice settings panel -->
     <div id="invoice-settings-panel" class="card no-print" style="display:none;margin-bottom:1rem">
       <div class="sec-title" style="margin-top:0">Invoice settings</div>
@@ -590,10 +590,6 @@ td{padding:8px 0;vertical-align:top}
             <option value="Net 7">Net 7</option><option value="Net 15">Net 15</option>
             <option value="Net 30">Net 30</option><option value="Net 45">Net 45</option><option value="Net 60">Net 60</option>
           </select></div>
-      </div>
-      <div class="field" style="margin-bottom:8px">
-        <label>Logo URL <span style="font-size:11px;color:var(--text3)">(direct image link — renders at top of invoice)</span></label>
-        <input id="s-logo-url" type="url" placeholder="https://..." oninput="saveSetting('logoUrl',this.value);renderInvoice()">
       </div>
       <div class="field" style="margin-bottom:0">
         <label>Invoice notes / footer text</label>
@@ -609,12 +605,12 @@ td{padding:8px 0;vertical-align:top}
       </select>
     </div>
     <div class="card" id="invoice-card">
-      <div id="inv-logo" style="display:none;margin-bottom:12px"><img id="inv-logo-img" style="max-height:60px;max-width:200px;object-fit:contain"></div>
+      <div id="inv-logo-placeholder" style="width:180px;height:60px;border:1.5px dashed var(--border2);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;margin-bottom:12px;color:var(--text3);font-size:11px">Logo</div>
       <div class="invoice-header">
         <div>
           <div style="font-size:22px;font-weight:500">Invoice</div>
           <div style="font-size:12px;color:var(--text2);margin-top:4px" id="inv-number"></div>
-          <div id="inv-from" style="margin-top:10px;font-size:12px;line-height:1.6;color:var(--text2);padding-bottom:10px;border-bottom:3px solid #9151a0;display:none"></div>
+          <div id="inv-from" style="margin-top:10px;font-size:12px;line-height:1.6;color:var(--text2);display:none"></div>
         </div>
         <div style="text-align:right">
           <div style="font-weight:500" id="inv-proj-name"></div>
@@ -1353,8 +1349,6 @@ document.getElementById('p-client').addEventListener('change',function(){
   document.getElementById('s-rate').value=settings.hourlyRate||'150';
   document.getElementById('s-terms').value=settings.paymentTerms||'';
   document.getElementById('s-inv-notes').value=settings.invoiceNotes||'';
-  const logoInput=document.getElementById('s-logo-url');
-  if(logoInput)logoInput.value=settings.logoUrl||'';
   document.getElementById('s-myname').value=myProfile.name||'';
   document.getElementById('s-myrole').value=myProfile.role||'';
   document.getElementById('s-myemail').value=myProfile.email||'';
@@ -3185,13 +3179,6 @@ function renderInvoice(){
   document.getElementById('inv-client-name').textContent='';
   document.getElementById('inv-period').textContent='Period: '+fmtMonth(m);
 
-  // Logo
-  const logoEl=document.getElementById('inv-logo');
-  const logoImg=document.getElementById('inv-logo-img');
-  if(logoEl&&logoImg&&settings.logoUrl){
-    logoImg.src=settings.logoUrl;logoEl.style.display='block';
-  } else if(logoEl){logoEl.style.display='none';}
-
   // Populate "From" block with studio/business info
   const fromEl=document.getElementById('inv-from');
   if(fromEl){
@@ -3678,15 +3665,21 @@ function buildGanttSVG(phases, milestones, opts={}){
 function renderMiniGantt(p, opts={}){
   const phases=(p.phases||[]).filter(ph=>ph.startDate||ph.endDate).sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
   const _allMilestones=(p.milestones||[]).filter(m=>m.date).sort((a,b)=>a.date.localeCompare(b.date));
-  const _taskFilt=getTaskFilter(p.id);
-  const milestones=_taskFilt.showDone?_allMilestones:_allMilestones.filter(m=>!m.completed);
+  const milestones=(()=>{const f=getTaskFilter(p.id);return f.showDone?_allMilestones:_allMilestones.filter(m=>!m.completed);})();
   if(!phases.length&&!milestones.length)return'';
 
   const gId=`mg-${p.id}`;
   const viewMode=_ganttCompressed[p.id]||'3mo';
 
   // Delegate all SVG building to the shared function
-  const {monthLabelDiv,svg,todayLabel}=buildGanttSVG(phases,milestones,{viewMode,forExport:false,escFn:esc});
+  // Resolve milestone-linked dates before passing to gantt
+  const ganttPhases=phases.map(ph=>{
+    const ms=p.milestones||[];
+    const s=ph.startMsId?ms.find(m=>m.id===ph.startMsId)?.date||ph.startDate:ph.startDate;
+    const e=ph.endMsId?ms.find(m=>m.id===ph.endMsId)?.date||ph.endDate:ph.endDate;
+    return{...ph,startDate:s,endDate:e};
+  });
+  const {monthLabelDiv,svg,todayLabel}=buildGanttSVG(ganttPhases,milestones,{viewMode,forExport:false,escFn:esc});
 
   return`<div style="margin-top:10px;padding-top:10px;border-top:.5px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
@@ -4132,7 +4125,7 @@ function initTaskAssignChips(projId){
   const projMembers=allMembers.filter(m=>projMemberIds.has(m.id));
   let selected=[];
   container.dataset.selected=JSON.stringify(selected);
-  container.innerHTML=projMembers.map(m=>`
+  container.innerHTML=sortedMemberChips(projMembers).map(m=>`
     <span onclick="toggleNewTaskAssignee('${projId}','${m.id}')" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid var(--border2);background:transparent;color:var(--text2)" id="nta-${projId}-${m.id}">
       ${m.name.split(' ')[0]}
     </span>`).join('');
@@ -4496,7 +4489,8 @@ function exportProjectPDF(projId){
 
   // Gantt SVG — 3mo view by default, with today line, matching inline style
   // Use shared gantt builder — forExport=true uses print-safe hardcoded colours
-  const {monthLabelDiv:ganttMonthDiv,svg:ganttSVGBody,todayLabel:ganttTodayLabel}=buildGanttSVG(phases,milestones,{viewMode:'3mo',forExport:true,escFn:h});
+  const _pdfPhases=phases.map(ph=>{const s=ph.startMsId?(p.milestones||[]).find(m=>m.id===ph.startMsId)?.date||ph.startDate:ph.startDate;const e=ph.endMsId?(p.milestones||[]).find(m=>m.id===ph.endMsId)?.date||ph.endDate:ph.endDate;return{...ph,startDate:s,endDate:e};});
+  const {monthLabelDiv:ganttMonthDiv,svg:ganttSVGBody,todayLabel:ganttTodayLabel}=buildGanttSVG(_pdfPhases,milestones,{viewMode:'3mo',forExport:true,escFn:h});
   const ganttSVG=ganttSVGBody?`${ganttMonthDiv}${ganttSVGBody}${ganttTodayLabel}`:'';
 
 
@@ -4830,7 +4824,8 @@ function generateClientShare(projId){
   // 3mo view from 1 week before today; solid bg, month labels top, today line, dots for milestones
   // forExport:true — popup windows don't have access to the app's CSS variables,
   // so we use hardcoded hex colours to prevent the black-background bug
-  const {monthLabelDiv:ganttMonthDiv,svg:ganttSVGBody,todayLabel:ganttTodayLbl}=buildGanttSVG(phases,milestones,{viewMode:'3mo',forExport:true,escFn:he});
+  const _sharePhases=phases.map(ph=>{const s=ph.startMsId?(p.milestones||[]).find(m=>m.id===ph.startMsId)?.date||ph.startDate:ph.startDate;const e=ph.endMsId?(p.milestones||[]).find(m=>m.id===ph.endMsId)?.date||ph.endDate:ph.endDate;return{...ph,startDate:s,endDate:e};});
+  const {monthLabelDiv:ganttMonthDiv,svg:ganttSVGBody,todayLabel:ganttTodayLbl}=buildGanttSVG(_sharePhases,milestones,{viewMode:'3mo',forExport:true,escFn:he});
   const ganttSVG=ganttSVGBody?`${ganttMonthDiv}${ganttSVGBody}${ganttTodayLbl}`:'';
   const todayStr=today();
   const upcomingMs=milestones.filter(m=>!m.completed&&m.date&&m.date>=todayStr).slice(0,5);
