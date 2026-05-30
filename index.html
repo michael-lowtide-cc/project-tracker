@@ -423,7 +423,16 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- EXPENSES -->
   <div id="expenses-section" style="display:none">
-    <div class="page-header"><h2 class="page-title">Expenses</h2></div>
+    <div class="page-header"><h2 class="page-title">Expenses <button class="icon-action" onclick="toggleExpenseSettings()" title="Expense categories" style="font-size:16px;vertical-align:middle"><i class="ti ti-settings"></i></button></h2></div>
+    <!-- Inline expense categories panel -->
+    <div id="expense-settings-panel" class="card" style="display:none;margin-bottom:1rem">
+      <div class="sec-title" style="margin-top:0">Expense categories</div>
+      <div class="cat-wrap" id="exp-cat-list-inline"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="exp-new-cat-input" type="text" placeholder="New category…" style="flex:1" onkeydown="if(event.key==='Enter')addExpenseCategoryInline()">
+        <button class="btn sm" onclick="addExpenseCategoryInline()"><i class="ti ti-plus"></i> Add</button>
+      </div>
+    </div>
     <div class="card">
       <div class="sec-title">Log expense</div>
       <div class="grid2">
@@ -602,21 +611,44 @@ td{padding:8px 0;vertical-align:top}
 
   <!-- INVOICE (print) -->
   <div id="invoice-section" style="display:none">
-    <div class="page-header no-print"><h2 class="page-title">Invoice</h2></div>
+    <div class="page-header no-print"><h2 class="page-title">Invoice <button class="icon-action" onclick="toggleInvoiceSettings()" title="Invoice settings" style="font-size:16px;vertical-align:middle"><i class="ti ti-settings"></i></button></h2></div>
+    <!-- Inline invoice settings panel -->
+    <div id="invoice-settings-panel" class="card no-print" style="display:none;margin-bottom:1rem">
+      <div class="sec-title" style="margin-top:0">Invoice settings</div>
+      <div class="grid2" style="margin-bottom:8px">
+        <div><label>Invoice prefix</label><input id="s-prefix" type="text" placeholder="INV" oninput="saveSetting('invoicePrefix',this.value);renderInvoice()"></div>
+        <div><label>Payment terms</label>
+          <select id="s-terms" onchange="saveSetting('paymentTerms',this.value)">
+            <option value="">None</option><option value="Due on receipt">Due on receipt</option>
+            <option value="Net 7">Net 7</option><option value="Net 15">Net 15</option>
+            <option value="Net 30">Net 30</option><option value="Net 45">Net 45</option><option value="Net 60">Net 60</option>
+          </select></div>
+      </div>
+      <div class="field" style="margin-bottom:8px">
+        <label>Logo URL <span style="font-size:11px;color:var(--text3)">(direct image link — renders at top of invoice)</span></label>
+        <input id="s-logo-url" type="url" placeholder="https://..." oninput="saveSetting('logoUrl',this.value);renderInvoice()">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Invoice notes / footer text</label>
+        <textarea id="s-inv-notes" rows="2" placeholder="e.g. Please make checks payable to Lowtide.cc." oninput="saveSetting('invoiceNotes',this.value)" style="width:100%;padding:8px 10px;border:.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;resize:vertical"></textarea>
+      </div>
+    </div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem" class="no-print">
       <label style="font-size:14px;color:var(--text2);margin:0">Period</label>
       <input type="month" id="inv-month" style="width:180px" oninput="renderInvoice()">
       <label style="font-size:14px;color:var(--text2);margin:0">Client</label>
-      <select id="inv-client-filter" style="width:200px" onchange="renderInvoice()">
+      <select id="inv-client-filter" style="width:200px" onchange="updateInvoicePrefix();renderInvoice()">
         <option value="">All clients</option>
       </select>
     </div>
     <div class="card" id="invoice-card">
+      <div id="inv-logo" style="display:none;margin-bottom:12px"><img id="inv-logo-img" style="max-height:60px;max-width:200px;object-fit:contain"></div>
       <div class="invoice-header">
         <div>
           <div style="font-size:22px;font-weight:500">Invoice</div>
           <div style="font-size:12px;color:var(--text2);margin-top:4px" id="inv-number"></div>
           <div id="inv-from" style="margin-top:10px;font-size:12px;line-height:1.6;color:var(--text2)"></div>
+          <div id="inv-from-divider" style="display:none;height:3px;background:#9151a0;border-radius:2px;margin-top:8px;width:120px"></div>
         </div>
         <div style="text-align:right">
           <div style="font-weight:500" id="inv-proj-name"></div>
@@ -632,7 +664,7 @@ td{padding:8px 0;vertical-align:top}
       <div id="inv-totals"></div>
       <div id="inv-notes-footer" style="margin-top:1.25rem;padding-top:1rem;border-top:.5px solid var(--border);font-size:12px;color:var(--text3)"></div>
     </div>
-    <button class="btn no-print" style="margin-top:1rem" onclick="window.print()"><i class="ti ti-printer"></i> Print / save as PDF</button>
+    <button class="btn no-print" style="margin-top:1rem" onclick="printInvoiceOnly()"><i class="ti ti-printer"></i> Print / save as PDF</button>
   </div>
 
   <!-- TEAM -->
@@ -1355,6 +1387,8 @@ document.getElementById('p-client').addEventListener('change',function(){
   document.getElementById('s-rate').value=settings.hourlyRate||'150';
   document.getElementById('s-terms').value=settings.paymentTerms||'';
   document.getElementById('s-inv-notes').value=settings.invoiceNotes||'';
+  const logoInput=document.getElementById('s-logo-url');
+  if(logoInput)logoInput.value=settings.logoUrl||'';
   document.getElementById('s-myname').value=myProfile.name||'';
   document.getElementById('s-myrole').value=myProfile.role||'';
   document.getElementById('s-myemail').value=myProfile.email||'';
@@ -1971,7 +2005,7 @@ function renderDashBudgets(){
       ${budgetMax>0?`<div class="gauge-bar" style="height:8px;margin-bottom:8px;position:relative">${barSegments}</div>`:''}
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
         ${renderHealthBadge(p)}
-        <button onclick="generateClientShare('${p.id}')" style="background:none;border:.5px solid var(--border2);border-radius:20px;padding:2px 8px;font-size:11px;color:var(--text3);cursor:pointer"><i class="ti ti-share" style="font-size:11px"></i> Share</button>
+
       </div>
       ${timeline}
       ${upcoming.length?`<div style="margin-top:10px;padding-top:8px;border-top:.5px solid var(--border)">
@@ -3091,6 +3125,75 @@ function refreshInvoiceClientFilter(){
   if(prev)sel.value=prev;
 }
 
+function toggleInvoiceSettings(){
+  const el=document.getElementById('invoice-settings-panel');
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
+
+function toggleExpenseSettings(){
+  const el=document.getElementById('expense-settings-panel');
+  if(!el)return;
+  const open=el.style.display==='none';
+  el.style.display=open?'block':'none';
+  if(open)renderExpenseCategoryInline();
+}
+
+function renderExpenseCategoryInline(){
+  const wrap=document.getElementById('exp-cat-list-inline');if(!wrap)return;
+  const cats=getCategories();
+  wrap.innerHTML=cats.map((c,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:.5px solid var(--border)">
+    <span style="flex:1;font-size:13px">${htmlEsc(c)}</span>
+    <button class="icon-action danger" onclick="deleteExpenseCatInline(${i})" style="font-size:12px"><i class="ti ti-x"></i></button>
+  </div>`).join('');
+}
+
+function deleteExpenseCatInline(idx){
+  const cats=getCategories();cats.splice(idx,1);
+  saveSetting('expenseCategories',cats);
+  renderExpenseCategoryInline();
+  refreshExpenseCategoryDropdown();
+}
+
+function addExpenseCategoryInline(){
+  const inp=document.getElementById('exp-new-cat-input');if(!inp||!inp.value.trim())return;
+  const cats=getCategories();cats.push(inp.value.trim());inp.value='';
+  saveSetting('expenseCategories',cats);
+  renderExpenseCategoryInline();
+  refreshExpenseCategoryDropdown();
+}
+
+function printInvoiceOnly(){
+  // Print only the invoice card by temporarily hiding everything else
+  const card=document.getElementById('invoice-card');if(!card)return;
+  const style=document.createElement('style');
+  style.id='print-invoice-only';
+  style.textContent='@media print{body>*{display:none!important}#invoice-card{display:block!important;max-width:100%!important;box-shadow:none!important;border:none!important}}';
+  document.head.appendChild(style);
+  window.print();
+  setTimeout(()=>document.getElementById('print-invoice-only')?.remove(),1000);
+}
+
+function updateInvoicePrefix(){
+  const cid=document.getElementById('inv-client-filter')?.value||'';
+  const client=cid?clients.find(c=>c.id===cid):null;
+  if(client&&client.company){
+    const auto=client.company.replace(/[^a-zA-Z]/g,'').slice(0,3).toUpperCase();
+    if(auto){
+      document.getElementById('s-prefix').value=auto;
+      saveSetting('invoicePrefix',auto);
+    }
+  }
+}
+
+// Sort team members by company then name
+function sortedMemberChips(memberList){
+  return [...memberList].sort((a,b)=>{
+    const ca=(a.company||'').toLowerCase();const cb=(b.company||'').toLowerCase();
+    if(ca!==cb)return ca<cb?-1:1;
+    return (a.name||'').localeCompare(b.name||'');
+  });
+}
+
 function renderInvoice(){
   const m=document.getElementById('inv-month').value||thisMonth();
   const cid=document.getElementById('inv-client-filter')?.value||'';
@@ -3098,13 +3201,22 @@ function renderInvoice(){
   const defRate=parseFloat(settings.hourlyRate||0);
   const client=cid?clients.find(c=>c.id===cid):null;
 
-  document.getElementById('inv-number').textContent=prefix+'-'+m.replace('-','')+(cid?'-'+cid.slice(0,4):'');
+  // Invoice number: PREFIX-YYYYMM (no clientId suffix)
+  document.getElementById('inv-number').textContent=prefix+'-'+m.replace('-','');
   document.getElementById('inv-proj-name').textContent=client?(client.company||clientLabel(client)):'All Clients';
   document.getElementById('inv-client-name').textContent='';
   document.getElementById('inv-period').textContent='Period: '+fmtMonth(m);
 
+  // Logo
+  const logoEl=document.getElementById('inv-logo');
+  const logoImg=document.getElementById('inv-logo-img');
+  if(logoEl&&logoImg&&settings.logoUrl){
+    logoImg.src=settings.logoUrl;logoEl.style.display='block';
+  } else if(logoEl){logoEl.style.display='none';}
+
   // Populate "From" block with studio/business info
   const fromEl=document.getElementById('inv-from');
+  const fromDivider=document.getElementById('inv-from-divider');
   if(fromEl){
     const lines=[
       bizInfo.name||myProfile.name||'',
@@ -3115,6 +3227,7 @@ function renderInvoice(){
     ].filter(Boolean);
     fromEl.innerHTML=lines.map(l=>htmlEsc(l)).join('<br>');
     fromEl.style.display=lines.length?'block':'none';
+    if(fromDivider)fromDivider.style.display=lines.length?'block':'none';
   }
 
   // Payment terms
@@ -3588,7 +3701,9 @@ function buildGanttSVG(phases, milestones, opts={}){
 
 function renderMiniGantt(p, opts={}){
   const phases=(p.phases||[]).filter(ph=>ph.startDate||ph.endDate).sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
-  const milestones=(p.milestones||[]).filter(m=>m.date).sort((a,b)=>a.date.localeCompare(b.date));
+  const _allMilestones=(p.milestones||[]).filter(m=>m.date).sort((a,b)=>a.date.localeCompare(b.date));
+  const _taskFilt=getTaskFilter(p.id);
+  const milestones=_taskFilt.showDone?_allMilestones:_allMilestones.filter(m=>!m.completed);
   if(!phases.length&&!milestones.length)return'';
 
   const gId=`mg-${p.id}`;
@@ -3679,6 +3794,72 @@ function saveTaskTitle(projId,taskId,newTitle){
   if(trimmed&&trimmed!==t.title){t.title=trimmed;save('tracker:projects',projects);renderProjectList();}
 }
 
+// ── Expand panel helpers (operate without full re-render) ────────────────────
+function saveTaskExpand(projId,taskId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
+  const titleEl=document.getElementById('task-edit-title-'+taskId);
+  const phaseEl=document.getElementById('task-edit-phase-'+taskId);
+  const dueEl=document.getElementById('task-edit-due-'+taskId);
+  if(titleEl&&titleEl.value.trim())t.title=titleEl.value.trim();
+  if(phaseEl)t.phaseId=phaseEl.value||'';
+  if(dueEl)t.dueDate=dueEl.value||'';
+  // Read assignees from chip state
+  const chips=document.querySelectorAll('#expand-assignees-'+taskId+' [data-mid]');
+  if(chips.length){t.assigneeIds=[...chips].filter(el=>el.dataset.sel==='1').map(el=>el.dataset.mid);t.assigneeId=t.assigneeIds[0]||'';}
+  save('tracker:projects',projects);
+  // Update the task title span without full re-render
+  const titleSpan=document.querySelector('#task-expand-'+projId+'-'+taskId)?.previousElementSibling?.querySelector('span[style*="flex:1"]');
+  if(titleSpan)titleSpan.textContent=t.title;
+}
+
+function toggleExpandAssignee(projId,taskId,memberId,el){
+  const sel=el.dataset.sel==='1';
+  el.dataset.sel=sel?'0':'1';
+  const m=[{id:'__me__',name:myProfile.name||'Me',color:'#9151a0'},...teamMembers].find(x=>x.id===memberId);
+  if(!m)return;
+  if(sel){el.style.border='.5px solid var(--border2)';el.style.background='transparent';el.style.color='var(--text2)';}
+  else{el.style.border='.5px solid '+m.color;el.style.background=m.color+'22';el.style.color=m.color;}
+}
+
+function addTaskDep(projId,taskId,sel){
+  const depId=sel.value;if(!depId)return;
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
+  if(!t.dependsOn)t.dependsOn=[];
+  if(!t.dependsOn.includes(depId))t.dependsOn.push(depId);
+  sel.value='';
+  save('tracker:projects',projects);renderProjectList();
+}
+
+function removeTaskDep(projId,taskId,depId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
+  t.dependsOn=(t.dependsOn||[]).filter(id=>id!==depId);
+  save('tracker:projects',projects);renderProjectList();
+}
+
+function updateTaskPhase(projId,taskId,phaseId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
+  t.phaseId=phaseId;
+  save('tracker:projects',projects);
+}
+
+function addTaskCommentInline(projId,taskId){
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const t=(p.tasks||[]).find(x=>x.id===taskId);if(!t)return;
+  const inp=document.getElementById('comment-inp-'+taskId);
+  if(!inp||!inp.value.trim())return;
+  if(!t.comments)t.comments=[];
+  t.comments.push({id:uid(),text:inp.value.trim(),author:myProfile.name||'Me',date:today()});
+  inp.value='';
+  save('tracker:projects',projects);
+  // Update comment list without full re-render
+  const cList=document.getElementById('task-comments-'+taskId);
+  if(cList)cList.innerHTML=t.comments.map(c=>`<div style="font-size:12px;padding:5px 8px;background:var(--bg3);border-radius:4px;margin-bottom:4px"><span style="font-weight:500;color:var(--accent);font-size:11px">${htmlEsc(c.author||'Me')}</span><span style="font-size:10px;color:var(--text3);margin-left:6px">${fmtDate(c.date)}</span><div style="margin-top:2px">${htmlEsc(c.text)}</div></div>`).join('');
+}
+
 function updateTaskStatus(projId,taskId,status){
   const p=projects.find(x=>x.id===projId);if(!p||!p.tasks)return;
   const t=p.tasks.find(x=>x.id===taskId);if(t)t.status=status;
@@ -3734,6 +3915,19 @@ function toggleAddMilestone(projId){
   editing.milestones=editing.milestones===key?null:key;
   renderProjectList();
 }
+function toggleTaskFilterChip(projId,key,val){
+  if(!_taskFilters[projId])_taskFilters[projId]={status:[],type:[],priority:[],showDone:false};
+  const f=_taskFilters[projId];
+  if(key==='showDone'){f.showDone=!f.showDone;}
+  else{
+    const arr=f[key]||[];
+    const idx=arr.indexOf(val);
+    if(idx>=0)arr.splice(idx,1);else arr.push(val);
+    f[key]=arr;
+  }
+  renderProjectList();
+}
+
 function cycleNewTaskPriority(projId){
   const inp=document.getElementById(`task-pri-${projId}`);
   const btn=document.getElementById(`task-pri-btn-${projId}`);
@@ -3771,11 +3965,11 @@ function initAddTaskForm(projId){
 
 // Per-project task filter state
 function getTaskFilter(projId){
-  return _taskFilters[projId]||{status:'all',type:'all',priority:'all',hideDone:false};
+  return _taskFilters[projId]||{status:[],type:[],priority:[],showDone:false};
 }
 
 function setTaskFilter(projId,key,val){
-  if(!_taskFilters[projId])_taskFilters[projId]={status:'all',type:'all',priority:'all',hideDone:false};
+  if(!_taskFilters[projId])_taskFilters[projId]={status:[],type:[],priority:[],showDone:false};
   _taskFilters[projId][key]=val;
   renderProjectList();
 }
@@ -3788,14 +3982,19 @@ function toggleFilterPanel(projId){
 function applyTaskFilters(tasks,projId){
   const f=getTaskFilter(projId);
   return tasks.filter(t=>{
-    if(f.hideDone&&t.status==='done')return false;
-    if(f.status!=='all'&&t.status!==f.status)return false;
-    if(f.type!=='all'){
+    // Hide done by default unless showDone is on
+    if(!f.showDone&&t.status==='done')return false;
+    // Status filter (array of selected values; empty = all)
+    if(f.status&&f.status.length&&!f.status.includes(t.status))return false;
+    // Type filter
+    if(f.type&&f.type.length){
       const tt=t.taskType||'';
-      if(f.type==='normal'&&tt!=='')return false;
-      if(f.type!=='normal'&&tt!==f.type)return false;
+      const matchNormal=f.type.includes('normal')&&tt==='';
+      const matchType=tt&&f.type.includes(tt);
+      if(!matchNormal&&!matchType)return false;
     }
-    if(f.priority!=='all'&&(t.priority||'medium')!==f.priority)return false;
+    // Priority filter
+    if(f.priority&&f.priority.length&&!f.priority.includes(t.priority||'medium'))return false;
     return true;
   });
 }
@@ -3816,6 +4015,12 @@ function toggleAddPhase(projId){
   editing.phases=editing.phases===key?null:key;
   renderProjectList();
 }
+function togglePhaseCollapse(projId,phId){
+  const k=projId+'-'+phId;
+  _phaseCollapsed[k]=!_phaseCollapsed[k];
+  renderProjectList();
+}
+
 function toggleEditPhase(projId,phId){
   editing.phases=editing.phases===phId?null:phId;
   renderProjectList();
@@ -3835,8 +4040,11 @@ function savePhaseEdit(projId,phId){
   const ph=(p.phases||[]).find(x=>x.id===phId);if(!ph)return;
   ph.title=document.getElementById(`ph-edit-name-${phId}`).value.trim()||ph.title;
   ph.color=document.getElementById(`ph-edit-color-${phId}`).value||ph.color;
-  ph.startDate=document.getElementById(`ph-edit-start-${phId}`).value||'';
-  ph.endDate=document.getElementById(`ph-edit-end-${phId}`).value||'';
+  ph.startMsId=document.getElementById(`ph-edit-start-ms-${phId}`)?.value||'';
+  ph.endMsId=document.getElementById(`ph-edit-end-ms-${phId}`)?.value||'';
+  // Only save manual date if no milestone linked
+  if(!ph.startMsId)ph.startDate=document.getElementById(`ph-edit-start-${phId}`).value||'';
+  if(!ph.endMsId)ph.endDate=document.getElementById(`ph-edit-end-${phId}`).value||'';
   save('tracker:projects',projects);
   editing.phases=null;
   renderProjectList();
@@ -3995,8 +4203,11 @@ function renderTasksAndMilestones(p){
     const chips=validAIds.map(id=>{const m=allMembers.find(x=>x.id===id);return m?'<span style="font-size:10px;background:'+m.color+';color:#fff;padding:1px 6px;border-radius:10px">'+m.name.split(' ')[0]+'</span>':'';}).join('');
     const depOtherTasks=tasks.filter(ot=>ot.id!==t.id);
     const curDeps=(t.dependsOn||[]).filter(id=>tasks.find(x=>x.id===id));
-    return`<div draggable="true" ondragstart="taskDragStart(event,'${p.id}','${t.id}')" ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'" ondragleave="this.style.outline=''" ondrop="taskDropOnTask(event,'${p.id}','${t.id}')" style="background:var(--bg);border-bottom:.5px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:6px;padding:5px 0;font-size:13px">
+    const priColors={high:'#a32d2d',medium:'#ba7517',low:'#9a979a'};
+    const priBorder=priColors[t.priority||'medium']||priColors.medium;
+    const phaseOpts2=(p.phases||[]).map(function(ph){return'<option value="'+ph.id+'"'+(t.phaseId===ph.id?' selected':'')+'>'+htmlEsc(ph.title)+'</option>';}).join('');
+    return`<div draggable="true" ondragstart="taskDragStart(event,'${p.id}','${t.id}')" ondragover="event.preventDefault();this.style.outline='2px solid var(--accent)'" ondragleave="this.style.outline=''" ondrop="taskDropOnTask(event,'${p.id}','${t.id}')" style="background:var(--bg);border-bottom:.5px solid var(--border);border-left:3px solid ${priBorder}">
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 0 5px 6px;font-size:13px">
         <input type="checkbox" ${t.status==='done'?'checked':''} onchange="updateTaskStatus('${p.id}','${t.id}',this.checked?'done':'todo')" style="width:auto;flex-shrink:0">
         ${typeBadge(t)}
         <span style="${t.status==='done'?'text-decoration:line-through;color:var(--text3);':''}flex:1;padding:1px 3px;border-radius:3px">${t.title}</span>
@@ -4010,20 +4221,27 @@ function renderTasksAndMilestones(p){
       <div id="${expandKey}" style="display:none;padding:8px 10px 10px;background:var(--bg2);border-radius:4px;margin-bottom:4px">
         <div style="margin-bottom:8px">
           <label style="font-size:11px;color:var(--text3)">Title</label>
-          <input type="text" id="task-edit-title-${t.id}" value="${t.title}" onblur="saveTaskTitle('${p.id}','${t.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:100%;font-size:13px;padding:4px 8px;margin-top:2px">
+          <input type="text" id="task-edit-title-${t.id}" value="${t.title}" onkeydown="if(event.key==='Enter')saveTaskField('${p.id}','${t.id}')" style="width:100%;font-size:13px;padding:4px 8px;margin-top:2px">
         </div>
-        ${!isOpen?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <span style="font-size:11px;color:var(--text3);flex-shrink:0">Due date:</span>
-          <input type="date" value="${t.dueDate||''}" onchange="updateTaskDueDate('${p.id}','${t.id}',this.value)" style="font-size:12px;padding:2px 6px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text)">
-          ${t.dueDate?`<button onclick="updateTaskDueDate('${p.id}','${t.id}','')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:0" title="Clear date">✕</button>`:''}
-        </div>`:''}
+        <div class="grid2" style="margin-bottom:8px">
+          <div><label style="font-size:11px;color:var(--text3)">Phase</label>
+            <select id="task-edit-phase-${t.id}" style="width:100%;font-size:12px;margin-top:2px">
+              <option value="">No phase</option>${phaseOpts2}
+            </select>
+          </div>
+          <div><label style="font-size:11px;color:var(--text3)">Due date</label>
+            <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
+              <input type="date" id="task-edit-due-${t.id}" value="${t.dueDate||''}" style="font-size:12px;padding:2px 6px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text)">
+            </div>
+          </div>
+        </div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Assign (project members):</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${projMembers.map(m=>{const sel=validAIds.includes(m.id);return`<span onclick="toggleTaskAssignee('${p.id}','${t.id}','${m.id}')" style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;}).join('')}</div>
+        <div id="expand-assignees-${t.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${projMembers.map(m=>{const sel=validAIds.includes(m.id);return`<span onclick="toggleExpandAssignee('${p.id}','${t.id}','${m.id}',this)" data-mid="${m.id}" data-sel="${sel?'1':'0'}" style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;border:.5px solid ${sel?m.color:'var(--border2)'};background:${sel?m.color+'22':'transparent'};color:${sel?m.color:'var(--text2)'}">${m.name.split(' ')[0]}</span>`;}).join('')}</div>
         ${(function(){
           if(!depOtherTasks.length)return'';
-          var dchips=curDeps.map(function(depId){var ot=tasks.find(function(x){return x.id===depId;});if(!ot)return'';return'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;background:#9151a022;border:.5px solid var(--accent);color:var(--accent)">'+ot.title.slice(0,25)+(ot.title.length>25?'..':'')+'<button onclick="toggleTaskDep(\''+p.id+'\',\''+t.id+'\',\''+depId+'\')" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12px;padding:0;line-height:1;margin-left:2px">×</button></span>';}).join('');
+          var dchips=curDeps.map(function(depId){var ot=tasks.find(function(x){return x.id===depId;});if(!ot)return'';return'<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;background:#9151a022;border:.5px solid var(--accent);color:var(--accent)">'+htmlEsc(ot.title.slice(0,25))+(ot.title.length>25?'..':'')+'<button onclick="removeTaskDep(\''+p.id+'\',\''+t.id+'\',\''+depId+'\')" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12px;padding:0;line-height:1;margin-left:2px">×</button></span>';}).join('');
           var dopts=depOtherTasks.filter(function(ot){return!curDeps.includes(ot.id);}).map(function(ot){return'<option value="'+ot.id+'">'+(ot.title||'').slice(0,40)+'</option>';}).join('');
-          return '<div style="font-size:11px;color:var(--text3);margin-bottom:4px">Depends on:</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">'+dchips+'</div><select onchange="if(this.value)toggleTaskDep(\''+p.id+'\',\''+t.id+'\',this.value);this.value=\'\'" style="font-size:12px;margin-bottom:10px;width:100%"><option value="">+ Add dependency...</option>'+dopts+'</select>';
+          return '<div style="font-size:11px;color:var(--text3);margin-bottom:4px">Depends on:</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">'+dchips+'</div><select onchange="addTaskDep(\''+p.id+'\',\''+t.id+'\',this)" style="font-size:12px;margin-bottom:10px;width:100%"><option value="">+ Add dependency...</option>'+dopts+'</select>';
         })()}
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Comments:</div>
         <div id="task-comments-${t.id}" style="margin-bottom:6px">
@@ -4034,11 +4252,12 @@ function renderTasksAndMilestones(p){
           </div>`).join('')}
         </div>
         <div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:8px">
-          <input type="text" id="comment-inp-${t.id}" placeholder="Add a comment..." style="flex:1;font-size:12px;padding:4px 8px" onkeydown="if(event.key==='Enter')addTaskComment('${p.id}','${t.id}')">
-          <button class="btn sm" onclick="addTaskComment('${p.id}','${t.id}')" style="flex-shrink:0"><i class="ti ti-send"></i></button>
+          <input type="text" id="comment-inp-${t.id}" placeholder="Add a comment..." style="flex:1;font-size:12px;padding:4px 8px" onkeydown="if(event.key==='Enter')addTaskCommentInline('${p.id}','${t.id}')">
+          <button class="btn sm" onclick="addTaskCommentInline('${p.id}','${t.id}')" style="flex-shrink:0"><i class="ti ti-send"></i></button>
         </div>
-        <div style="display:flex;justify-content:flex-end">
-          <button class="btn danger sm" onclick="deleteTask('${p.id}','${t.id}')"><i class="ti ti-trash"></i> Delete task</button>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <button class="btn danger sm" onclick="deleteTask('${p.id}','${t.id}')"><i class="ti ti-trash"></i> Delete</button>
+          <button class="btn primary sm" onclick="saveTaskExpand('${p.id}','${t.id}')"><i class="ti ti-check"></i> Save</button>
         </div>
       </div>
     </div>`;
@@ -4093,37 +4312,35 @@ function renderTasksAndMilestones(p){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:4px">
       <span class="sec-title" style="margin:0">Phases & Tasks <span style="font-weight:400;color:var(--text3)">(${doneTasks}/${tasks.length})</span></span>
       <div style="display:flex;gap:4px;align-items:center">
-        <button class="icon-action" onclick="toggleFilterPanel('${p.id}')" title="Filter tasks" style="font-size:14px;color:${(()=>{const f=getTaskFilter(p.id);return(f.status!=='all'||f.type!=='all'||f.priority!=='all'||f.hideDone)?'var(--accent)':'var(--text3)'})()}"><i class="ti ti-filter"></i></button>
+        <button class="icon-action" onclick="toggleFilterPanel('${p.id}')" title="Filter tasks" style="font-size:14px;color:${(()=>{const f=getTaskFilter(p.id);return(f.status.length||f.type.length||f.priority.length||f.showDone)?'var(--accent)':'var(--text3)'})()}"><i class="ti ti-filter"></i></button>
         <button class="btn sm" onclick="toggleAddPhase('${p.id}')" style="font-size:11px;padding:2px 8px"><i class="ti ti-plus"></i> Phase</button>
         <button class="btn sm" onclick="toggleAddTask('${p.id}')" style="font-size:11px;padding:2px 8px"><i class="ti ti-plus"></i> Task</button>
       </div>
     </div>
     <div id="task-filter-panel-${p.id}" style="display:none;background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px;font-size:12px">
-      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
-        <div><label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Status</label>
-          <select onchange="setTaskFilter('${p.id}','status',this.value)" style="font-size:12px">
-            <option value="all"${getTaskFilter(p.id).status==='all'?' selected':''}>All</option>
-            <option value="todo"${getTaskFilter(p.id).status==='todo'?' selected':''}>To Do</option>
-            <option value="in_progress"${getTaskFilter(p.id).status==='in_progress'?' selected':''}>In Progress</option>
-            <option value="done"${getTaskFilter(p.id).status==='done'?' selected':''}>Done</option>
-          </select></div>
-        <div><label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Type</label>
-          <select onchange="setTaskFilter('${p.id}','type',this.value)" style="font-size:12px">
-            <option value="all"${getTaskFilter(p.id).type==='all'?' selected':''}>All</option>
-            <option value="normal"${getTaskFilter(p.id).type==='normal'?' selected':''}>Normal</option>
-            <option value="open"${getTaskFilter(p.id).type==='open'?' selected':''}>Open</option>
-            <option value="critical"${getTaskFilter(p.id).type==='critical'?' selected':''}>Critical</option>
-          </select></div>
-        <div><label style="font-size:11px;color:var(--text3);display:block;margin-bottom:3px">Priority</label>
-          <select onchange="setTaskFilter('${p.id}','priority',this.value)" style="font-size:12px">
-            <option value="all"${getTaskFilter(p.id).priority==='all'?' selected':''}>All</option>
-            <option value="low"${getTaskFilter(p.id).priority==='low'?' selected':''}>Low</option>
-            <option value="medium"${getTaskFilter(p.id).priority==='medium'?' selected':''}>Med</option>
-            <option value="high"${getTaskFilter(p.id).priority==='high'?' selected':''}>High</option>
-          </select></div>
-        <label class="check-label" style="font-size:12px"><input type="checkbox" ${getTaskFilter(p.id).hideDone?'checked':''} onchange="setTaskFilter('${p.id}','hideDone',this.checked)"> Hide completed</label>
-        <button class="btn sm" onclick="delete _taskFilters['${p.id}'];renderProjectList()" style="font-size:11px">Reset</button>
-      </div>
+      ${(()=>{
+        const f=getTaskFilter(p.id);
+        function chip(key,val,label){
+          const on=(f[key]||[]).includes(val);
+          return `<button onclick="toggleTaskFilterChip('${p.id}','${key}','${val}')" style="padding:2px 9px;border-radius:12px;font-size:11px;cursor:pointer;border:.5px solid ${on?'var(--accent)':'var(--border2)'};background:${on?'var(--accent)22':'transparent'};color:${on?'var(--accent)':'var(--text2)'};font-weight:${on?'600':'400'}">${label}</button>`;
+        }
+        return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--text3);min-width:50px">Status</span>
+          ${chip('status','todo','To Do')}${chip('status','in_progress','In Progress')}${chip('status','done','Done')}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--text3);min-width:50px">Type</span>
+          ${chip('type','normal','Normal')}${chip('type','open','Open')}${chip('type','critical','Critical')}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--text3);min-width:50px">Priority</span>
+          ${chip('priority','low','Low')}${chip('priority','medium','Med')}${chip('priority','high','High')}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="toggleTaskFilterChip('${p.id}','showDone')" style="padding:2px 9px;border-radius:12px;font-size:11px;cursor:pointer;border:.5px solid ${f.showDone?'var(--accent)':'var(--border2)'};background:${f.showDone?'var(--accent)22':'transparent'};color:${f.showDone?'var(--accent)':'var(--text2)'}">Show completed</button>
+          <button class="btn sm" onclick="delete _taskFilters['${p.id}'];renderProjectList()" style="font-size:11px">Reset</button>
+        </div>`;
+      })()}
     </div>
     ${showAddPhase?`<div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
       <div class="grid2" style="margin-bottom:8px">
@@ -4174,11 +4391,17 @@ function renderTasksAndMilestones(p){
     ${ungrouped.length>0?`<div style="margin-bottom:10px">${ungrouped.map(renderTaskRow).join('')}</div>`:''}
     ${grouped.map(({phase,tasks:pts})=>{
       const isEditingPh=editing.phases===phase.id;
+      const collapsed=!!_phaseCollapsed[p.id+'-'+phase.id];
+      // Resolve milestone-linked dates at render time
+      const effStart=phase.startMsId?(p.milestones||[]).find(m=>m.id===phase.startMsId)?.date||phase.startDate:phase.startDate;
+      const effEnd=phase.endMsId?(p.milestones||[]).find(m=>m.id===phase.endMsId)?.date||phase.endDate:phase.endDate;
+      const msOpts=(p.milestones||[]).map(m=>`<option value="${m.id}">${htmlEsc(m.title)}${m.date?' ('+fmtDate(m.date)+')':''}</option>`).join('');
       return`<div style="margin-bottom:12px;border:.5px dashed transparent;border-radius:var(--radius-sm);padding:4px" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='transparent'" ondrop="taskDropOnPhase(event,'${p.id}','${phase.id}');this.style.borderColor='transparent'">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-          <span style="width:12px;height:12px;border-radius:3px;background:${phase.color||'var(--accent)'};flex-shrink:0;display:inline-block"></span>
+          <span onclick="togglePhaseCollapse('${p.id}','${phase.id}')" title="${collapsed?'Expand':'Collapse'} phase tasks" style="width:12px;height:12px;border-radius:3px;background:${phase.color||'var(--accent)'};flex-shrink:0;display:inline-block;cursor:pointer;opacity:${collapsed?'0.6':'1'}"></span>
           <span style="font-size:12px;font-weight:600;color:var(--text)">${phase.title}</span>
-          ${phase.startDate||phase.endDate?`<span style="font-size:11px;color:var(--text3)">${phase.startDate?fmtDate(phase.startDate):''}${phase.startDate&&phase.endDate?' → ':''}${phase.endDate?fmtDate(phase.endDate):''}</span>`:''}
+          ${collapsed?`<span style="font-size:10px;color:var(--text3)">(${pts.length} hidden)</span>`:''}
+          ${effStart||effEnd?`<span style="font-size:11px;color:var(--text3)">${effStart?fmtDate(effStart):''}${effStart&&effEnd?' → ':''}${effEnd?fmtDate(effEnd):''}</span>`:''}
           <button class="icon-action" onclick="toggleEditPhase('${p.id}','${phase.id}')" style="margin-left:auto"><i class="ti ${isEditingPh?'ti-x':'ti-pencil'}"></i></button>
         </div>
         ${isEditingPh?`<div class="edit-form" style="margin-bottom:8px;background:var(--bg)">
@@ -4195,12 +4418,26 @@ function renderTasksAndMilestones(p){
             <div><label>Start date</label><input type="date" id="ph-edit-start-${phase.id}" value="${phase.startDate||''}"></div>
             <div><label>End date</label><input type="date" id="ph-edit-end-${phase.id}" value="${phase.endDate||''}"></div>
           </div>
+          ${msOpts?`<div class="grid2" style="margin-top:4px">
+            <div><label style="font-size:11px;color:var(--text3)">Start date from milestone</label>
+              <select id="ph-edit-start-ms-${phase.id}" onchange="document.getElementById('ph-edit-start-${phase.id}').value=''" style="font-size:12px">
+                <option value="">— Manual date —</option>${msOpts}
+              </select>
+              <script>document.getElementById('ph-edit-start-ms-${phase.id}').value='${phase.startMsId||''}';<\/script>
+            </div>
+            <div><label style="font-size:11px;color:var(--text3)">End date from milestone</label>
+              <select id="ph-edit-end-ms-${phase.id}" onchange="document.getElementById('ph-edit-end-${phase.id}').value=''" style="font-size:12px">
+                <option value="">— Manual date —</option>${msOpts}
+              </select>
+              <script>document.getElementById('ph-edit-end-ms-${phase.id}').value='${phase.endMsId||''}';<\/script>
+            </div>
+          </div>`:''}
           <div class="edit-actions"><div></div><div style="display:flex;gap:6px">
             <button class="btn danger sm" onclick="deletePhase('${p.id}','${phase.id}')"><i class="ti ti-trash"></i> Delete</button>
             <button class="btn primary sm" onclick="savePhaseEdit('${p.id}','${phase.id}')"><i class="ti ti-check"></i> Save</button>
           </div></div>
         </div>`:''}
-        ${pts.length?pts.map(renderTaskRow).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">No tasks in this phase</div>'}
+        ${collapsed?'':(pts.length?pts.map(renderTaskRow).join(''):'<div style="font-size:12px;color:var(--text3);padding:4px 0">No tasks in this phase</div>')}
       </div>`;
     }).join('')}
     <div style="display:flex;justify-content:flex-end;margin-top:12px;padding-top:8px;border-top:.5px solid var(--border)">
@@ -4231,18 +4468,22 @@ function exportProjectPDF(projId){
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
-    @media print{body{margin:0}}
+    @media print{
+      body{margin:0}
+      * {-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    }
     body{font-family:Arial,sans-serif;font-size:10pt;color:#2A2829;max-width:720px;margin:24px auto;padding:0 20px}
     h1{font-size:16pt;color:#9151a0;margin-bottom:2px}
     h2{font-size:11pt;color:#9151a0;border-bottom:1px solid #ddd;padding-bottom:3px;margin-top:18px;margin-bottom:8px}
     .meta{font-size:9pt;color:#888;margin-bottom:16px}
     table{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:10px}
-    th{text-align:left;padding:4px 6px;background:#f0eaf7;font-weight:600;border-bottom:1px solid #ddd}
+    th{text-align:left;padding:4px 6px;background:#f0eaf7!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:600;border-bottom:1px solid #ddd;color:#9151a0}
     td{padding:4px 6px;border-bottom:1px solid #eee;vertical-align:top}
-    .chip{display:inline-block;padding:1px 6px;border-radius:10px;font-size:8pt;color:#fff;margin:1px}
+    .chip{display:inline-block;padding:1px 6px;border-radius:10px;font-size:8pt;color:#fff!important;margin:1px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:8pt;font-weight:600;background:#e8f5ee;color:#0f6e56}
     .badge.critical{background:#fdecea;color:#a32d2d}
     .badge.open{background:#f5f5f2;color:#6b686a}
+    .phase-dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     svg{display:block;width:100%;height:auto}
   </style></head><body>
   <h1>${h(p.num?p.num+' -- ':'')}${h(p.name)}</h1>
@@ -4258,7 +4499,7 @@ function exportProjectPDF(projId){
 
   ${projTeam.length?`<h2>Team</h2><div style="margin-bottom:14px">${projTeam.map(m=>`<span class="chip" style="background:${m.color||'#888'}">${h(m.name)}</span>`).join('')}</div>`:''}
   ${phases.length?`<h2>Phases</h2><table><colgroup><col style="width:55%"><col style="width:22%"><col style="width:23%"></colgroup><tr><th>Phase</th><th>Start</th><th>End</th></tr>
-    ${phases.map(ph=>`<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${ph.color||'#4a90d9'};margin-right:5px;vertical-align:middle"></span>${h(ph.title)}</td><td>${fd(ph.startDate)}</td><td>${fd(ph.endDate)}</td></tr>`).join('')}
+    ${phases.map(ph=>`<tr><td><span class="phase-dot" style="background:${ph.color||'#4a90d9'}">&nbsp;</span>${h(ph.title)}</td><td>${fd(ph.startDate)}</td><td>${fd(ph.endDate)}</td></tr>`).join('')}
   </table>`:''}
 
   ${milestones.length?`<h2>Milestones</h2><table><colgroup><col style="width:55%"><col style="width:22%"><col style="width:23%"></colgroup><tr><th>Milestone</th><th>Date</th><th>Status</th></tr>
@@ -4399,6 +4640,7 @@ function renderBoard(){
 
 let _boardDragTaskId=null,_boardDragProjId=null;
 const _lastPhaseUsed={}; // { [projId]: phaseId } — remembers last phase used per project
+const _phaseCollapsed={}; // { [projId+phId]: bool } — collapsed state per phase
 const _taskFilters={}; // { [projId]: {status,type,priority,hideDone} }
 function boardDragStart(e,taskId,projId){
   _boardDragTaskId=taskId;_boardDragProjId=projId;
@@ -4418,12 +4660,16 @@ function boardDropTask(e,newStatus){
 // ═══════════════════════════════════════════════
 //  WORKLOAD VIEW
 // ═══════════════════════════════════════════════
-function toggleWorkloadExpand(triggerEl, memberId){
+function toggleWorkloadExpand(memberId){
   const extra=document.querySelector(`.workload-extra-${memberId}`);
+  const moreBtn=document.getElementById(`wl-more-${memberId}`);
   if(!extra)return;
   const expanded=extra.style.display!=='none';
   extra.style.display=expanded?'none':'block';
-  if(triggerEl)triggerEl.textContent=expanded?`+${extra.querySelectorAll('div[style*="border-bottom"]').length} more tasks`:'Show less';
+  if(moreBtn){
+    const total=extra.querySelectorAll('[style*="border-bottom"]').length;
+    moreBtn.style.display=expanded?'block':'none';
+  }
 }
 
 function refreshWorkloadFilters(){
@@ -4463,7 +4709,15 @@ function renderWorkload(){
     const total=mt.todo.length+mt.in_progress.length+mt.done.length;
     const doneW=total>0?(mt.done.length/total*100).toFixed(1):0;
     const inpW=total>0?(mt.in_progress.length/total*100).toFixed(1):0;
-    const activeTasks=[...mt.in_progress,...mt.todo];
+    // Sort: priority High→Med→Low, then status In Progress→To Do→Done
+    const priOrder={high:0,medium:1,low:2};
+    const stOrder={in_progress:0,todo:1,done:2};
+    const allTasksSorted=[...mt.in_progress,...mt.todo,...mt.done].sort((a,b)=>{
+      const pd=(priOrder[a.priority||'medium']||1)-(priOrder[b.priority||'medium']||1);
+      if(pd!==0)return pd;
+      return (stOrder[a.status]||1)-(stOrder[b.status]||1);
+    });
+    const activeTasks=allTasksSorted;
     return`<div class="card" style="margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
         <div style="width:34px;height:34px;border-radius:50%;background:${m.color||'var(--accent)'};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0">
@@ -4484,14 +4738,15 @@ function renderWorkload(){
         <span style="font-size:11px;color:var(--text3)">${t._proj.name}</span>
         ${t.dueDate?`<span style="font-size:11px;color:${t.dueDate<today()&&t.status!=='done'?'var(--danger)':'var(--text3)'}">${fmtDate(t.dueDate)}</span>`:''}
       </div>`).join('')}
-      ${activeTasks.length>5?`<div style="font-size:11px;color:var(--accent);margin-top:4px;cursor:pointer" onclick="toggleWorkloadExpand(this,'${m.id}')">+${activeTasks.length-5} more tasks</div>
-        <div class="workload-extra-${m.id}" style="display:none">${activeTasks.slice(5).map(t=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:.5px solid var(--border)">
-          <span style="width:6px;height:6px;border-radius:50%;background:${t.status==='in_progress'?'var(--warning)':'var(--border2)'};flex-shrink:0"></span>
-          <span style="flex:1">${t.title}</span>
-          <span style="font-size:11px;color:var(--text3)">${t._proj.name}</span>
-          ${t.dueDate?`<span style="font-size:11px;color:${t.dueDate<today()&&t.status!=='done'?'var(--danger)':'var(--text3)'}">${fmtDate(t.dueDate)}</span>`:''}
-        </div>`).join('')}
-        <div style="font-size:11px;color:var(--accent);margin-top:4px;cursor:pointer" onclick="toggleWorkloadExpand(this.parentElement.previousElementSibling,'${m.id}')">Show less</div>
+      ${activeTasks.length>5?`<div id="wl-more-${m.id}" style="font-size:11px;color:var(--accent);margin-top:4px;cursor:pointer" onclick="toggleWorkloadExpand('${m.id}')">+${activeTasks.length-5} more tasks</div>
+        <div class="workload-extra-${m.id}" style="display:none">
+          ${activeTasks.slice(5).map(t=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:.5px solid var(--border)">
+            <span style="width:6px;height:6px;border-radius:50%;background:${t.status==='in_progress'?'var(--warning)':t.status==='done'?'var(--success)':'var(--border2)'};flex-shrink:0"></span>
+            <span style="flex:1">${t.title}</span>
+            <span style="font-size:11px;color:var(--text3)">${t._proj.name}</span>
+            ${t.dueDate?`<span style="font-size:11px;color:${t.dueDate<today()&&t.status!=='done'?'var(--danger)':'var(--text3)'}">${fmtDate(t.dueDate)}</span>`:''}
+          </div>`).join('')}
+          <div style="font-size:11px;color:var(--accent);margin-top:6px;cursor:pointer" onclick="toggleWorkloadExpand('${m.id}')">Show less</div>
         </div>`:''}
     </div>`;
   }).join('');
