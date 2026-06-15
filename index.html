@@ -3311,10 +3311,12 @@ function renderInvoice(){
   const durSec=document.getElementById('inv-duration-section');
   if(durSec){
     // Find this client's main project with both contract dates set.
-    // (Self-contained — does not depend on retainerProj, which is declared later.)
-    // Prefer a non-sub project; fall back to any project with both dates.
-    const dProj=clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth)&&!p.parentId)
-      || clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth));
+    // Exclude sub-projects (budgetType 'sub') — they carry their own dates but
+    // are not the contract-level project the client should see on the invoice.
+    const isMainProj=p=>p.budgetType!=='sub'&&!p.parentId;
+    const dProj=clientProjects.find(p=>isMainProj(p)&&p.startDate&&(p.endDate||p.endDateMonth))
+      || clientProjects.find(p=>isMainProj(p)&&p.startDate)
+      || clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth)&&p.budgetType!=='sub');
     // Resolve the contract end date (supports specific date or month/year type)
     function resolveEnd(p){
       if(!p)return'';
@@ -3366,15 +3368,14 @@ function renderInvoice(){
   // client sees overall project spend vs. budget on the invoice. Mirrors the
   // timeline bar's style with resolved hex colors (works in the print window).
   const budSec=document.getElementById('inv-budget-section');
-  console.log('[BUDGET BAR] budSec found:', !!budSec, '| clientProjects count:', clientProjects.length);
   if(budSec){
-    // Pick the same primary project the timeline used.
-    const bProj=clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth)&&!p.parentId)
-      || clientProjects.find(p=>!p.parentId&&(parseFloat(p.budget||0)>0))
-      || clientProjects.find(p=>parseFloat(p.budget||0)>0);
+    // Pick the contract-level project (NOT a sub-project). Sub-projects have
+    // budgetType 'sub' and no budget value, so they must be excluded here.
+    const hasBudget=p=>{const b=getProjBudget(p);return b.max>0;};
+    const bProj=clientProjects.find(p=>p.budgetType!=='sub'&&!p.parentId&&hasBudget(p))
+      || clientProjects.find(p=>p.budgetType!=='sub'&&hasBudget(p));
     const bBudget=bProj?getProjBudget(bProj):null;
     const bMax=bBudget?bBudget.max:0;
-    console.log('[BUDGET BAR] bProj:', bProj?bProj.name:'NONE', '| budget raw:', bProj?bProj.budget:'-', '| budgetMax:', bProj?bProj.budgetMax:'-', '| budgetType:', bProj?bProj.budgetType:'-', '| computed bMax:', bMax);
     if(bProj&&bMax>0){
       // Total billed-to-date across ALL months for this project
       const rate=getProjRate(bProj);
