@@ -3303,11 +3303,11 @@ function renderInvoice(){
   // stands when they receive the invoice.
   const durSec=document.getElementById('inv-duration-section');
   if(durSec){
-    // Use the retainer/primary project for this client. When a specific client
-    // is selected, prefer their main (non-sub) project that has both dates.
-    const dProj=(retainerProj&&retainerProj.startDate&&(retainerProj.endDate||retainerProj.endDateMonth))
-      ? retainerProj
-      : clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth)&&!p.parentId);
+    // Find this client's main project with both contract dates set.
+    // (Self-contained — does not depend on retainerProj, which is declared later.)
+    // Prefer a non-sub project; fall back to any project with both dates.
+    const dProj=clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth)&&!p.parentId)
+      || clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth));
     // Resolve the contract end date (supports specific date or month/year type)
     function resolveEnd(p){
       if(!p)return'';
