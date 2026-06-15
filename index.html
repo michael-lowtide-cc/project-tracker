@@ -3426,26 +3426,23 @@ function renderInvoice(){
       // clamped to 4%-92% so it never collides with $0 or runs off the edge.
       const billedLabelPos=Math.max(4,Math.min(92,fillPct));
 
-      // "% of min" label sits ABOVE the bar, right-aligned to the gap position,
-      // matching the "% of max" text style (12px / #6b686a). It's placed in a
-      // thin overlay band directly above the bar so it adds no net card height
-      // (the band height is absorbed by the header's reduced bottom margin),
-      // keeping this card the SAME height as the Project Timeline card.
-      const minLabelOverlay=hasMinGap
-        ? `<span style="position:absolute;left:${gapPosPct}%;transform:translateX(-100%);bottom:14px;padding-right:4px;font-size:12px;line-height:1;color:#6b686a;white-space:nowrap">${pctOfMin}% of ${$f0(bMin)}</span>`
+      // "% of min" label sits in the SAME header row as "% of max" so both share
+      // the exact baseline. Right-aligned to the gap so it stays left of the gap,
+      // away from the max-label which is pinned to the far right.
+      const minLabelInHeader=hasMinGap
+        ? `<span style="position:absolute;left:${gapPosPct}%;transform:translateX(-100%);padding-right:8px;font-size:12px;color:#6b686a;white-space:nowrap">${pctOfMin}% of ${$f0(bMin)}</span>`
         : '';
 
       // Card structure mirrors the Project Timeline card exactly:
       //   header (mb8) -> bar (h10) -> footer (mt6) + 12/14 padding.
-      // The min-% label is an overlay anchored to the bottom of an 8px band that
-      // overlaps the header's margin, so it does NOT add a 4th row.
+      // Both % labels live in the header row, so the card height is unchanged.
       budSec.innerHTML=`<div style="background:#f7f5f9;border:.5px solid #e7e3ec;border-radius:10px;padding:12px 14px;margin-bottom:1rem;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:13px">
+        <div style="position:relative;display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:13px">
           <strong style="color:#2A2829">Project Budget</strong>
+          ${minLabelInHeader}
           <span style="color:#6b686a;font-size:12px">${pctOfMax}% of ${$f0(bMax)}</span>
         </div>
         <div style="position:relative;height:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-          ${minLabelOverlay}
           ${trackHtml}
           ${fillHtml}
         </div>
