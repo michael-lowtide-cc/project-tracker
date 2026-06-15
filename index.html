@@ -621,6 +621,7 @@ td{padding:8px 0;vertical-align:top}
         </div>
       </div>
       <div id="inv-duration-section"></div>
+      <div id="inv-budget-section"></div>
       <div id="inv-retainer-section"></div>
       <div id="inv-time-section"></div>
       <div id="inv-exp-section"></div>
@@ -3238,6 +3239,7 @@ function printInvoiceOnly(){
     .total-final{display:flex;justify-content:flex-end;gap:2rem;font-size:16px;font-weight:600;padding:8px 0;border-top:1px solid #ddd;margin-top:4px}
     #inv-from{border-bottom:3px solid #9151a0;padding-bottom:10px}
     #inv-duration-section *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    #inv-budget-section *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   </style>
   </head><body>${card.innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`);
   w.document.close();
@@ -3355,6 +3357,51 @@ function renderInvoice(){
     } else {
       durSec.innerHTML='';
       durSec.style.display='none';
+    }
+  }
+
+  // ── Project Budget bar ───────────────────────────────────────────────────
+  // Shows total billed-to-date (all months) against the project budget, so the
+  // client sees overall project spend vs. budget on the invoice. Mirrors the
+  // timeline bar's style with resolved hex colors (works in the print window).
+  const budSec=document.getElementById('inv-budget-section');
+  if(budSec){
+    // Pick the same primary project the timeline used.
+    const bProj=clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth)&&!p.parentId)
+      || clientProjects.find(p=>!p.parentId&&(parseFloat(p.budget||0)>0))
+      || clientProjects.find(p=>parseFloat(p.budget||0)>0);
+    const bBudget=bProj?getProjBudget(bProj):null;
+    const bMax=bBudget?bBudget.max:0;
+    if(bProj&&bMax>0){
+      // Total billed-to-date across ALL months for this project
+      const rate=getProjRate(bProj);
+      const bTime=timeEntries.filter(e=>e.projectId===bProj.id&&e.billable).reduce((s,e)=>s+parseFloat(e.hours||0)*rate,0);
+      const bExp=expenses.filter(e=>e.projectId===bProj.id&&e.billable).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+      const billedToDate=bTime+bExp;
+      const pct=Math.min(100,Math.round(billedToDate/bMax*100));
+      const rawPct=billedToDate/bMax*100;
+      const over=billedToDate>bMax;
+      // Color: on-budget green, within 15% of max amber, over budget red
+      const barColor=over?'#a32d2d':(rawPct>=85?'#ba7517':'#1d9e75');
+      const budgetLabel=bBudget.isRange?`${$f(bBudget.min)} – ${$f(bBudget.max)}`:$f(bMax);
+      const statusLabel=over?`${$f(billedToDate)} billed · over budget`:`${$f(billedToDate)} of ${budgetLabel} · ${pct}% used`;
+      budSec.innerHTML=`<div style="background:#f7f5f9;border:.5px solid #e7e3ec;border-radius:10px;padding:12px 14px;margin-bottom:1rem;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:13px">
+          <strong style="color:#2A2829">Project Budget</strong>
+          <span style="color:#6b686a;font-size:12px">${statusLabel}</span>
+        </div>
+        <div style="height:10px;background:#e7e3ec;border-radius:6px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          <div style="height:100%;width:${Math.min(100,pct)}%;background:${barColor};border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:#9a979a">
+          <span>${$f(0)}</span>
+          <span>${budgetLabel}</span>
+        </div>
+      </div>`;
+      budSec.style.display='block';
+    } else {
+      budSec.innerHTML='';
+      budSec.style.display='none';
     }
   }
 
