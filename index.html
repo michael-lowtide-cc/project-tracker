@@ -3419,30 +3419,39 @@ function renderInvoice(){
         fillHtml=`<div style="position:absolute;left:0;top:0;height:100%;width:${fillPct.toFixed(2)}%;background:${barColor};border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>`;
       }
 
-      // "% of min" label sits above the gap, centered on the gap position.
-      const minLabelHtml=hasMinGap
-        ? `<div style="position:absolute;left:${gapPosPct}%;transform:translateX(-50%);top:0;font-size:10px;color:#6b686a;white-space:nowrap">${pctOfMin}% of ${$f(bMin)}</div>`
-        : '';
+      // No-cents currency for the bar labels (cents take up too much space).
+      const $f0=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:settings.currency||'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0);
 
       // Billed-amount label floats under the right edge of the green fill,
-      // clamped to 4%-92% so it never collides with $0.00 or runs off the edge.
+      // clamped to 4%-92% so it never collides with $0 or runs off the edge.
       const billedLabelPos=Math.max(4,Math.min(92,fillPct));
 
+      // "% of min" label sits ABOVE the bar, right-aligned to the gap position,
+      // matching the "% of max" text style (12px / #6b686a). It's placed in a
+      // thin overlay band directly above the bar so it adds no net card height
+      // (the band height is absorbed by the header's reduced bottom margin),
+      // keeping this card the SAME height as the Project Timeline card.
+      const minLabelOverlay=hasMinGap
+        ? `<span style="position:absolute;left:${gapPosPct}%;transform:translateX(-100%);bottom:14px;padding-right:4px;font-size:12px;line-height:1;color:#6b686a;white-space:nowrap">${pctOfMin}% of ${$f0(bMin)}</span>`
+        : '';
+
+      // Card structure mirrors the Project Timeline card exactly:
+      //   header (mb8) -> bar (h10) -> footer (mt6) + 12/14 padding.
+      // The min-% label is an overlay anchored to the bottom of an 8px band that
+      // overlaps the header's margin, so it does NOT add a 4th row.
       budSec.innerHTML=`<div style="background:#f7f5f9;border:.5px solid #e7e3ec;border-radius:10px;padding:12px 14px;margin-bottom:1rem;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:${hasMinGap?'16':'8'}px;font-size:13px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:13px">
           <strong style="color:#2A2829">Project Budget</strong>
-          <span style="color:#6b686a;font-size:12px">${pctOfMax}% of ${$f(bMax)}</span>
+          <span style="color:#6b686a;font-size:12px">${pctOfMax}% of ${$f0(bMax)}</span>
         </div>
-        <div style="position:relative;height:10px;${hasMinGap?'margin-top:4px;':''}-webkit-print-color-adjust:exact;print-color-adjust:exact">
-          ${minLabelHtml}
-          <div style="position:relative;height:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-            ${trackHtml}
-            ${fillHtml}
-          </div>
+        <div style="position:relative;height:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          ${minLabelOverlay}
+          ${trackHtml}
+          ${fillHtml}
         </div>
-        <div style="position:relative;height:16px;margin-top:5px;font-size:11px;color:#9a979a">
-          <span style="position:absolute;left:0;top:0">${$f(0)}</span>
-          <span style="position:absolute;left:${billedLabelPos}%;transform:translateX(-50%);top:0;color:#2A2829;font-weight:500;white-space:nowrap">${$f(billedToDate)} Billed</span>
+        <div style="position:relative;height:14px;margin-top:6px;font-size:11px;color:#9a979a">
+          <span style="position:absolute;left:0;top:0">${$f0(0)}</span>
+          <span style="position:absolute;left:${billedLabelPos}%;transform:translateX(-50%);top:0;color:#9a979a;white-space:nowrap">${$f0(billedToDate)} Billed</span>
         </div>
       </div>`;
       budSec.style.display='block';
