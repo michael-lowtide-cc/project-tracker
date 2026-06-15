@@ -196,7 +196,8 @@ td{padding:8px 0;vertical-align:top}
 /* Profile avatar in settings */
 .profile-avatar{width:54px;height:54px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0}
 @media print{
-  body{background:white}
+  body{background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   #app{max-width:100%;padding:1rem}
   .tabs,.header button,.no-print{display:none!important}
   #invoice-section{display:block!important}
@@ -3236,8 +3237,7 @@ function printInvoiceOnly(){
     .total-row{display:flex;justify-content:flex-end;gap:2rem;font-size:14px;padding:4px 0;color:#6b686a}
     .total-final{display:flex;justify-content:flex-end;gap:2rem;font-size:16px;font-weight:600;padding:8px 0;border-top:1px solid #ddd;margin-top:4px}
     #inv-from{border-bottom:3px solid #9151a0;padding-bottom:10px}
-    #inv-duration-section>div{background:#f0eaf7!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    #inv-duration-section [style*="background:var(--success)"],#inv-duration-section [style*="background:var(--warning)"],#inv-duration-section [style*="background:var(--danger)"]{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #inv-duration-section *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   </style>
   </head><body>${card.innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`);
   w.document.close();
@@ -3333,18 +3333,20 @@ function renderInvoice(){
       const pct=Math.round(elapsed/totalSpan*100);
       const done=nowMs>=endMs;
       const notStarted=nowMs<startMs;
-      // Color: on-track green, final 15% amber, past-end danger
-      const barColor=done?'var(--danger)':(pct>=85?'var(--warning)':'var(--success)');
+      // Color: on-track green, final 15% amber, past-end danger.
+      // Hard hex (not CSS vars) so it renders in the print window too.
+      const barColor=done?'#a32d2d':(pct>=85?'#ba7517':'#1d9e75');
       const statusLabel=notStarted?'Not yet started':done?'Contract period ended':`${pct}% through project timeline`;
-      durSec.innerHTML=`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:1rem">
+      // Off-white rounded container + light rounded track, all resolved hex + print-color-adjust
+      durSec.innerHTML=`<div style="background:#f7f5f9;border:.5px solid #e7e3ec;border-radius:10px;padding:12px 14px;margin-bottom:1rem;-webkit-print-color-adjust:exact;print-color-adjust:exact">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:13px">
-          <strong style="color:var(--text)">Project Timeline</strong>
-          <span style="color:var(--text2);font-size:12px">${statusLabel}</span>
+          <strong style="color:#2A2829">Project Timeline</strong>
+          <span style="color:#6b686a;font-size:12px">${statusLabel}</span>
         </div>
-        <div style="height:10px;background:var(--bg3);border-radius:6px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <div style="height:10px;background:#e7e3ec;border-radius:6px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact">
           <div style="height:100%;width:${notStarted?0:pct}%;background:${barColor};border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--text3)">
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:#9a979a">
           <span>${fmtDate(cStart)}</span>
           <span>${fmtDate(cEnd)}</span>
         </div>
