@@ -309,6 +309,7 @@ td{padding:8px 0;vertical-align:top}
     </div>
 
     <button class="btn" style="margin-top:1rem" onclick="toggleSettings()">Done</button>
+    <div style="margin-top:10px;font-size:10px;color:var(--text3)">Build: build-20260615-1944</div>
   </div>
 
   <!-- TABS -->
@@ -3365,6 +3366,7 @@ function renderInvoice(){
   // client sees overall project spend vs. budget on the invoice. Mirrors the
   // timeline bar's style with resolved hex colors (works in the print window).
   const budSec=document.getElementById('inv-budget-section');
+  console.log('[BUDGET BAR] budSec found:', !!budSec, '| clientProjects count:', clientProjects.length);
   if(budSec){
     // Pick the same primary project the timeline used.
     const bProj=clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth)&&!p.parentId)
@@ -3372,6 +3374,7 @@ function renderInvoice(){
       || clientProjects.find(p=>parseFloat(p.budget||0)>0);
     const bBudget=bProj?getProjBudget(bProj):null;
     const bMax=bBudget?bBudget.max:0;
+    console.log('[BUDGET BAR] bProj:', bProj?bProj.name:'NONE', '| budget raw:', bProj?bProj.budget:'-', '| budgetMax:', bProj?bProj.budgetMax:'-', '| budgetType:', bProj?bProj.budgetType:'-', '| computed bMax:', bMax);
     if(bProj&&bMax>0){
       // Total billed-to-date across ALL months for this project
       const rate=getProjRate(bProj);
