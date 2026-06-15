@@ -3297,6 +3297,10 @@ function renderInvoice(){
     termsEl.style.display=settings.paymentTerms?'block':'none';
   }
 
+
+  // Get projects for this client
+  const clientProjects=cid?projects.filter(p=>p.clientId===cid):projects;
+  const clientProjIds=new Set(clientProjects.map(p=>p.id));
   // ── Project Duration / Progress bar ──────────────────────────────────────
   // Shows contract start -> contract end with the % of the project timeline
   // elapsed as of today. Gives the client a quick sense of where the project
@@ -3351,10 +3355,6 @@ function renderInvoice(){
       durSec.style.display='none';
     }
   }
-
-  // Get projects for this client
-  const clientProjects=cid?projects.filter(p=>p.clientId===cid):projects;
-  const clientProjIds=new Set(clientProjects.map(p=>p.id));
 
   const invT=timeEntries.filter(e=>e.date.startsWith(m)&&e.billable&&(!cid||clientProjIds.has(e.projectId))).sort((a,b)=>a.date.localeCompare(b.date));
   const invE=expenses.filter(e=>e.date.startsWith(m)&&e.billable&&(!cid||clientProjIds.has(e.projectId)||e.clientId===cid)).sort((a,b)=>a.date.localeCompare(b.date));
