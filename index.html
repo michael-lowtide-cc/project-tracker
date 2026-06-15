@@ -619,6 +619,7 @@ td{padding:8px 0;vertical-align:top}
           <div style="font-size:13px;color:var(--text2);margin-top:8px" id="inv-terms"></div>
         </div>
       </div>
+      <div id="inv-duration-section"></div>
       <div id="inv-retainer-section"></div>
       <div id="inv-time-section"></div>
       <div id="inv-exp-section"></div>
@@ -3235,6 +3236,8 @@ function printInvoiceOnly(){
     .total-row{display:flex;justify-content:flex-end;gap:2rem;font-size:14px;padding:4px 0;color:#6b686a}
     .total-final{display:flex;justify-content:flex-end;gap:2rem;font-size:16px;font-weight:600;padding:8px 0;border-top:1px solid #ddd;margin-top:4px}
     #inv-from{border-bottom:3px solid #9151a0;padding-bottom:10px}
+    #inv-duration-section>div{background:#f0eaf7!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #inv-duration-section [style*="background:var(--success)"],#inv-duration-section [style*="background:var(--warning)"],#inv-duration-section [style*="background:var(--danger)"]{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   </style>
   </head><body>${card.innerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`);
   w.document.close();
@@ -3275,14 +3278,13 @@ function renderInvoice(){
   document.getElementById('inv-period').textContent='Period: '+fmtMonth(m);
 
   // Populate "From" block with studio/business info
+  // (Phone and website intentionally omitted from the client-facing invoice.)
   const fromEl=document.getElementById('inv-from');
   if(fromEl){
     const lines=[
       bizInfo.name||myProfile.name||'',
       bizInfo.address||'',
-      bizInfo.email||(myProfile.email||''),
-      bizInfo.phone||(myProfile.phone||''),
-      bizInfo.website||''
+      bizInfo.email||(myProfile.email||'')
     ].filter(Boolean);
     fromEl.innerHTML=lines.map(l=>htmlEsc(l)).join('<br>');
     fromEl.style.display=lines.length?'block':'none';
@@ -3293,6 +3295,61 @@ function renderInvoice(){
   if(termsEl){
     termsEl.textContent=settings.paymentTerms?'Terms: '+settings.paymentTerms:'';
     termsEl.style.display=settings.paymentTerms?'block':'none';
+  }
+
+  // ── Project Duration / Progress bar ──────────────────────────────────────
+  // Shows contract start -> contract end with the % of the project timeline
+  // elapsed as of today. Gives the client a quick sense of where the project
+  // stands when they receive the invoice.
+  const durSec=document.getElementById('inv-duration-section');
+  if(durSec){
+    // Use the retainer/primary project for this client. When a specific client
+    // is selected, prefer their main (non-sub) project that has both dates.
+    const dProj=(retainerProj&&retainerProj.startDate&&(retainerProj.endDate||retainerProj.endDateMonth))
+      ? retainerProj
+      : clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth)&&!p.parentId);
+    // Resolve the contract end date (supports specific date or month/year type)
+    function resolveEnd(p){
+      if(!p)return'';
+      if(p.endDateType==='monthyear'&&p.endDateMonth){
+        // last day of that month
+        const [y,mo]=p.endDateMonth.split('-').map(Number);
+        return new Date(y,mo,0).toISOString().slice(0,10);
+      }
+      return p.endDate||'';
+    }
+    const cStart=dProj?dProj.startDate:'';
+    const cEnd=dProj?resolveEnd(dProj):'';
+    if(dProj&&cStart&&cEnd){
+      const startMs=new Date(cStart+'T00:00:00').getTime();
+      const endMs=new Date(cEnd+'T00:00:00').getTime();
+      const nowMs=Date.now();
+      const totalSpan=Math.max(1,endMs-startMs);
+      const elapsed=Math.min(totalSpan,Math.max(0,nowMs-startMs));
+      const pct=Math.round(elapsed/totalSpan*100);
+      const done=nowMs>=endMs;
+      const notStarted=nowMs<startMs;
+      // Color: on-track green, final 15% amber, past-end danger
+      const barColor=done?'var(--danger)':(pct>=85?'var(--warning)':'var(--success)');
+      const statusLabel=notStarted?'Not yet started':done?'Contract period ended':`${pct}% through project timeline`;
+      durSec.innerHTML=`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:1rem">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:13px">
+          <strong style="color:var(--text)">Project Timeline</strong>
+          <span style="color:var(--text2);font-size:12px">${statusLabel}</span>
+        </div>
+        <div style="height:10px;background:var(--bg3);border-radius:6px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          <div style="height:100%;width:${notStarted?0:pct}%;background:${barColor};border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--text3)">
+          <span>${fmtDate(cStart)}</span>
+          <span>${fmtDate(cEnd)}</span>
+        </div>
+      </div>`;
+      durSec.style.display='block';
+    } else {
+      durSec.innerHTML='';
+      durSec.style.display='none';
+    }
   }
 
   // Get projects for this client
