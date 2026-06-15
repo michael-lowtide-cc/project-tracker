@@ -784,6 +784,8 @@ async function forcSync(){
   if(!gdToken||!gdFileId){setSyncUI('error','Not connected -- click Connect Drive first',true,'Connect Drive');return;}
   setSyncUI('saving','Syncing now...');
   clearTimeout(syncTimer);
+  // writeToDrive now verifies res.ok and surfaces a real error if the token
+  // has expired, so a failed Force Sync can no longer masquerade as success.
   await writeToDrive();
 }
 
@@ -818,6 +820,7 @@ function handleDriveAuth(){
       localStorage.removeItem('gd_auth_token');
       if(data.token){
         gdToken=data.token;
+        recordTokenAcquired();
         localStorage.setItem('gd:wasConnected','1');
         if(popup&&!popup.closed)popup.close();
         await initDriveWithToken();
@@ -832,6 +835,7 @@ function handleDriveAuth(){
     if(e.data&&e.data.type==='gd_token'){
       cleanup();
       gdToken=e.data.token;
+      recordTokenAcquired();
       localStorage.setItem('gd:wasConnected','1');
       if(popup&&!popup.closed)popup.close();
       await initDriveWithToken();
@@ -868,6 +872,7 @@ function checkHashToken(){
   if(!t)return false;
   history.replaceState(null,'',window.location.pathname);
   gdToken=t;
+  recordTokenAcquired();
   localStorage.setItem('gd:wasConnected','1');
   return true;
 }
@@ -1127,25 +1132,57 @@ async function backupHTMLToDrive(version, dateStr){
 
 async function loadFromDrive(){
   if(!gdFileId||!gdToken)return;
-  setSyncUI('pending','Loading from Drive...');
+  setSyncUI('pending','Checking Drive...');
   try{
     const res=await fetch(`https://www.googleapis.com/drive/v3/files/${gdFileId}?alt=media`,{headers:{Authorization:`Bearer ${gdToken}`}});
-    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    if(!res.ok){
+      if(res.status===401||res.status===403){
+        handleExpiredToken('Session expired -- click Connect Drive to sign in again. Your local data is safe.');
+        return;
+      }
+      throw new Error(`HTTP ${res.status}`);
+    }
     const raw=await res.text();
     const data=(raw&&raw!=='null'&&raw.trim()!=='')?JSON.parse(raw):{};
-    GD_KEYS.forEach(k=>{if(data[k]!=null)localStorage.setItem(k,JSON.stringify(data[k]));});
-    reloadState();
-    allDropdownRefresh();
-    refreshAll();
-    setSyncUI('idle',`Synced . ${new Date().toLocaleTimeString()}`);
-    document.getElementById('sync-force-btn').style.display='inline-flex';
-  }catch(e){setSyncUI('error','Load failed: '+e.message,true,'Retry');console.error(e);}
+
+    // ── NEWEST-WINS RECONCILIATION (Option A) ──────────────────────────────
+    // Compare Drive's timestamp against local's. Whichever is newer wins.
+    const driveStamp=(typeof data._lastModified==='number')?data._lastModified:0;
+    const localStamp=getLocalLastModified();
+    const driveHasData=GD_KEYS.some(k=>data[k]!=null);
+
+    if(localStamp>driveStamp){
+      // LOCAL IS NEWER (or Drive has no timestamp / is empty).
+      // Do NOT overwrite local. Push local up to Drive instead so unsynced work is preserved.
+      // This is the case that previously destroyed data on reconnect.
+      setSyncUI('saving','Local data is newer -- updating Drive...');
+      await writeToDrive(); // pushes current in-memory/local state up, stamped with localStamp
+      // writeToDrive sets its own success/error UI
+      return;
+    }
+
+    // DRIVE IS NEWER (or equal): safe to load Drive into local.
+    if(driveHasData){
+      GD_KEYS.forEach(k=>{if(data[k]!=null)localStorage.setItem(k,JSON.stringify(data[k]));});
+      // Align local timestamp to Drive's so we don't immediately re-push
+      if(driveStamp>0)localStorage.setItem('tracker:lastModified',driveStamp+'');
+      _lastDriveSyncedStamp=driveStamp;
+      reloadState();
+      allDropdownRefresh();
+      refreshAll();
+    }
+    setSyncUI('idle',`Synced · ${new Date().toLocaleTimeString()}`);
+    markSynced();
+    const fb=document.getElementById('sync-force-btn');if(fb)fb.style.display='inline-flex';
+  }catch(e){setSyncUI('error','Load failed: '+e.message+' -- data safe locally',true,'Retry');console.error(e);}
 }
 
 async function writeToDrive(){
   if(!gdFileId||!gdToken)return;
   // Always serialize current in-memory state — don't re-read from localStorage
-  // which could be stale if another tab wrote to it
+  // which could be stale if another tab wrote to it.
+  // Stamp with the local last-modified time so loadFromDrive can compare ages (newest-wins).
+  const stamp=getLocalLastModified();
   const data={
     'tracker:settings':settings,
     'tracker:time':timeEntries,
@@ -1155,21 +1192,69 @@ async function writeToDrive(){
     'tracker:clientInvs':clientInvs,
     'tracker:team':teamMembers,
     'tracker:myProfile':myProfile,
-    'tracker:bizInfo':bizInfo
+    'tracker:bizInfo':bizInfo,
+    '_lastModified':stamp
   };
   try{
-    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${gdFileId}?uploadType=media`,{
+    const res=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${gdFileId}?uploadType=media`,{
       method:'PATCH',
       headers:{'Content-Type':'application/json','Authorization':`Bearer ${gdToken}`},
       body:JSON.stringify(data)
     });
+    // CRITICAL: a failed PATCH (e.g. 401 expired token) must NOT report success.
+    if(!res.ok){
+      if(res.status===401||res.status===403){
+        handleExpiredToken('Sync FAILED: Google session expired. Click Connect Drive to sign in again -- your data is safe locally.');
+      } else {
+        setSyncUI('error',`Sync FAILED (HTTP ${res.status}) -- data safe locally. Click Retry.`,true,'Retry');
+      }
+      return; // do NOT markSynced -- we still have unsynced changes
+    }
+    _lastDriveSyncedStamp=stamp; // Drive now matches this local stamp
     setSyncUI('idle',`Saved · ${new Date().toLocaleTimeString()}`);
     markSynced();
-    document.getElementById('sync-force-btn').style.display='inline-flex';
+    const fb=document.getElementById('sync-force-btn');if(fb)fb.style.display='inline-flex';
     // Create a daily backup in the Archives folder (silently, non-blocking)
     archiveToday();
-  }catch(e){setSyncUI('error','Save failed -- data safe locally',true,'Retry');console.error(e);}
+  }catch(e){
+    setSyncUI('error','Sync FAILED (network) -- data safe locally. Click Retry.',true,'Retry');
+    console.error(e);
+  }
 }
+
+// ── Local last-modified timestamp — newest-wins sync support ─────────────────
+function getLocalLastModified(){
+  const v=localStorage.getItem('tracker:lastModified');
+  return v?parseInt(v,10):0;
+}
+function touchLocalLastModified(){
+  const now=Date.now();
+  localStorage.setItem('tracker:lastModified',now+'');
+  return now;
+}
+let _lastDriveSyncedStamp=0;
+
+// Called when a write/read reveals the token is dead. Surfaces a clear,
+// honest prompt instead of silently failing or faking success.
+function handleExpiredToken(msg){
+  gdToken=null; // force reconnect on next attempt
+  setSyncUI('error',msg||'Session expired -- click Connect Drive',true,'Connect Drive');
+  updateSettingsDriveUI();
+}
+
+// Google OAuth tokens last ~3600s. Record acquisition time so we can warn
+// the user *before* a save silently fails, and gate the daily heartbeat.
+let _tokenAcquiredAt=0;
+const TOKEN_LIFETIME_MS=55*60*1000; // treat as expired a few min early for safety
+function recordTokenAcquired(){_tokenAcquiredAt=Date.now();}
+function tokenLikelyExpired(){return gdToken&&_tokenAcquiredAt&&(Date.now()-_tokenAcquiredAt>TOKEN_LIFETIME_MS);}
+// Periodically surface an expiry warning so the user knows to reconnect
+// instead of discovering it only when a save fails.
+setInterval(()=>{
+  if(tokenLikelyExpired()){
+    handleExpiredToken('Google session has likely expired -- click Connect Drive to keep syncing. Your data is safe locally.');
+  }
+},60000);
 
 function scheduleDriveSync(){
   if(!gdToken||!gdFileId)return;
@@ -1181,6 +1266,8 @@ function scheduleDriveSync(){
 function save(k,v){
   try{
     localStorage.setItem(k,JSON.stringify(v));
+    // Stamp every change so newest-wins sync knows local is fresher than Drive
+    touchLocalLastModified();
     if(k==='tracker:projects'){
       localStorage.setItem('tracker:projects:backup',JSON.stringify({ts:Date.now(),data:v}));
     }
@@ -1250,16 +1337,29 @@ function startAutosaveHeartbeat(){
   },30000);
 }
 
-// Warn if leaving page with unsynced changes
+// Warn if leaving page with unsynced changes.
+// Watches projects AND time entries AND expenses (previously only projects,
+// which let unsynced time/expense data slip away without warning).
 let _lastSyncedHash='';
+function _dataHash(){
+  try{
+    return [
+      JSON.stringify(projects||[]).length,
+      JSON.stringify(timeEntries||[]).length,
+      JSON.stringify(expenses||[]).length,
+      JSON.stringify(clients||[]).length,
+      JSON.stringify(clientInvs||{}).length
+    ].join(':');
+  }catch{return '';}
+}
 function markSynced(){
-  try{_lastSyncedHash=JSON.stringify(projects).length+'';}catch{}
+  _lastSyncedHash=_dataHash();
 }
 window.addEventListener('beforeunload',e=>{
   if(!projects)return;
-  const cur=JSON.stringify(projects).length+'';
+  const cur=_dataHash();
   if(cur!==_lastSyncedHash&&_lastSyncedHash!==''){
-    e.preventDefault();e.returnValue='You may have unsaved changes. Are you sure you want to leave?';
+    e.preventDefault();e.returnValue='You may have unsynced changes (time, expenses, or projects). Click Force Sync before leaving.';
   }
 });
 
