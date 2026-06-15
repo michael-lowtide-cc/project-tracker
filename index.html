@@ -3307,17 +3307,46 @@ function renderInvoice(){
   const invTotal=invTimeAmt+invExpAmt;
   const invHours=invT.reduce((s,e)=>s+parseFloat(e.hours||0),0);
 
-  // Retainer logic — apply if exactly one client's project has retainer paid
+  // ── Retainer logic — depleting balance across the project timeline ──────────
+  // A retainer is a prepaid credit that gets drawn down chronologically as
+  // billable work is performed. For the month being invoiced, we only apply
+  // whatever balance remains AFTER every prior month consumed its share.
   const retainerProj=clientProjects.find(p=>p.retainerOn&&p.retainerPaid&&p.retainerInBudget);
   const retainerAmt=retainerProj?parseFloat(retainerProj.retainerAmt||0):0;
-  const retainerApplied=retainerProj?Math.min(retainerAmt,invTotal):0;
+
+  // Sum all billable charges (time + expenses) for this client in every month
+  // BEFORE the invoice month `m`. Those charges already consumed the retainer.
+  let retainerConsumedBefore=0;
+  if(retainerProj&&retainerAmt>0){
+    const priorTime=timeEntries.filter(e=>e.billable&&e.date<m+'-01'&&(!cid||clientProjIds.has(e.projectId)));
+    const priorTimeAmt=priorTime.reduce((s,e)=>{const p=e.projectId?projects.find(x=>x.id===e.projectId):null;const r=p?getProjRate(p):defRate;return s+parseFloat(e.hours||0)*r;},0);
+    const priorExp=expenses.filter(e=>e.billable&&e.date<m+'-01'&&(!cid||clientProjIds.has(e.projectId)||e.clientId===cid));
+    const priorExpAmt=priorExp.reduce((s,e)=>s+parseFloat(e.amount||0),0);
+    retainerConsumedBefore=priorTimeAmt+priorExpAmt;
+  }
+  // Balance left at the START of this invoice month
+  const retainerRemainingBefore=retainerProj?Math.max(0,retainerAmt-retainerConsumedBefore):0;
+  // Apply only what's left, capped at this month's total
+  const retainerApplied=retainerProj?Math.min(retainerRemainingBefore,invTotal):0;
+  const retainerRemainingAfter=Math.max(0,retainerRemainingBefore-retainerApplied);
   const balance=invTotal-retainerApplied;
 
   const rSec=document.getElementById('inv-retainer-section');
-  rSec.innerHTML=retainerProj?`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:1rem;font-size:13px">
-    <strong>Retainer on account:</strong> ${$f(retainerAmt)} paid
-    <span style="color:var(--success);margin-left:8px">· ${$f(retainerApplied)} applied this invoice</span>
-  </div>`:'';
+  if(!retainerProj){
+    rSec.innerHTML='';
+  } else if(retainerRemainingBefore<=0){
+    // Retainer fully consumed in prior months — show it's exhausted, don't apply
+    rSec.innerHTML=`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:1rem;font-size:13px">
+      <strong>Retainer on account:</strong> ${$f(retainerAmt)} paid
+      <span style="color:var(--text3);margin-left:8px">· fully applied in prior months — none remaining for ${fmtMonth(m)}</span>
+    </div>`;
+  } else {
+    rSec.innerHTML=`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:1rem;font-size:13px">
+      <strong>Retainer on account:</strong> ${$f(retainerAmt)} paid${retainerConsumedBefore>0?` <span style="color:var(--text3)">· ${$f(Math.min(retainerAmt,retainerConsumedBefore))} used before ${fmtMonth(m)}</span>`:''}
+      <br><span style="color:var(--success)">· ${$f(retainerApplied)} applied this invoice</span>
+      <span style="color:var(--text2);margin-left:8px">· ${$f(retainerRemainingAfter)} remaining after</span>
+    </div>`;
+  }
 
   const tsec=document.getElementById('inv-time-section');
   const esec=document.getElementById('inv-exp-section');
@@ -3373,7 +3402,7 @@ function renderInvoice(){
     <div class="total-row"><span style="color:var(--text2)">Subtotal</span><span>${$f(invTotal)}</span></div>
     ${retainerApplied>0?`<div class="total-row"><span style="color:var(--text2)">Retainer applied</span><span>(${$f(retainerApplied)})</span></div>`:''}
     <div class="total-final"><span>Balance due</span><span>${$f(balance)}</span></div>
-    ${balance===0&&invTotal>0?'<div style="font-size:12px;color:var(--success);margin-top:6px"><i class="ti ti-circle-check"></i> Fully covered by retainer</div>':''}
+    ${balance===0&&invTotal>0&&retainerApplied>0?'<div style="font-size:12px;color:var(--success);margin-top:6px"><i class="ti ti-circle-check"></i> Fully covered by retainer</div>':''}
   </div>`;
 
   // Notes / footer text from Invoice Settings
