@@ -598,9 +598,18 @@ td{padding:8px 0;vertical-align:top}
         <textarea id="s-inv-notes" rows="2" placeholder="e.g. Please make checks payable to Lowtide.cc." oninput="saveSetting('invoiceNotes',this.value)" style="width:100%;padding:8px 10px;border:.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;resize:vertical"></textarea>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem" class="no-print">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;flex-wrap:wrap" class="no-print">
       <label style="font-size:14px;color:var(--text2);margin:0">Period</label>
-      <input type="month" id="inv-month" style="width:180px" oninput="renderInvoice()">
+      <select id="inv-period-mode" style="width:140px" onchange="setInvoicePeriodMode(this.value)">
+        <option value="month">Month</option>
+        <option value="range">Custom range</option>
+      </select>
+      <input type="month" id="inv-month" style="width:170px" oninput="renderInvoice()">
+      <span id="inv-range-inputs" style="display:none;align-items:center;gap:8px">
+        <input type="date" id="inv-range-start" style="width:150px" oninput="renderInvoice()">
+        <span style="font-size:14px;color:var(--text3)">to</span>
+        <input type="date" id="inv-range-end" style="width:150px" oninput="renderInvoice()">
+      </span>
       <label style="font-size:14px;color:var(--text2);margin:0">Client</label>
       <select id="inv-client-filter" style="width:200px" onchange="updateInvoicePrefix();renderInvoice()">
         <option value="">All clients</option>
@@ -1419,6 +1428,59 @@ function today(){return new Date().toISOString().split('T')[0]}
 function thisMonth(){return today().substring(0,7)}
 function fmtDate(d){if(!d)return'';return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}
 function fmtMonth(m){if(!m)return'';const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'})}
+
+// ── Invoice period: Month vs Custom range ───────────────────────────────────
+let _invPeriodMode='month'; // 'month' | 'range'
+function setInvoicePeriodMode(mode){
+  _invPeriodMode=mode==='range'?'range':'month';
+  const monthInp=document.getElementById('inv-month');
+  const rangeWrap=document.getElementById('inv-range-inputs');
+  if(monthInp)monthInp.style.display=_invPeriodMode==='range'?'none':'inline-block';
+  if(rangeWrap)rangeWrap.style.display=_invPeriodMode==='range'?'inline-flex':'none';
+  // Seed sensible defaults for range from the current month if empty
+  if(_invPeriodMode==='range'){
+    const s=document.getElementById('inv-range-start'), e=document.getElementById('inv-range-end');
+    if(s&&!s.value){const m=document.getElementById('inv-month').value||thisMonth();s.value=m+'-01';}
+    if(e&&!e.value){e.value=today();}
+  }
+  updateInvoicePrefix();
+  renderInvoice();
+}
+
+// Resolve the active invoice period into start/end ISO dates, a display label,
+// and the YYMMDD invoice-number stem (always based on the period START date).
+function getInvoicePeriod(){
+  if(_invPeriodMode==='range'){
+    const start=document.getElementById('inv-range-start')?.value||'';
+    const end=document.getElementById('inv-range-end')?.value||'';
+    return {
+      mode:'range',
+      start, end,
+      // inclusive match helpers
+      inPeriod:d=>(!start||d>=start)&&(!end||d<=end),
+      beforePeriod:d=>start?d<start:false,
+      label:(start&&end)?`${fmtDate(start)} – ${fmtDate(end)}`:(start?`From ${fmtDate(start)}`:(end?`Through ${fmtDate(end)}`:'Custom range')),
+      stemDate:start||end||today()
+    };
+  }
+  // Month mode
+  const m=document.getElementById('inv-month')?.value||thisMonth();
+  const monthStart=m+'-01';
+  return {
+    mode:'month',
+    start:monthStart, end:m+'-31', m,
+    inPeriod:d=>d.startsWith(m),
+    beforePeriod:d=>d<monthStart,
+    label:fmtMonth(m),
+    stemDate:monthStart
+  };
+}
+// Invoice number stem: PREFIX-YYMMDD from the period start date.
+function invNumStem(period){
+  const d=period.stemDate||today(); // YYYY-MM-DD
+  const[y,mo,da]=d.split('-');
+  return y.slice(2)+mo+da; // YYMMDD
+}
 function $f(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:settings.currency||'USD',minimumFractionDigits:2}).format(n||0)}
 function saveSetting(k,v){settings[k]=v;save('tracker:settings',settings)}
 function getProjRate(proj){
@@ -3268,17 +3330,18 @@ function sortedMemberChips(memberList){
 }
 
 function renderInvoice(){
-  const m=document.getElementById('inv-month').value||thisMonth();
+  const period=getInvoicePeriod();
+  const m=period.m||(document.getElementById('inv-month').value||thisMonth());
   const cid=document.getElementById('inv-client-filter')?.value||'';
   const prefix=settings.invoicePrefix||'INV';
   const defRate=parseFloat(settings.hourlyRate||0);
   const client=cid?clients.find(c=>c.id===cid):null;
 
-  // Invoice number: PREFIX-YYYYMM (no clientId suffix)
-  document.getElementById('inv-number').textContent=prefix+'-'+m.replace('-','');
+  // Invoice number: PREFIX-YYMMDD (from the period start date)
+  document.getElementById('inv-number').textContent=prefix+'-'+invNumStem(period);
   document.getElementById('inv-proj-name').textContent=client?(client.company||clientLabel(client)):'All Clients';
   document.getElementById('inv-client-name').textContent='';
-  document.getElementById('inv-period').textContent='Period: '+fmtMonth(m);
+  document.getElementById('inv-period').textContent='Period: '+period.label;
 
   // Populate "From" block with studio/business info
   // (Phone and website intentionally omitted from the client-facing invoice.)
@@ -3458,8 +3521,8 @@ function renderInvoice(){
     }
   }
 
-  const invT=timeEntries.filter(e=>e.date.startsWith(m)&&e.billable&&(!cid||clientProjIds.has(e.projectId))).sort((a,b)=>a.date.localeCompare(b.date));
-  const invE=expenses.filter(e=>e.date.startsWith(m)&&e.billable&&(!cid||clientProjIds.has(e.projectId)||e.clientId===cid)).sort((a,b)=>a.date.localeCompare(b.date));
+  const invT=timeEntries.filter(e=>period.inPeriod(e.date)&&e.billable&&(!cid||clientProjIds.has(e.projectId))).sort((a,b)=>a.date.localeCompare(b.date));
+  const invE=expenses.filter(e=>period.inPeriod(e.date)&&e.billable&&(!cid||clientProjIds.has(e.projectId)||e.clientId===cid)).sort((a,b)=>a.date.localeCompare(b.date));
 
   const invTimeAmt=invT.reduce((s,e)=>{const p=e.projectId?projects.find(x=>x.id===e.projectId):null;const r=p?getProjRate(p):defRate;return s+parseFloat(e.hours||0)*r;},0);
   const invExpAmt=invE.reduce((s,e)=>s+parseFloat(e.amount||0),0);
@@ -3477,9 +3540,9 @@ function renderInvoice(){
   // BEFORE the invoice month `m`. Those charges already consumed the retainer.
   let retainerConsumedBefore=0;
   if(retainerProj&&retainerAmt>0){
-    const priorTime=timeEntries.filter(e=>e.billable&&e.date<m+'-01'&&(!cid||clientProjIds.has(e.projectId)));
+    const priorTime=timeEntries.filter(e=>e.billable&&period.beforePeriod(e.date)&&(!cid||clientProjIds.has(e.projectId)));
     const priorTimeAmt=priorTime.reduce((s,e)=>{const p=e.projectId?projects.find(x=>x.id===e.projectId):null;const r=p?getProjRate(p):defRate;return s+parseFloat(e.hours||0)*r;},0);
-    const priorExp=expenses.filter(e=>e.billable&&e.date<m+'-01'&&(!cid||clientProjIds.has(e.projectId)||e.clientId===cid));
+    const priorExp=expenses.filter(e=>e.billable&&period.beforePeriod(e.date)&&(!cid||clientProjIds.has(e.projectId)||e.clientId===cid));
     const priorExpAmt=priorExp.reduce((s,e)=>s+parseFloat(e.amount||0),0);
     retainerConsumedBefore=priorTimeAmt+priorExpAmt;
   }
@@ -3497,11 +3560,11 @@ function renderInvoice(){
     // Retainer fully consumed in prior months — show it's exhausted, don't apply
     rSec.innerHTML=`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:1rem;font-size:13px">
       <strong>Retainer on account:</strong> ${$f(retainerAmt)} paid
-      <span style="color:var(--text3);margin-left:8px">· fully applied in prior months — none remaining for ${fmtMonth(m)}</span>
+      <span style="color:var(--text3);margin-left:8px">· fully applied in prior periods — none remaining for ${period.label}</span>
     </div>`;
   } else {
     rSec.innerHTML=`<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:10px;margin-bottom:1rem;font-size:13px">
-      <strong>Retainer on account:</strong> ${$f(retainerAmt)} paid${retainerConsumedBefore>0?` <span style="color:var(--text3)">· ${$f(Math.min(retainerAmt,retainerConsumedBefore))} used before ${fmtMonth(m)}</span>`:''}
+      <strong>Retainer on account:</strong> ${$f(retainerAmt)} paid${retainerConsumedBefore>0?` <span style="color:var(--text3)">· ${$f(Math.min(retainerAmt,retainerConsumedBefore))} used before ${period.label}</span>`:''}
       <br><span style="color:var(--success)">· ${$f(retainerApplied)} applied this invoice</span>
       <span style="color:var(--text2);margin-left:8px">· ${$f(retainerRemainingAfter)} remaining after</span>
     </div>`;
@@ -3515,7 +3578,7 @@ function renderInvoice(){
   if(!invT.length&&!invE.length){
     tsec.innerHTML='';esec.innerHTML='';totals.innerHTML='';
     empty.style.display='block';
-    empty.textContent='No billable entries for '+fmtMonth(m)+(cid?' for this client':'')+ '.';
+    empty.textContent='No billable entries for '+period.label+(cid?' for this client':'')+ '.';
     return;
   }
   empty.style.display='none';
