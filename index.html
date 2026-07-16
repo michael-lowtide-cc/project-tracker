@@ -499,7 +499,7 @@ td{padding:8px 0;vertical-align:top}
             <select id="p-budget-parent" style="display:none;flex:1;font-size:13px"><option value="">— Parent project —</option></select>
           </div>
         </div>
-        <div id="p-rate-wrap"><label>Hourly rate ($/hr)</label><input type="number" id="p-rate" min="0" step="5" placeholder="Use default"></div>
+        <div id="p-rate-wrap"><label id="p-rate-label">Hourly rate ($/hr)</label><input type="number" id="p-rate" min="0" step="5" placeholder="Use default"></div>
       </div>
       <div id="p-retainer-wrap" style="margin-bottom:12px">
         <label class="check-label" style="margin-bottom:8px"><input type="checkbox" id="p-retainer-on" onchange="toggleRetainerFields()"> Has retainer</label>
@@ -1484,7 +1484,17 @@ function invNumStem(period){
 function $f(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:settings.currency||'USD',minimumFractionDigits:2}).format(n||0)}
 function saveSetting(k,v){settings[k]=v;save('tracker:settings',settings)}
 function getProjRate(proj){
-  return parseFloat((proj&&proj.rate)?proj.rate:(myProfile&&myProfile.rate)?myProfile.rate:settings.hourlyRate||150);
+  // A project's own rate wins if set.
+  if(proj&&proj.rate)return parseFloat(proj.rate);
+  // A sub-project with no own rate inherits its parent project's rate (if the
+  // parent has one set). This lets sub-projects optionally override the rate
+  // while defaulting to the parent's.
+  if(proj&&proj.budgetType==='sub'&&proj.parentProjectId){
+    const parent=projects.find(x=>x.id===proj.parentProjectId);
+    if(parent&&parent.rate)return parseFloat(parent.rate);
+  }
+  // Fall back to profile rate, then global default.
+  return parseFloat((myProfile&&myProfile.rate)?myProfile.rate:settings.hourlyRate||150);
 }
 function getProjBudget(proj){
   if(!proj)return{min:0,max:0,isRange:false,display:''};
@@ -1784,11 +1794,17 @@ function toggleBudgetType(){
   document.getElementById('p-budget-range-sep').style.display=isRange?'inline':'none';
   document.getElementById('p-budget-max').style.display=isRange?'block':'none';
   document.getElementById('p-budget-parent').style.display=isSub?'block':'none';
-  // Hide rate and retainer for sub-projects
+  // Rate stays visible for sub-projects (optional override of parent's rate);
+  // only retainer is hidden for sub-projects.
   const rateWrap=document.getElementById('p-rate-wrap');
   const retWrap=document.getElementById('p-retainer-wrap');
-  if(rateWrap)rateWrap.style.display=isSub?'none':'block';
+  if(rateWrap)rateWrap.style.display='block';
   if(retWrap)retWrap.style.display=isSub?'none':'block';
+  // Update the rate hint/placeholder depending on sub vs main.
+  const rateInp=document.getElementById('p-rate');
+  const rateLbl=document.getElementById('p-rate-label');
+  if(rateInp)rateInp.placeholder=isSub?"Leave blank to inherit parent's rate":'Use default';
+  if(rateLbl)rateLbl.textContent=isSub?'Hourly rate ($/hr) — optional override':'Hourly rate ($/hr)';
   if(isSub){
     const sel=document.getElementById('p-budget-parent');
     const prev=sel.value;
@@ -2573,7 +2589,7 @@ function renderProjectEditForm(p){
     </div>
     <div class="grid2">
       <div><label>Duration (optional)</label><input type="text" id="${pfx}-dur" value="${p.duration||''}" placeholder="e.g. 3 months"></div>
-      <div id="${pfx}-rate-wrap" style="${isSub?'display:none':''}"><label>Hourly rate ($/hr)</label><input type="number" id="${pfx}-rate" value="${p.rate||''}" min="0" step="5" placeholder="Use default"></div>
+      <div id="${pfx}-rate-wrap"><label>Hourly rate ($/hr)${isSub?' — optional override':''}</label><input type="number" id="${pfx}-rate" value="${p.rate||''}" min="0" step="5" placeholder="${isSub?"Leave blank to inherit parent's rate":'Use default'}"></div>
     </div>
     <div class="grid2">
       <div>
@@ -2631,7 +2647,10 @@ function epToggleBudgetType(projId){
   document.getElementById(`${pfx}-budgetsep`).style.display=isRange?'inline':'none';
   document.getElementById(`${pfx}-budgetmax`).style.display=isRange?'block':'none';
   document.getElementById(`${pfx}-budget-parent`).style.display=isSub?'block':'none';
-  document.getElementById(`${pfx}-rate-wrap`).style.display=isSub?'none':'block';
+  // Rate stays visible for sub-projects (optional override); update its hint.
+  document.getElementById(`${pfx}-rate-wrap`).style.display='block';
+  const eRate=document.getElementById(`${pfx}-rate`);
+  if(eRate)eRate.placeholder=isSub?"Leave blank to inherit parent's rate":'Use default';
   document.getElementById(`${pfx}-retainer-wrap`).style.display=isSub?'none':'block';
 }
 
