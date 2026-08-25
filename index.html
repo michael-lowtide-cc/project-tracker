@@ -2095,7 +2095,7 @@ function renderDashBudgets(){
   const myId='__me__';
 
   // Sort active top-level projects by project number
-  const active=projects.filter(p=>p.status==='active'&&!p.parentProjectId);
+  const active=projects.filter(p=>p.status==='active'&&!p.parentProjectId&&!p.archived);
   active.sort((a,b)=>{
     if(!a.num&&!b.num)return 0;
     if(!a.num)return 1;if(!b.num)return -1;
@@ -2118,7 +2118,7 @@ function renderDashBudgets(){
     const timeline=renderMiniGantt(p,{compressed:_ganttCompressed[p.id]!==false});
 
     // Sub-projects for this parent
-    const subs=projects.filter(s=>s.parentProjectId===p.id&&s.status==='active');
+    const subs=projects.filter(s=>s.parentProjectId===p.id&&s.status==='active'&&!s.archived);
 
     return`<div class="card" id="dash-proj-${p.id}" style="margin-bottom:1rem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
@@ -2318,9 +2318,19 @@ function renderTimeList(){
   }).join('');
 }
 
+// Build <option> list of projects for a dropdown. Archived projects are omitted
+// UNLESS one is the currently-selected value (selId) — so existing time entries
+// that reference an archived project remain selectable/editable.
+function projectOptionsHtml(selId){
+  return projects
+    .filter(p=>!p.archived||p.id===selId)
+    .map(p=>`<option value="${p.id}"${p.id===selId?' selected':''}>${p.name}${p.archived?' (archived)':''}</option>`)
+    .join('');
+}
+
 function renderTimeEditForm(e){
   const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${clientLabel(c)}</option>`).join('');
-  const projOpts=projects.map(p=>`<option value="${p.id}"${p.id===e.projectId?' selected':''}>${p.name}</option>`).join('');
+  const projOpts=projectOptionsHtml(e.projectId);
   return`<div class="edit-form">
     <div class="grid2">
       <div><label>Date</label><input type="date" id="et-date-${e.id}" value="${e.date}"></div>
@@ -2403,7 +2413,9 @@ function refreshExpenseProjectDropdown(){
   const cid=document.getElementById('e-client').value||'';
   const prev=sel.value;
   sel.innerHTML='<option value="">-- No project --</option>';
-  (cid?projects.filter(p=>p.clientId===cid):projects).forEach(p=>{sel.appendChild(new Option(p.name,p.id));});
+  (cid?projects.filter(p=>p.clientId===cid):projects)
+    .filter(p=>!p.archived||p.id===prev)
+    .forEach(p=>{sel.appendChild(new Option(p.name+(p.archived?' (archived)':''),p.id));});
   if(prev)sel.value=prev;
 }
 
@@ -2432,7 +2444,7 @@ function renderExpenseList(){
 
 function renderExpenseEditForm(e){
   const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${(c.company&&c.contactName)?c.company+' -- '+c.contactName:c.company||c.contactName}</option>`).join('');
-  const projOpts=projects.map(p=>`<option value="${p.id}"${p.id===e.projectId?' selected':''}>${p.name}</option>`).join('');
+  const projOpts=projectOptionsHtml(e.projectId);
   const catOpts=getCategories().map(c=>`<option value="${c}"${c===e.category?' selected':''}>${c}</option>`).join('');
   const freqOpts=['weekly','monthly','quarterly','annually'].map(f=>`<option value="${f}"${f===e.recurringFrequency?' selected':''}>${f.charAt(0).toUpperCase()+f.slice(1)}</option>`).join('');
   return`<div class="edit-form">
@@ -2516,17 +2528,40 @@ function saveProject(p){
 //  PROJECTS
 // ═══════════════════════════════════════════════
 
+let _showArchived=false;
+function toggleShowArchived(){_showArchived=!_showArchived;renderProjectList();}
+
 function renderProjectList(){
   const el=document.getElementById('project-list');
   if(!projects.length){el.innerHTML='<div class="empty">No projects yet.</div>';return;}
-  // Sort alphanumerically by project number (blanks last)
-  const sorted=[...projects].sort((a,b)=>{
+  const sortFn=(a,b)=>{
     if(!a.num&&!b.num)return 0;if(!a.num)return 1;if(!b.num)return -1;
     const na=parseFloat(a.num),nb=parseFloat(b.num);
     if(!isNaN(na)&&!isNaN(nb))return na-nb;
     return a.num.localeCompare(b.num);
-  });
-  el.innerHTML=sorted.map(p=>{
+  };
+  const activeProjects=projects.filter(p=>!p.archived).sort(sortFn);
+  const archivedProjects=projects.filter(p=>p.archived).sort(sortFn);
+
+  let html=activeProjects.length
+    ? activeProjects.map(renderProjectCard).join('')
+    : '<div class="empty">No active projects. Add one, or show archived below.</div>';
+
+  // "+ Show Archived Projects" toggle + section at the bottom.
+  if(archivedProjects.length){
+    html+=`<div style="margin-top:16px;text-align:center">
+      <button onclick="toggleShowArchived()" style="background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;padding:6px 12px">
+        <i class="ti ${_showArchived?'ti-chevron-down':'ti-chevron-right'}" style="font-size:13px"></i> ${_showArchived?'Hide':'Show'} Archived Projects (${archivedProjects.length})
+      </button>
+    </div>`;
+    if(_showArchived){
+      html+=`<div style="margin-top:8px;opacity:.85">${archivedProjects.map(renderProjectCard).join('')}</div>`;
+    }
+  }
+  el.innerHTML=html;
+}
+
+function renderProjectCard(p){
     const client=p.clientId?clients.find(c=>c.id===p.clientId):null;
     const clientLabel=client?(client.company||client.contactName):'';
     const rate=getProjRate(p);
@@ -2543,7 +2578,7 @@ function renderProjectList(){
     return`<div class="project-card" id="proj-card-${p.id}">
       <div class="project-header">
         <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:500">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} -- </span>`:''}${p.name}</div>
+          <div style="font-size:15px;font-weight:500">${p.num?`<span style="font-size:12px;color:var(--text2);font-weight:400">${p.num} -- </span>`:''}${p.name}${p.archived?' <span style="font-size:10px;color:var(--text3);border:.5px solid var(--border2);border-radius:8px;padding:1px 6px;margin-left:4px">Archived</span>':''}</div>
           <div class="project-meta">
             ${clientLabel?`<span><i class="ti ti-building" style="font-size:12px"></i> ${clientLabel}</span>`:''}
             ${p.startDate?`<span><i class="ti ti-calendar" style="font-size:12px"></i> ${fmtDate(p.startDate)}</span>`:''}
@@ -2565,7 +2600,6 @@ function renderProjectList(){
       ${renderMiniGantt(p,{compressed:_ganttCompressed[p.id]!==false})}
       ${(function(){try{return renderTasksAndMilestones(p);}catch(e){console.error('renderTasksAndMilestones error:',e);return '<div style="color:var(--danger);font-size:12px;margin-top:8px">Error rendering tasks — check console. Your data is safe.</div>';}})()}`}
     </div>`;
-  }).join('');
 }
 
 function renderProjectEditForm(p){
@@ -2634,6 +2668,7 @@ function renderProjectEditForm(p){
     <div class="edit-actions"><div></div><div style="display:flex;gap:8px">
       <button class="btn danger sm" onclick="deleteProject('${p.id}')"><i class="ti ti-trash"></i> Delete</button>
       <button class="btn sm" onclick="duplicateProject('${p.id}')"><i class="ti ti-copy"></i> Duplicate</button>
+      <button class="btn sm" onclick="toggleArchiveProject('${p.id}')"><i class="ti ${p.archived?'ti-archive-off':'ti-archive'}"></i> ${p.archived?'Unarchive':'Archive'}</button>
       <button class="btn primary sm" onclick="saveProjectEdit('${p.id}')"><i class="ti ti-check"></i> Save</button>
     </div></div>
   </div>`;
@@ -2887,6 +2922,22 @@ function deleteProject(id){
   save('tracker:projects',projects);editing.projects=null;allDropdownRefresh();refreshAll();
 }
 
+// Archive (or unarchive) a project. Archiving also archives its sub-projects.
+// Archived projects are hidden from the main list, dashboard, and dropdowns,
+// but all their data is preserved and the action is fully reversible.
+function toggleArchiveProject(id){
+  const p=projects.find(x=>x.id===id);if(!p)return;
+  const nowArchived=!p.archived;
+  // Collect the project + its sub-projects so they move together.
+  const affected=[p,...projects.filter(s=>s.parentProjectId===id)];
+  affected.forEach(x=>{x.archived=nowArchived;});
+  save('tracker:projects',projects);
+  editing.projects=null;
+  // If we just archived, keep the archived section open so it doesn't vanish.
+  if(nowArchived)_showArchived=true;
+  allDropdownRefresh();refreshAll();
+}
+
 function addProject(){
   const name=document.getElementById('p-name').value.trim();if(!name)return;
   const retainerOn=document.getElementById('p-retainer-on').checked;
@@ -3027,7 +3078,7 @@ function renderClientList(){
   }).join('');
 }
 function renderInvAddFormHTML(cid,pid){
-  const projOpts=projects.filter(p=>p.clientId===cid).map(p=>`<option value="${p.id}"${p.id===pid?' selected':''}>${p.name}</option>`).join('');
+  const projOpts=projects.filter(p=>p.clientId===cid&&(!p.archived||p.id===pid)).map(p=>`<option value="${p.id}"${p.id===pid?' selected':''}>${p.name}${p.archived?' (archived)':''}</option>`).join('');
   return`<div class="grid3" style="margin-bottom:8px">
     <div><label>Invoice #</label><input type="text" id="if-num-${cid}-${pid}" placeholder="${(settings.invoicePrefix||'INV')}-001"></div>
     <div><label>Date</label><input type="date" id="if-date-${cid}-${pid}" value="${today()}"></div>
@@ -3045,7 +3096,7 @@ function renderInvAddFormHTML(cid,pid){
 }
 
 function renderInvEditForm(cid,inv){
-  const projOpts=projects.filter(p=>p.clientId===cid).map(p=>`<option value="${p.id}"${p.id===inv.projectId?' selected':''}>${p.name}</option>`).join('');
+  const projOpts=projects.filter(p=>p.clientId===cid&&(!p.archived||p.id===inv.projectId)).map(p=>`<option value="${p.id}"${p.id===inv.projectId?' selected':''}>${p.name}${p.archived?' (archived)':''}</option>`).join('');
   return`<div class="edit-form">
     <div class="grid3">
       <div><label>Invoice #</label><input type="text" id="ie-num-${cid}-${inv.id}" value="${inv.num||''}"></div>
