@@ -2416,8 +2416,8 @@ function renderTimeCalendar(){
     const h=byDay[ds]||0;
     const isToday=ds===todayStr;
     const cp=circlePct(h);
-    cells+=`<div title="${fmtDate(ds)}${h?' — '+(+h.toFixed(2))+'h':''}" style="position:relative;aspect-ratio:1;border-radius:5px;background:var(--bg2);${isToday?'outline:1.5px solid var(--accent);outline-offset:-1.5px':''}">
-      <span style="position:absolute;top:2px;left:4px;font-size:8px;line-height:1;color:var(--text3)">${d}</span>
+    cells+=`<div title="${fmtDate(ds)}${h?' — '+(+h.toFixed(2))+'h':''}" style="position:relative;aspect-ratio:1;border-radius:6px;background:var(--bg2);${isToday?'outline:1.5px solid var(--accent);outline-offset:-1.5px':''}">
+      <span style="position:absolute;top:3px;left:5px;font-size:9px;line-height:1;color:var(--text3)">${d}</span>
       ${h?`<span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:${cp.toFixed(1)}%;aspect-ratio:1;border-radius:50%;background:rgba(145,81,160,.32)${h>FULL_DAY?';box-shadow:0 0 0 1.5px rgba(145,81,160,.55)':''}"></span>`:''}
     </div>`;
   }
@@ -2431,12 +2431,10 @@ function renderTimeCalendar(){
       <span class="sec-title" style="margin:0">Daily hours — ${fmtMonth(m)}</span>
       <span style="font-size:12px;color:var(--text2)">${daysWorked} day${daysWorked===1?'':'s'} worked · avg ${(+avg.toFixed(2))}h</span>
     </div>
-    <div style="max-width:300px">
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px">
-        ${dows.map(d=>`<div style="text-align:center;font-size:9px;color:var(--text3)">${d}</div>`).join('')}
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">${cells}</div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">
+      ${dows.map(d=>`<div style="text-align:center;font-size:10px;color:var(--text3)">${d}</div>`).join('')}
     </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${cells}</div>
   </div>`;
 }
 
