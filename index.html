@@ -309,7 +309,7 @@ td{padding:8px 0;vertical-align:top}
     </div>
 
     <button class="btn" style="margin-top:1rem" onclick="toggleSettings()">Done</button>
-    <div style="margin-top:10px;font-size:10px;color:var(--text3)">Build: build-20260615-1944</div>
+    <div style="margin-top:10px;font-size:10px;color:var(--text3)">Build: 20260902-050845</div>
   </div>
 
   <!-- TABS -->
@@ -2321,6 +2321,7 @@ function refreshTimeProjectDropdown(){
   // Only ACTIVE, non-archived projects can receive new time. The currently
   // selected project is kept even if closed, so an existing entry stays editable.
   const filtered=byClient.filter(p=>p.id===prev||(!p.archived&&p.status==='active'));
+  console.log('[TIME DROPDOWN] candidates:',byClient.map(p=>({name:p.name,status:p.status,archived:p.archived})),'| shown:',filtered.map(p=>p.name));
   // Sort alphanumerically by project number, blanks last
   const sorted=[...filtered].sort((a,b)=>{
     if(!a.num&&!b.num)return 0;if(!a.num)return 1;if(!b.num)return -1;
@@ -6145,4 +6146,3 @@ setSyncUI('offline','Google Drive not connected',true,'Connect Drive');
 <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()" defer></script>
 </body>
 </html>
-
