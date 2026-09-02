@@ -1503,6 +1503,82 @@ function getProjRate(proj){
   // Fall back to profile rate, then global default.
   return parseFloat((myProfile&&myProfile.rate)?myProfile.rate:settings.hourlyRate||150);
 }
+// ── Monthly plan (estimated hours/fees per month, per contract) ─────────────
+// Stored on the project as: monthlyPlan:[{month:'YYYY-MM',hours:'20',fees:'2200'}]
+function getMonthlyPlan(proj){
+  if(!proj||!Array.isArray(proj.monthlyPlan))return[];
+  return proj.monthlyPlan.filter(r=>r&&r.month).slice().sort((a,b)=>a.month.localeCompare(b.month));
+}
+// Running cumulative planned fees at the END of each planned month.
+function monthlyPlanCumulative(proj){
+  let cum=0;
+  return getMonthlyPlan(proj).map(r=>{
+    const fees=parseFloat(r.fees||0)||0;
+    cum+=fees;
+    return{month:r.month,hours:parseFloat(r.hours||0)||0,fees,cum};
+  });
+}
+function planRowHtml(pfx,i,r){
+  r=r||{month:'',hours:'',fees:''};
+  return `<div class="plan-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+    <input type="month" class="plan-month" value="${r.month||''}" style="flex:1.2;font-size:12px;padding:3px 6px">
+    <input type="number" class="plan-hours" value="${r.hours||''}" min="0" step="0.5" placeholder="Hours" style="flex:.8;font-size:12px;padding:3px 6px">
+    <input type="number" class="plan-fees" value="${r.fees||''}" min="0" step="50" placeholder="Fees" style="flex:1;font-size:12px;padding:3px 6px">
+    <button class="icon-action danger" onclick="this.parentElement.remove();updatePlanTotal('${pfx}')" title="Remove" style="font-size:12px"><i class="ti ti-x"></i></button>
+  </div>`;
+}
+function addPlanRow(pfx){
+  const wrap=document.getElementById(pfx+'-plan-rows');if(!wrap)return;
+  const div=document.createElement('div');
+  div.innerHTML=planRowHtml(pfx,wrap.children.length,null);
+  wrap.appendChild(div.firstElementChild);
+  updatePlanTotal(pfx);
+}
+// Read the plan rows out of the DOM (used on save and for the live total).
+function readPlanRows(pfx){
+  const wrap=document.getElementById(pfx+'-plan-rows');if(!wrap)return[];
+  return [...wrap.querySelectorAll('.plan-row')].map(row=>({
+    month:row.querySelector('.plan-month')?.value||'',
+    hours:row.querySelector('.plan-hours')?.value||'',
+    fees:row.querySelector('.plan-fees')?.value||''
+  })).filter(r=>r.month);
+}
+// Live total + a warning when the plan doesn't reconcile with the project budget.
+function updatePlanTotal(pfx){
+  const el=document.getElementById(pfx+'-plan-total');if(!el)return;
+  const rows=readPlanRows(pfx);
+  if(!rows.length){el.textContent='';return;}
+  const th=rows.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
+  const tf=rows.reduce((s,r)=>s+(parseFloat(r.fees)||0),0);
+  const projId=pfx.replace(/^ep-/,'');
+  const proj=projects.find(x=>x.id===projId);
+  const bmax=proj?getProjBudget(proj).max:0;
+  let warn='';
+  if(bmax>0&&Math.abs(tf-bmax)>0.5){
+    warn=` <span style="color:var(--warning)">· plan total differs from budget (${$f0(bmax)})</span>`;
+  }
+  el.innerHTML=`Plan total: ${(+th.toFixed(2))}h · ${$f0(tf)}${warn}`;
+}
+
+function fmtMonthShort(m){if(!m)return'';const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleDateString('en-US',{month:'short'});}
+function planForMonth(proj,m){
+  return getMonthlyPlan(proj).find(r=>r.month===m)||null;
+}
+// Month-end boundaries strictly inside a date range, as % positions along it.
+function monthEndPositions(startISO,endISO){
+  if(!startISO||!endISO)return[];
+  const s=new Date(startISO+'T00:00:00'),e=new Date(endISO+'T00:00:00');
+  const span=e-s; if(span<=0)return[];
+  const out=[];let y=s.getFullYear(),mo=s.getMonth();
+  for(let guard=0;guard<120;guard++){
+    const eom=new Date(y,mo+1,0);
+    if(eom>=e)break;
+    if(eom>s)out.push({pct:(eom-s)/span*100,label:eom.toLocaleDateString('en-US',{month:'short'})});
+    mo++;if(mo>11){mo=0;y++;}
+  }
+  return out;
+}
+
 function getProjBudget(proj){
   if(!proj)return{min:0,max:0,isRange:false,display:''};
   const min=parseFloat(proj.budget||0);
@@ -2765,6 +2841,14 @@ function renderProjectEditForm(p){
       </div>
       <div></div>
     </div>
+    <div id="${pfx}-plan-wrap" style="${isSub?'display:none':''};margin-bottom:10px">
+      <label style="display:block;margin-bottom:4px">Monthly plan <span style="font-size:11px;color:var(--text3);font-weight:400">— estimated hours & fees per month (from contract)</span></label>
+      <div id="${pfx}-plan-rows">
+        ${getMonthlyPlan(p).map((r,i)=>planRowHtml(pfx,i,r)).join('')}
+      </div>
+      <button class="btn sm" onclick="addPlanRow('${pfx}')" style="font-size:11px;margin-top:4px"><i class="ti ti-plus"></i> Add month</button>
+      <div id="${pfx}-plan-total" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
+    </div>
     <div id="${pfx}-retainer-wrap" style="${isSub?'display:none':''}">
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <label class="check-label"><input type="checkbox" id="${pfx}-ret-on" ${p.retainerOn?'checked':''} onchange="document.getElementById('${pfx}-ret-amt-wrap').style.display=this.checked?'flex':'none'"> Has retainer</label>
@@ -2807,6 +2891,8 @@ function epToggleBudgetType(projId){
   const eRate=document.getElementById(`${pfx}-rate`);
   if(eRate)eRate.placeholder=isSub?"Leave blank to inherit parent's rate":'Use default';
   document.getElementById(`${pfx}-retainer-wrap`).style.display=isSub?'none':'block';
+  const planWrap=document.getElementById(`${pfx}-plan-wrap`);
+  if(planWrap)planWrap.style.display=isSub?'none':'block';
 }
 
 // Edit project team search (mirrors projTeamSearch but for the edit form)
@@ -3019,6 +3105,8 @@ function saveProjectEdit(id){
   p.budget=btype!=='sub'?document.getElementById(`${pfx}-budget`)?.value||'':'';
   p.budgetMax=btype==='range'?document.getElementById(`${pfx}-budgetmax`)?.value||'':'';
   p.parentProjectId=btype==='sub'?document.getElementById(`${pfx}-budget-parent`)?.value||'':'';
+  // Monthly plan (estimated hours/fees per month), sorted by month
+  p.monthlyPlan=readPlanRows(pfx).sort((a,b)=>a.month.localeCompare(b.month));
   p.retainerOn=document.getElementById(`${pfx}-ret-on`)?.checked||false;
   p.retainerPaid=document.getElementById(`${pfx}-ret-paid`)?.checked||false;
   p.retainerAmt=document.getElementById(`${pfx}-ret-amt`)?.value||'';
@@ -3601,8 +3689,9 @@ function renderInvoice(){
           <strong style="color:#2A2829">Project Timeline</strong>
           <span style="color:#6b686a;font-size:12px">${statusLabel}</span>
         </div>
-        <div style="height:10px;background:#e7e3ec;border-radius:6px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <div style="position:relative;height:10px;background:#e7e3ec;border-radius:6px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact">
           <div style="height:100%;width:${notStarted?0:pct}%;background:${barColor};border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+          ${monthEndPositions(cStart,cEnd).map(t=>`<span style="position:absolute;left:${t.pct.toFixed(2)}%;top:0;height:100%;width:2px;background:#f7f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span>`).join('')}
         </div>
         <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:#9a979a">
           <span>${fmtDate(cStart)}</span>
@@ -3686,23 +3775,53 @@ function renderInvoice(){
         ? `<span style="position:absolute;left:${gapPosPct}%;transform:translateX(-100%);padding-right:8px;font-size:12px;color:#6b686a;white-space:nowrap">${pctOfMin}% of ${$f0(bMin)}</span>`
         : '';
 
-      // Card structure mirrors the Project Timeline card exactly:
-      //   header (mb8) -> bar (h10) -> footer (mt6) + 12/14 padding.
-      // Both % labels live in the header row, so the card height is unchanged.
+      // ── Monthly plan markers ────────────────────────────────────────────
+      // Each planned month places a break at its CUMULATIVE planned fees, so an
+      // uneven effort distribution shows up as unevenly spaced markers. The fill
+      // reaching past a marker means you're ahead of that month's plan.
+      const planRows=monthlyPlanCumulative(bProj);
+      const planMarks=planRows
+        .map(r=>({...r,pct:bMax>0?r.cum/bMax*100:0}))
+        .filter(r=>r.pct>0.5&&r.pct<99.5);
+      // Label every marker, or every other one when they'd crowd.
+      const labelStep=planMarks.length>6?2:1;
+      const planMarkHtml=planMarks.map(r=>`<span style="position:absolute;left:${r.pct.toFixed(2)}%;top:0;height:100%;width:2px;background:#f7f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span>`).join('');
+      const planLabelHtml=planMarks.map((r,i)=>(i%labelStep!==0)?'':`<span style="position:absolute;left:${r.pct.toFixed(2)}%;transform:translateX(-50%);top:0;font-size:9px;line-height:1;color:#9a979a;white-space:nowrap">${fmtMonthShort(r.month)}</span>`).join('');
+      const planLabelRow=planMarks.length
+        ? `<div style="position:relative;height:11px;margin-bottom:3px">${planLabelHtml}</div>`
+        : '';
+
+      // Current-month hours caption: actual vs planned (prints; no hover needed).
+      const curM=thisMonth();
+      const curPlan=planForMonth(bProj,curM);
+      let hoursCaption='';
+      if(curPlan&&curPlan.hours>0){
+        const actualH=timeEntries
+          .filter(e=>e.projectId===bProj.id&&e.billable&&(e.date||'').startsWith(curM))
+          .reduce((s,e)=>s+parseFloat(e.hours||0),0);
+        const overH=actualH>curPlan.hours;
+        hoursCaption=`<div style="margin-top:6px;font-size:11px;color:${overH?'#ba7517':'#6b686a'}">
+          ${fmtMonth(curM)}: <strong style="color:${overH?'#ba7517':'#2A2829'}">${+actualH.toFixed(2)}h</strong> of ${+curPlan.hours.toFixed(2)}h planned${curPlan.fees?` · ${$f0(curPlan.fees)} planned fees`:''}
+        </div>`;
+      }
+
       budSec.innerHTML=`<div style="background:#f7f5f9;border:.5px solid #e7e3ec;border-radius:10px;padding:12px 14px;margin-bottom:1rem;-webkit-print-color-adjust:exact;print-color-adjust:exact">
         <div style="position:relative;display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:13px">
           <strong style="color:#2A2829">Project Budget</strong>
           ${minLabelInHeader}
           <span style="color:#6b686a;font-size:12px">${pctOfMax}% of ${$f0(bMax)}</span>
         </div>
+        ${planLabelRow}
         <div style="position:relative;height:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
           ${trackHtml}
           ${fillHtml}
+          ${planMarkHtml}
         </div>
         <div style="position:relative;height:14px;margin-top:6px;font-size:11px;color:#9a979a">
           <span style="position:absolute;left:0;top:0">${$f0(0)}</span>
           <span style="position:absolute;left:${billedLabelPos}%;transform:translateX(-50%);top:0;color:#9a979a;white-space:nowrap">${$f0(billedToDate)} Billed</span>
         </div>
+        ${hoursCaption}
       </div>`;
       budSec.style.display='block';
     } else {
