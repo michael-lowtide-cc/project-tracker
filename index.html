@@ -309,7 +309,7 @@ td{padding:8px 0;vertical-align:top}
     </div>
 
     <button class="btn" style="margin-top:1rem" onclick="toggleSettings()">Done</button>
-    <div style="margin-top:10px;font-size:10px;color:var(--text3)">Build: 20260902-052028</div>
+    <div style="margin-top:10px;font-size:10px;color:var(--text3)">Build: 20260902-052938</div>
   </div>
 
   <!-- TABS -->
@@ -1563,7 +1563,11 @@ function updatePlanTotal(pfx){
 
 function fmtMonthShort(m){if(!m)return'';const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleDateString('en-US',{month:'short'});}
 function planForMonth(proj,m){
-  return getMonthlyPlan(proj).find(r=>r.month===m)||null;
+  const r=getMonthlyPlan(proj).find(x=>x.month===m);
+  if(!r)return null;
+  // Rows are stored as strings from the form inputs — normalise to numbers so
+  // callers can safely do arithmetic / toFixed on them.
+  return{month:r.month,hours:parseFloat(r.hours||0)||0,fees:parseFloat(r.fees||0)||0};
 }
 // Month-end boundaries strictly inside a date range, as % positions along it.
 function monthEndPositions(startISO,endISO){
@@ -2035,7 +2039,11 @@ function getExtraContacts(containerId){
 // ═══════════════════════════════════════════════
 function renderCategoryList(){
   const cats=getCategories();
-  document.getElementById('cat-list').innerHTML=cats.map((c,i)=>
+  // The old Settings-panel category list was removed (categories now live in
+  // the Expenses tab), so this element may not exist. Guard instead of throwing.
+  const el=document.getElementById('cat-list');
+  if(!el)return;
+  el.innerHTML=cats.map((c,i)=>
     `<span class="cat-tag">${c}<button onclick="removeCategory(${i})" title="Remove">×</button></span>`
   ).join('');
   refreshExpenseCategoryDropdown();
@@ -2322,7 +2330,6 @@ function refreshTimeProjectDropdown(){
   // Only ACTIVE, non-archived projects can receive new time. The currently
   // selected project is kept even if closed, so an existing entry stays editable.
   const filtered=byClient.filter(p=>p.id===prev||(!p.archived&&p.status==='active'));
-  console.log('[TIME DROPDOWN] candidates:',byClient.map(p=>({name:p.name,status:p.status,archived:p.archived})),'| shown:',filtered.map(p=>p.name));
   // Sort alphanumerically by project number, blanks last
   const sorted=[...filtered].sort((a,b)=>{
     if(!a.num&&!b.num)return 0;if(!a.num)return 1;if(!b.num)return -1;
@@ -3752,7 +3759,6 @@ function renderInvoice(){
       ...clientProjects.filter(p=>!p.archived&&p.status!=='completed')
     ];
     const bProj=budgetCandidates.find(p=>p&&p.budgetType!=='sub'&&hasBudget(p));
-    if(!bProj)console.log('[BUDGET BAR] no project with a budget. relevant:',relevantProjects.map(p=>p.name+'/'+p.budgetType+'/'+(p.budget||'-')),'| candidates:',budgetCandidates.map(p=>p&&p.name));
     const bBudget=bProj?getProjBudget(bProj):null;
     const bMax=bBudget?bBudget.max:0;
     if(bProj&&bMax>0){
