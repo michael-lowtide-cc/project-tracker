@@ -2317,7 +2317,10 @@ function refreshTimeProjectDropdown(){
   const cid=document.getElementById('t-client').value||'';
   const prev=sel.value;
   sel.innerHTML='<option value="">-- No project --</option>';
-  const filtered=cid?projects.filter(p=>p.clientId===cid):projects;
+  const byClient=cid?projects.filter(p=>p.clientId===cid):projects;
+  // Only ACTIVE, non-archived projects can receive new time. The currently
+  // selected project is kept even if closed, so an existing entry stays editable.
+  const filtered=byClient.filter(p=>p.id===prev||(!p.archived&&p.status==='active'));
   // Sort alphanumerically by project number, blanks last
   const sorted=[...filtered].sort((a,b)=>{
     if(!a.num&&!b.num)return 0;if(!a.num)return 1;if(!b.num)return -1;
@@ -2326,7 +2329,8 @@ function refreshTimeProjectDropdown(){
     return a.num.localeCompare(b.num);
   });
   sorted.forEach(p=>{
-    const label=p.num?`${p.num} — ${p.name}`:p.name;
+    const closed=p.archived?' (archived)':(p.status&&p.status!=='active'?` (${p.status==='on_hold'?'on hold':'completed'})`:'');
+    const label=(p.num?`${p.num} — ${p.name}`:p.name)+closed;
     sel.appendChild(new Option(label,p.id));
   });
   if(prev&&filtered.find(p=>p.id===prev))sel.value=prev;
@@ -2616,8 +2620,8 @@ function refreshExpenseProjectDropdown(){
   const prev=sel.value;
   sel.innerHTML='<option value="">-- No project --</option>';
   (cid?projects.filter(p=>p.clientId===cid):projects)
-    .filter(p=>p.id===prev||(!p.archived&&p.status==='active'))
-    .forEach(p=>{sel.appendChild(new Option(p.name+(p.archived?' (archived)':(p.status&&p.status!=='active'?' ('+(p.status==='on_hold'?'on hold':'completed')+')':'')),p.id));});
+    .filter(p=>!p.archived||p.id===prev)
+    .forEach(p=>{sel.appendChild(new Option(p.name+(p.archived?' (archived)':''),p.id));});
   if(prev)sel.value=prev;
 }
 
@@ -6141,3 +6145,4 @@ setSyncUI('offline','Google Drive not connected',true,'Connect Drive');
 <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()" defer></script>
 </body>
 </html>
+
