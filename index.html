@@ -3729,7 +3729,18 @@ function renderInvoice(){
     // Pick the contract-level project (NOT a sub-project). Sub-projects have
     // budgetType 'sub' and no budget value, so they must be excluded here.
     const hasBudget=p=>{const b=getProjBudget(p);return b.max>0;};
-    const bProj=relevantProjects.find(p=>p.budgetType!=='sub'&&hasBudget(p));
+    // Candidate order: (1) projects billed this period, (2) the PARENT of any
+    // billed sub-project (sub-projects carry no budget of their own), then
+    // (3) the client's active projects as a fallback. Prevents the bar from
+    // vanishing when the period's entries sit on a sub-project or a project
+    // that has no budget entered.
+    const budgetCandidates=[
+      ...relevantProjects,
+      ...relevantProjects.map(p=>p.parentProjectId?projects.find(x=>x.id===p.parentProjectId):null).filter(Boolean),
+      ...clientProjects.filter(p=>!p.archived&&p.status!=='completed')
+    ];
+    const bProj=budgetCandidates.find(p=>p&&p.budgetType!=='sub'&&hasBudget(p));
+    if(!bProj)console.log('[BUDGET BAR] no project with a budget. relevant:',relevantProjects.map(p=>p.name+'/'+p.budgetType+'/'+(p.budget||'-')),'| candidates:',budgetCandidates.map(p=>p&&p.name));
     const bBudget=bProj?getProjBudget(bProj):null;
     const bMax=bBudget?bBudget.max:0;
     if(bProj&&bMax>0){
