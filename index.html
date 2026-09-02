@@ -309,7 +309,7 @@ td{padding:8px 0;vertical-align:top}
     </div>
 
     <button class="btn" style="margin-top:1rem" onclick="toggleSettings()">Done</button>
-    <div style="margin-top:10px;font-size:10px;color:var(--text3)">Build: 20260902-050845</div>
+    <div style="margin-top:10px;font-size:10px;color:var(--text3)">Build: 20260902-052028</div>
   </div>
 
   <!-- TABS -->
@@ -1488,6 +1488,7 @@ function invNumStem(period){
   const[y,mo,da]=d.split('-');
   return y.slice(2)+mo+da; // YYMMDD
 }
+function $f0(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:settings.currency||'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0)}
 function $f(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:settings.currency||'USD',minimumFractionDigits:2}).format(n||0)}
 function saveSetting(k,v){settings[k]=v;save('tracker:settings',settings)}
 function getProjRate(proj){
@@ -3797,8 +3798,6 @@ function renderInvoice(){
         fillHtml=`<div style="position:absolute;left:0;top:0;height:100%;width:${fillPct.toFixed(2)}%;background:${barColor};border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>`;
       }
 
-      // No-cents currency for the bar labels (cents take up too much space).
-      const $f0=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:settings.currency||'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0);
 
       // Billed-amount label floats under the right edge of the green fill,
       // clamped to 4%-92% so it never collides with $0 or runs off the edge.
