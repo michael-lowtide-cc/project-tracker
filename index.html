@@ -2517,16 +2517,22 @@ function renderTimeCalendar(){
 // Build <option> list of projects for a dropdown. Archived projects are omitted
 // UNLESS one is the currently-selected value (selId) — so existing time entries
 // that reference an archived project remain selectable/editable.
-function projectOptionsHtml(selId){
+function projectOptionsHtml(selId,activeOnly){
   return projects
-    .filter(p=>!p.archived||p.id===selId)
-    .map(p=>`<option value="${p.id}"${p.id===selId?' selected':''}>${p.name}${p.archived?' (archived)':''}</option>`)
+    // Always hide archived. When activeOnly, also hide completed/on-hold.
+    // The currently-selected project is ALWAYS kept so existing entries stay
+    // editable even if their project has since been closed or archived.
+    .filter(p=>p.id===selId||(!p.archived&&(!activeOnly||p.status==='active')))
+    .map(p=>{
+      const tag=p.archived?' (archived)':(p.status&&p.status!=='active'?` (${p.status==='on_hold'?'on hold':'completed'})`:'');
+      return `<option value="${p.id}"${p.id===selId?' selected':''}>${p.name}${tag}</option>`;
+    })
     .join('');
 }
 
 function renderTimeEditForm(e){
   const clientOpts=clients.map(c=>`<option value="${c.id}"${c.id===e.clientId?' selected':''}>${clientLabel(c)}</option>`).join('');
-  const projOpts=projectOptionsHtml(e.projectId);
+  const projOpts=projectOptionsHtml(e.projectId,true);
   return`<div class="edit-form">
     <div class="grid2">
       <div><label>Date</label><input type="date" id="et-date-${e.id}" value="${e.date}"></div>
@@ -2610,8 +2616,8 @@ function refreshExpenseProjectDropdown(){
   const prev=sel.value;
   sel.innerHTML='<option value="">-- No project --</option>';
   (cid?projects.filter(p=>p.clientId===cid):projects)
-    .filter(p=>!p.archived||p.id===prev)
-    .forEach(p=>{sel.appendChild(new Option(p.name+(p.archived?' (archived)':''),p.id));});
+    .filter(p=>p.id===prev||(!p.archived&&p.status==='active'))
+    .forEach(p=>{sel.appendChild(new Option(p.name+(p.archived?' (archived)':(p.status&&p.status!=='active'?' ('+(p.status==='on_hold'?'on hold':'completed')+')':'')),p.id));});
   if(prev)sel.value=prev;
 }
 
