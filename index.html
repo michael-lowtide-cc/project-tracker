@@ -3645,6 +3645,21 @@ function renderInvoice(){
   // Get projects for this client
   const clientProjects=cid?projects.filter(p=>p.clientId===cid):projects;
   const clientProjIds=new Set(clientProjects.map(p=>p.id));
+
+  // ── Which projects this invoice is actually about ──────────────────────────
+  // Timeline, budget and retainer context must come from the projects being
+  // BILLED in this period — not from every project the client has ever had.
+  // Otherwise a finished/archived project's retainer or dates leak onto a new
+  // project's invoice. Falls back to active projects when the period is empty.
+  const periodProjIds=new Set([
+    ...timeEntries.filter(e=>e.billable&&period.inPeriod(e.date)).map(e=>e.projectId),
+    ...expenses.filter(e=>e.billable&&period.inPeriod(e.date)).map(e=>e.projectId)
+  ].filter(Boolean));
+  const relevantProjects=(()=>{
+    const billed=clientProjects.filter(p=>!p.archived&&periodProjIds.has(p.id));
+    if(billed.length)return billed;
+    return clientProjects.filter(p=>!p.archived&&p.status!=='completed');
+  })();
   // ── Project Duration / Progress bar ──────────────────────────────────────
   // Shows contract start -> contract end with the % of the project timeline
   // elapsed as of today. Gives the client a quick sense of where the project
@@ -3655,9 +3670,9 @@ function renderInvoice(){
     // Exclude sub-projects (budgetType 'sub') — they carry their own dates but
     // are not the contract-level project the client should see on the invoice.
     const isMainProj=p=>p.budgetType!=='sub'&&!p.parentId;
-    const dProj=clientProjects.find(p=>isMainProj(p)&&p.startDate&&(p.endDate||p.endDateMonth))
-      || clientProjects.find(p=>isMainProj(p)&&p.startDate)
-      || clientProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth)&&p.budgetType!=='sub');
+    const dProj=relevantProjects.find(p=>isMainProj(p)&&p.startDate&&(p.endDate||p.endDateMonth))
+      || relevantProjects.find(p=>isMainProj(p)&&p.startDate)
+      || relevantProjects.find(p=>p.startDate&&(p.endDate||p.endDateMonth)&&p.budgetType!=='sub');
     // Resolve the contract end date (supports specific date or month/year type)
     function resolveEnd(p){
       if(!p)return'';
@@ -3714,8 +3729,7 @@ function renderInvoice(){
     // Pick the contract-level project (NOT a sub-project). Sub-projects have
     // budgetType 'sub' and no budget value, so they must be excluded here.
     const hasBudget=p=>{const b=getProjBudget(p);return b.max>0;};
-    const bProj=clientProjects.find(p=>p.budgetType!=='sub'&&!p.parentId&&hasBudget(p))
-      || clientProjects.find(p=>p.budgetType!=='sub'&&hasBudget(p));
+    const bProj=relevantProjects.find(p=>p.budgetType!=='sub'&&hasBudget(p));
     const bBudget=bProj?getProjBudget(bProj):null;
     const bMax=bBudget?bBudget.max:0;
     if(bProj&&bMax>0){
@@ -3842,7 +3856,7 @@ function renderInvoice(){
   // A retainer is a prepaid credit that gets drawn down chronologically as
   // billable work is performed. For the month being invoiced, we only apply
   // whatever balance remains AFTER every prior month consumed its share.
-  const retainerProj=clientProjects.find(p=>p.retainerOn&&p.retainerPaid&&p.retainerInBudget);
+  const retainerProj=relevantProjects.find(p=>p.retainerOn&&p.retainerPaid&&p.retainerInBudget);
   const retainerAmt=retainerProj?parseFloat(retainerProj.retainerAmt||0):0;
 
   // Sum all billable charges (time + expenses) for this client in every month
